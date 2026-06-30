@@ -1,0 +1,115 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+develop-eggs/
+downloads/
+parts/
+sdist/
+wheels/
+share/python-wheels/
+pip-wheel-metadata/
+.installed.cfg
+MANIFEST
+
+# ===== Virtual envs =====
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# ===== Editors / OS =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== Testing / coverage / type-check =====
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+.dmypy.json
+dmypy.json
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+*.ipynb
+
+# ===== Env / secrets =====
+.env
+.env.*
+!.env.example
+*.local
+secrets/
+
+# ===== Project: data & model artifacts =====
+# 下载的原始数据集(ViDoRe / RealKIE / CHIC / Siemens 等)
+data/raw/
+data/external/
+# 处理后的中间产物
+data/processed/
+data/interim/
+# MinIO 本地卷、对象存储挂载
+storage/
+minio_data/
+# FAISS 索引、ColPali 多向量缓存
+*.faiss
+*.index
+indexes/
+faiss_index/
+colpali_cache/
+# 模型权重 / HuggingFace 缓存
+models/
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.gguf
+.huggingface/
+hf_cache/
+# 评测产物(大文件,选择性提交小报告)
+results/*.json
+results/*.parquet
+results/embeddings/
+!results/**/.gitkeep
+
+# ===== Logs =====
+logs/
+*.log
+*.out
+*.pid
+
+# ===== Node / 前端 =====
+node_modules/
+.next/
+dist/
+.cache/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
+
+# ===== Docker 卷 =====
+*.db
+*.sqlite
+*.sqlite3
+pgdata/
+neo4j_data/

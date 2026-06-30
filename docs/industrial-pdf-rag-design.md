@@ -1,10 +1,13 @@
-# 工业 PDF 多模态 RAG 系统 — 设计文档
+# PrismRAG — 工业 PDF 多模态 RAG 系统 设计文档
 
+> **PrismRAG**（仓库 `prism-rag`）:棱镜将白光分成三道光再合一,隐喻 BM25 + Dense + Visual 三路检索 → RRF 融合 → cross-encoder 重排的核心架构。
 > 独立项目，参考 WeKnora 架构思想 + ViDoRe 评测验证，面向 AI Agent 开发工程师面试。
 
 ---
 
 ## 1. 项目定位
+
+**项目名**：PrismRAG —— A multimodal RAG that prisms PDF pages into lexical, semantic, and visual retrieval channels and fuses them back.
 
 **一句话**：借鉴腾讯 WeKnora 的多模态 RAG 架构，自研工业 PDF 智能检索问答系统，用 ViDoRe 国际基准量化验证，两阶段交付。
 
@@ -352,7 +355,7 @@ services:
 
 ### 对外一句话
 
-> 借鉴腾讯 WeKnora 的多模态混合检索架构，在 ViDoRe 国际基准上验证效果，多模态解析管道全自研，分层评测驱动迭代。
+> **PrismRAG** —— 棱镜分光、再合光。借鉴腾讯 WeKnora 的多模态混合检索架构，把工业 PDF 检索拆成 lexical / semantic / visual 三路，融合重排后在 ViDoRe 国际基准上验证效果，多模态解析管道全自研，分层评测驱动迭代。
 
 ### 面试话术
 
