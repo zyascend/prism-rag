@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--dataset", default="vidore/vidore_v3_industrial", help="HF dataset path")
     parser.add_argument("--max-pages", type=int, default=None, help="Limit pages (for testing)")
     parser.add_argument("--skip-faiss", action="store_true", help="Skip ColPali + FAISS (BGE only)")
+    parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint")
     args = parser.parse_args()
 
     # 初始化
@@ -37,6 +38,7 @@ def main():
         dataset_path=args.dataset,
         max_pages=args.max_pages,
         skip_faiss=args.skip_faiss,
+        resume=args.resume,
     )
 
 
