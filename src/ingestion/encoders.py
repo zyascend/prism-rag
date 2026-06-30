@@ -17,7 +17,7 @@ class BGEEmbedder:
     """BGE-large-en-v1.5 文本编码器"""
 
     def __init__(self, device: str | None = None):
-        self.device = device or cfg.get("embedding.bge_device", "cpu")
+        self.device = device if device is not None else cfg.get("embedding.bge_device", "cpu")
         # 使用 sentence-transformers 加载 BGE
         self.model = SentenceTransformer(
             cfg.bge_model_id,
@@ -44,13 +44,14 @@ class ColPaliEmbedder:
     """ColPali 整页多向量编码器"""
 
     def __init__(self, device: str | None = None):
-        self.device = device or cfg.get("embedding.colpali_device", "cpu")
+        self.device = device if device is not None else cfg.get("embedding.colpali_device", "cpu")
         self.model = ColPali.from_pretrained(
             cfg.colpali_model_id,
             torch_dtype=torch.bfloat16,
             device_map=self.device,
         ).eval()
         self.processor = ColPaliProcessor.from_pretrained(cfg.colpali_model_id)
+        self._warmed_up = False
 
     @torch.no_grad()
     def encode_pages(
@@ -58,7 +59,7 @@ class ColPaliEmbedder:
     ) -> List[torch.Tensor]:
         """编码页面列表，每页返回 [n_patches, 128] 多向量"""
         # 预热：首次 query 有 torch.compile 开销
-        if not hasattr(self, "_warmed_up"):
+        if not self._warmed_up:
             dummy = Image.new("RGB", (1000, 1600), color=255)
             self._warmup(dummy)
             self._warmed_up = True
