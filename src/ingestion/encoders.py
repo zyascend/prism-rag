@@ -69,6 +69,7 @@ class ColPaliEmbedder:
             batch_imgs = images[i : i + batch_size]
             batch_inputs = self.processor(
                 images=batch_imgs,
+                text=[""] * len(batch_imgs),
                 return_tensors="pt",
                 padding=True,
             ).to(self.device)
@@ -80,7 +81,7 @@ class ColPaliEmbedder:
 
     def _warmup(self, dummy_image: Image.Image):
         """MPS 首次查询预热"""
-        inputs = self.processor(images=[dummy_image], return_tensors="pt", padding=True).to(self.device)
+        inputs = self.processor(images=[dummy_image], text=[""], return_tensors="pt", padding=True).to(self.device)
         _ = self.model(**inputs)
 
     @torch.no_grad()
