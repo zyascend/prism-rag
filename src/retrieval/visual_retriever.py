@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import List
 
-import torch
-
 from src.ingestion.encoders import ColPaliEmbedder
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore

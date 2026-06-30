@@ -60,20 +60,23 @@ def generate_answer(retriever: PrismRAGRetriever, query: str) -> Dict:
         model="qwen2:7b",
     )
 
-    rejected = any(phrase in answer.lower() for phrase in [
-        "cannot answer", "not enough information",
-        "based on the available", "cannot provide",
-        "i don't have", "i do not have",
-        "no information", "not covered",
-        "out of scope", "beyond the scope",
-    ])
+    if not answer:
+        is_rejected = True  # Ollama failure → safer to count as rejected
+    else:
+        is_rejected = any(phrase in answer.lower() for phrase in [
+            "cannot answer", "not enough information",
+            "based on the available", "cannot provide",
+            "i don't have", "i do not have",
+            "no information", "not covered",
+            "out of scope", "beyond the scope",
+        ])
 
     return {
         "query": query,
         "retrieved": len(retrieved),
         "context_length": len(context),
         "answer": answer,
-        "is_rejected": rejected,
+        "is_rejected": is_rejected,
     }
 
 

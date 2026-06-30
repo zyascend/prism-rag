@@ -17,8 +17,8 @@ ingest-vidore: .env ## 导入 ViDoRe Industrial 子集（构建索引）
 eval-vidore: .env ## 运行 ViDoRe 消融评测（全量）
 	python scripts/run_eval.py --dataset vidore/vidore_v3_industrial
 
-eval-vidore-quick: .env ## 运行 ViDoRe 快速消融（10 条查询）
-	python scripts/run_eval.py --dataset vidore/vidore_v3_industrial --max-queries 10
+eval-vidore-quick: .env ## 运行 ViDoRe 快速消融（10 条查询，跳过索引构建）
+	python scripts/run_eval.py --dataset vidore/vidore_v3_industrial --max-queries 10 --skip-index
 
 eval-vidore-skip-index: .env ## 跳过索引构建，直接评测
 	python scripts/run_eval.py --dataset vidore/vidore_v3_industrial --skip-index

@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock
 
-import numpy as np
 import torch
 
 from src.retrieval.dense_retriever import DenseRetriever

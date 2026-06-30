@@ -55,6 +55,8 @@ def main():
         from src.ingestion.vidore_ingestor import ViDoReIngestor
         ingestor = ViDoReIngestor(pg_store, faiss_store, bge, colpali, chunker)
         ingestor.ingest(dataset_path=args.dataset)
+        bm25.fit_from_pgvector(pg_store)
+        logging.info("BM25 索引构建完成")
     else:
         faiss_loaded = faiss_store.load()
         if faiss_loaded:
@@ -65,6 +67,8 @@ def main():
             from src.ingestion.vidore_ingestor import ViDoReIngestor
             ingestor = ViDoReIngestor(pg_store, faiss_store, bge, colpali, chunker)
             ingestor.ingest(dataset_path=args.dataset)
+            bm25.fit_from_pgvector(pg_store)
+            logging.info("BM25 索引构建完成")
 
     run_ablation(retriever, dataset_path=args.dataset, max_queries=args.max_queries, output_dir=args.output_dir)
 

@@ -5,7 +5,7 @@ models:
   llm: "qwen2:7b"
 
 embedding:
-  bge_dim: 768
+  bge_dim: 1024
   bge_device: "auto"
   colpali_device: "auto"
 

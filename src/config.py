@@ -47,6 +47,12 @@ class Config:
     def __getattr__(self, key: str) -> Any:
         if not self._loaded:
             self.load()
+            # After loading, properties (bge_model_id, colpali_model_id, etc.)
+            # may now succeed because _data is available.
+            try:
+                return object.__getattribute__(self, key)
+            except AttributeError:
+                pass
         raise AttributeError(
             f"Config key '{key}' not found. "
             "Use typed properties like cfg.colpali_model_id or "
