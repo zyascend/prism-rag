@@ -68,8 +68,8 @@ def run_ablation(
 ) -> List[dict]:
     """运行全量消融实验"""
     logger.info("加载查询和 qrels...")
-    queries_ds = load_dataset(dataset_path, split="queries", trust_remote_code=True)
-    qrels_ds = load_dataset(dataset_path, split="qrels", trust_remote_code=True)
+    queries_ds = load_dataset(dataset_path, "queries", split="test")
+    qrels_ds = load_dataset(dataset_path, "qrels", split="test")
 
     if max_queries:
         queries_ds = queries_ds.select(range(min(max_queries, len(queries_ds))))

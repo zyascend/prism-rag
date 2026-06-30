@@ -29,7 +29,7 @@ storage:
 
 vidore:
   dataset_name: "vidore/vidore_v3_industrial"
-  split_corpus: "corpus"
-  split_queries: "queries"
-  split_qrels: "qrels"
+  split_corpus: "test"
+  split_queries: "test"
+  split_qrels: "test"
   num_pages: 5244

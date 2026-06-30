@@ -49,7 +49,7 @@ class ViDoReIngestor:
     ):
         """执行导入流程"""
         logger.info(f"加载数据集: {dataset_path}")
-        ds = load_dataset(dataset_path, split="corpus", trust_remote_code=True)
+        ds = load_dataset(dataset_path, "corpus", split="test")
 
         if max_pages:
             ds = ds.select(range(min(max_pages, len(ds))))
