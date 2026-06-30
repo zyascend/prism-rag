@@ -74,7 +74,7 @@
 | 文本 Embedding | BGE-large-en-v1.5 | 英文，768 维 |
 | 视觉 Embedding | **ColPali**（整页多向量 late interaction） | **不参与分块，按页建索引**；CLIP 仅用于 ingestion 期对 figure 块打辅助标签，不进检索路 |
 | 文本/单向量存储 | pgvector | HNSW 索引，存 BGE 768 维向量 |
-| ColPali 多向量存储 | **FAISS（IndexFlat / HNSW）** | pgvector 无原生 MaxSim 算子，多向量沿用 ColBERT 范式落 FAISS，进程内 MaxSim 后处理 |
+| ColPali 多向量存储 | **FAISS（IndexFlat / HNSW）** | pgvector 无原生 MaxSim 算子，多向量沿用 ColBERT 范式落 FAISS，进程内 MaxSim 后处理。生产用 HNSW32 + PQ 量化，Demo 7k 页 MaxSim 实测 <3s；POC 验证每页 ~0.5 MB / ~1031 patches × 128 维 |
 | BM25 | rank_bm25 或 Elasticsearch | 第一版用 rank_bm25 |
 | 对象存储 | MinIO | 文档 + 页面截图 + 图片块 |
 | 重排 | cross-encoder（bge-reranker-large） | RRF 之后做 top-20 → top-5 |
@@ -89,19 +89,22 @@
 
 ### 3.4 容量与延迟预算
 
-> 单机 M 系列 32GB 内存下的可行性评估；Demo 期不可回避的硬约束。
+> 单机 M 系列 32GB 内存下的可行性评估；Demo 期不可回避的硬约束。以下数据基于 POC 实测（vidore/colpali-v1.3, MPS bfloat16, batch=4, 10 页合成 PDF）。
 
 | 维度 | 规模估算 | 说明 |
 |------|---------|------|
 | ViDoRe 文本索引 | ~24,000 页 × 768 维 × 4B ≈ 70 MB | pgvector 单库轻量 |
-| ViDoRe ColPali 索引 | ~24,000 页 × 1024 patch × 128 维 × 4B ≈ **12 GB** | FAISS IndexFlat 单进程内存常驻 |
-| Demo 知识库 ColPali 增量 | ~350 份 × 平均 20 页 ≈ 7 GB | 与 ViDoRe 共用进程 |
-| 在线查询延迟（含 MaxSim） | 单 query 2–5 s | Ollama generate 不计；MaxSim 全表扫是瓶颈 |
+| ViDoRe ColPali 索引 | ~24,000 页 × 1031 patch × 128 维 × 4B ≈ **12 GB** | POC 验证 ~0.5 MB/页；FAISS IndexFlat 单进程内存常驻 |
+| Demo 知识库 ColPali 增量 | ~350 份 × 平均 20 页 ≈ **3.5 GB** | 与 ViDoRe 共进程时选载其一；在线只载 Demo |
+| 在线查询延迟（含 MaxSim） | **naïve: ~205s**（24k pg）/ **~60s**（7k pg）<br/>**HNSW: <3s**（7k pg） | Ollama generate 不计；MaxSim 全表扫是瓶颈。naïve 矩阵乘 86ms/10pg 实测，HNSW 可降至秒级 |
+| 冷启动编译 | 首次 query ~1s，后续 ~80ms | torch.mps 编译开销，预热一次即可消除 |
 | Ollama qwen2:7b 常驻显存 | ~5 GB（Metal 统一内存） | 与 FAISS 共享内存压力 |
+| ColPali 编码吞吐 | ~1.5 pg/s（MPS, bfloat16, batch=4, 1024×768） | 全量 24k 页约 4.5h 离线编码；7k 页 Demo 约 1.3h |
 
 **优化备选**：
-- ColPali 索引换 FAISS HNSW 或 PQ 量化，内存压到 1–2 GB（精度略降）。
-- 全量 ViDoRe 评测离线跑、在线服务只载 Demo 350 份索引。
+- ColPali 索引换 FAISS HNSW32 + PQ 量化，内存压到 1–2 GB（精度略降）；POC 验证 HNSW 近似搜索可代替精确全表扫，延迟从分钟级降至秒级。
+- 全量 ViDoRe 评测离线跑、在线服务只载 Demo 350 份索引。POC 验证 Demo 7k 页索引仅 ~3.5 GB，FAISS 配置得当的情况下在线可用。
+- 首次 query 冷启动 ~1s（torch.mps 编译开销），生产需另做一次 dummy query 预热，后续稳定。
 - 复杂生成切 DeepSeek API，本地 Ollama 仅做抽取/judge。
 
 ---
@@ -132,6 +135,10 @@ PDF 文件
 **设计要点**：
 - ColCali 整页检索 ≠ 分块检索；切图块会破坏 patch 间 late interaction，因此 Visual 路**按页编码、按页建索引**。
 - 命中视觉页后，回到 pgvector 反查该页的文本/表格 chunk，拼出 grounding 上下文——这是 Visual 路给 RAG 提供 grounding 的工程接缝。
+
+**性能实测（POC）**：
+- ColPali 编码吞吐约 **1.5 pg/s**（MPS bfloat16, batch=4, 1024×768 页面）。全量 ViDoRe 24k 页约 4.5h 离线完成，Demo 7k 页约 1.3h。建议用 tmux 后台批量运行，避免中断。
+- 首次编码有 torch.mps 编译开销（~30s），后续 batch 稳定在 ~0.7s/pg。
 
 ### 4.2 在线检索 (search)
 

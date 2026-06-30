@@ -257,12 +257,14 @@ flowchart TB
 | 维度 | 规模 | 单机 32GB 可行性 |
 |------|------|----------------|
 | ViDoRe 文本索引 | ~70 MB | ✅ 轻量 |
-| ViDoRe ColPali 索引 | ~12 GB | ⚠️ 主要内存压力源 |
-| Demo 知识库 ColPali 增量 | ~7 GB | 与 ViDoRe 共进程 |
-| 单 query 延迟 | 2–5 s | ⚠️ MaxSim 全表扫是瓶颈 |
+| ViDoRe ColPali 索引 | ~12 GB | ⚠️ 主要内存压力源（POC 验证 ~0.5 MB/页） |
+| Demo 知识库 ColPali 增量 | ~**3.5 GB** | ⚠️ 在线只载 Demo，ViDoRe 离线跑 |
+| 单 query 延迟 | **naïve ~60s / HNSW <3s**（7k Demo） | ⚠️ naïve 矩阵乘 86ms/10pg。HNSW32+PQ 可降至秒级 |
+| 冷启动编译 | 首次 ~1s，后续 ~80ms | torch.mps 编译开销，预热一次可消除 |
+| ColPali 编码吞吐 | **1.5 pg/s** | 全量 24k 页 ~4.5h 离线编码 |
 | Ollama qwen2:7b 常驻 | ~5 GB | 与 FAISS 共享内存 |
 
-**降内存备选**：FAISS HNSW / PQ 量化 → 1–2 GB（精度略降）；在线服务只载 Demo 350 份索引，ViDoRe 离线跑。
+**降内存备选**：FAISS HNSW / PQ 量化 → 1–2 GB（精度略降）；在线服务只载 Demo 350 份索引，ViDoRe 离线跑。**POC 已验证**：以上推算基于 vidore/colpali-v1.3 在 MPS bfloat16 下的实测数据。
 
 ---
 
