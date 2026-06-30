@@ -87,5 +87,12 @@ class ColPaliEmbedder:
     @torch.no_grad()
     def encode_query(self, text: str) -> torch.Tensor:
         """编码单条文本查询为 [1, n_patches, 128]（ColPali 查询编码）"""
-        inputs = self.processor(text=[text], return_tensors="pt", padding=True).to(self.device)
+        # PaliGemmaProcessor 需要 images 参数，即使是查询也要传一个 dummy image
+        dummy = Image.new("RGB", (448, 448), color=255)
+        inputs = self.processor(
+            images=[dummy],
+            text=[text],
+            return_tensors="pt",
+            padding=True,
+        ).to(self.device)
         return self.model(**inputs).cpu()
