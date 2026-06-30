@@ -111,7 +111,7 @@ class ViDoReIngestor:
             batch = []
             for j in range(i, min(i + batch_size, len(all_chunk_rows))):
                 chunk_id, page_id, doc_id, pn, ctype, text, _ = all_chunk_rows[j]
-                vec = bge_embs[j].numpy().tolist()
+                vec = bge_embs[j].cpu().numpy().tolist()
                 batch.append((chunk_id, page_id, doc_id, pn, ctype, text, vec))
             self.pg.insert_chunks(batch)
 
