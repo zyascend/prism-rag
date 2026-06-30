@@ -1,0 +1,22 @@
+[
+  {"question": "What is the meaning of life according to philosophy?", "expected_rejection": true, "reason": "非工业 PDF 知识域"},
+  {"question": "Who won the 2022 FIFA World Cup?", "expected_rejection": true, "reason": "非知识库内容"},
+  {"question": "How do I install Python on Windows?", "expected_rejection": true, "reason": "非工业文档内容"},
+  {"question": "What is the capital of France?", "expected_rejection": true, "reason": "常识问题，不在知识库中"},
+  {"question": "Can you write a poem about conveyor belts?", "expected_rejection": true, "reason": "创造性内容，非文档事实"},
+  {"question": "What is the stock price of Siemens today?", "expected_rejection": true, "reason": "实时数据，不在知识库中"},
+  {"question": "How to cook pasta?", "expected_rejection": true, "reason": "非工业领域"},
+  {"question": "Who is the current president of the United States?", "expected_rejection": true, "reason": "常识问题，不在知识库中"},
+  {"question": "What are the health benefits of coffee?", "expected_rejection": true, "reason": "非工业文档内容"},
+  {"question": "Explain quantum computing in simple terms.", "expected_rejection": true, "reason": "非知识库主题"},
+  {"question": "What movies are playing this weekend?", "expected_rejection": true, "reason": "实时信息，非知识库内容"},
+  {"question": "How to train a dog?", "expected_rejection": true, "reason": "非工业领域"},
+  {"question": "What is the weather forecast for tomorrow?", "expected_rejection": true, "reason": "实时数据"},
+  {"question": "Write a resignation letter.", "expected_rejection": true, "reason": "创造性/通用内容"},
+  {"question": "Who developed the theory of relativity?", "expected_rejection": true, "reason": "常识知识，不在知识库中"},
+  {"question": "What is the recipe for chocolate cake?", "expected_rejection": true, "reason": "非工业内容"},
+  {"question": "How to fix a leaking faucet?", "expected_rejection": true, "reason": "通用生活技能，非知识库内容"},
+  {"question": "What are the best tourist attractions in Paris?", "expected_rejection": true, "reason": "非工业文档知识域"},
+  {"question": "Tell me a joke.", "expected_rejection": true, "reason": "创造性内容，不在知识库中"},
+  {"question": "How does cryptocurrency work?", "expected_rejection": true, "reason": "非工业 PDF 主题"}
+]
