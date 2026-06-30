@@ -1,0 +1,33 @@
+[project]
+name = "prismrag"
+version = "0.1.0"
+description = "Multimodal RAG that prisms PDF pages into lexical, semantic, and visual retrieval channels"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.0",
+    "colpali-engine>=0.3.0",
+    "datasets>=5.0",
+    "psycopg2-binary>=2.9",
+    "pgvector>=0.3",
+    "faiss-cpu>=1.14",
+    "rank-bm25>=0.2",
+    "sentence-transformers>=3.0",
+    "vidore-benchmark>=0.1",
+    "ragas>=0.2",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pyyaml>=6.0",
+    "pillow>=10.0",
+    "numpy>=1.24",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

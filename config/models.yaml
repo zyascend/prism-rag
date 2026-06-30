@@ -1,0 +1,35 @@
+models:
+  colpali: "vidore/colpali-v1.3"
+  bge_embedding: "BAAI/bge-large-en-v1.5"
+  bge_reranker: "BAAI/bge-reranker-large"
+  llm: "qwen2:7b"
+
+embedding:
+  bge_dim: 1024
+  bge_device: "auto"
+  colpali_device: "auto"
+
+retrieval:
+  bm25_k: 20
+  dense_k: 20
+  visual_k: 20
+  rrf_k: 60
+  rerank_k: 5
+
+storage:
+  pgvector:
+    host: "localhost"
+    port: 5432
+    dbname: "prismrag"
+    user: "prismrag"
+    password: "prismrag"
+  faiss:
+    index_path: "indexes/colpali-vidore-industrial.faiss"
+    id_map_path: "indexes/colpali-vidore-industrial-ids.npy"
+
+vidore:
+  dataset_name: "vidore/vidore_v3_industrial"
+  split_corpus: "test"
+  split_queries: "test"
+  split_qrels: "test"
+  num_pages: 5244
