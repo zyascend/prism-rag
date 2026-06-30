@@ -34,7 +34,7 @@ class FaissColPaliStore:
 
         start = 0
         for page_id in sorted(page_embeddings.keys()):
-            emb = page_embeddings[page_id].numpy().astype(np.float32)
+            emb = page_embeddings[page_id].float().numpy().astype(np.float32)
             n = emb.shape[0]
             all_vectors.append(emb)
             all_ids.extend([page_id] * n)
