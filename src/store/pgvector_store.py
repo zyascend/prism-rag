@@ -8,7 +8,7 @@ Schema:
     page_number INTEGER NOT NULL,
     chunk_type TEXT NOT NULL DEFAULT 'text',
     text TEXT NOT NULL,
-    bge_vector vector(768) NOT NULL
+    bge_vector vector(1024) NOT NULL
   );
   CREATE INDEX idx_chunks_page_id ON chunks(page_id);
   CREATE INDEX idx_chunks_doc_id ON chunks(doc_id);
@@ -61,7 +61,7 @@ class PgVectorStore:
                     page_number INTEGER NOT NULL,
                     chunk_type TEXT NOT NULL DEFAULT 'text',
                     text TEXT NOT NULL,
-                    bge_vector vector(768) NOT NULL
+                    bge_vector vector(1024) NOT NULL
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_page_id ON chunks(page_id)")
