@@ -3,7 +3,7 @@
 
 torch>=2.0
 colpali-engine>=0.3.0
-datasets>=5.0
+datasets>=2.15.0
 psycopg2-binary>=2.9
 pgvector>=0.3
 faiss-gpu>=1.14

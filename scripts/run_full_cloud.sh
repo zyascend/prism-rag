@@ -41,18 +41,27 @@ if [ -f /etc/network_turbo ]; then
     log "网络代理已启用"
 fi
 
-# ── venv ──
-if [ ! -f .venv/bin/python3 ]; then
-    err "未找到 .venv，请先运行 bash scripts/cloud_setup.sh"
-fi
-source .venv/bin/activate
+	# ── Python 环境（读取 Phase 1 保存的路径） ──
+	PYTHON_BIN=""
+	if [ -f .python_bin ]; then
+	    PYTHON_BIN=$(cat .python_bin)
+	    log "Python: $PYTHON_BIN"
+	elif [ -f .venv/bin/python3 ]; then
+	    PYTHON_BIN=".venv/bin/python3"
+	    log "Python: .venv (legacy)"
+	elif [ -f /root/miniconda3/bin/python3 ]; then
+	    PYTHON_BIN="/root/miniconda3/bin/python3"
+	    log "Python: conda (fallback)"
+	else
+	    err "未找到 Python 环境，请先运行 bash scripts/cloud_setup.sh"
+	fi
 
-# ── CUDA 验证 ──
-python3 -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'" || \
-    err "CUDA 不可用，检查 GPU 驱动"
+	# ── CUDA 验证 ──
+	$PYTHON_BIN -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'" || \
+	    err "CUDA 不可用，检查 GPU 驱动"
 
-VRAM=$(python3 -c "import torch; print(torch.cuda.get_device_properties(0).total_mem // 1024**3)")
-log "VRAM: ${VRAM}GB"
+	VRAM=$($PYTHON_BIN -c "import torch; print(torch.cuda.get_device_properties(0).total_memory // 1024**3)")
+	log "VRAM: ${VRAM}GB"
 
 # ── HF cache ──
 export HF_HOME="/root/autodl-tmp/huggingface"
@@ -92,9 +101,9 @@ log "进度: logs/ingest.log"
 
 > logs/ingest.log
 
-python3 scripts/ingest_vidore.py \
-    --dataset vidore/vidore_v3_industrial \
-    2>&1 | tee -a logs/ingest.log
+	$PYTHON_BIN scripts/ingest_vidore.py \
+	    --dataset vidore/vidore_v3_industrial \
+	    2>&1 | tee -a logs/ingest.log
 INGEST_RC=${PIPESTATUS[0]}
 
 if [ "$INGEST_RC" -ne 0 ]; then
@@ -103,7 +112,7 @@ fi
 
 log ""
 log "✅ Ingest 完成"
-log "  pgvector chunks: $(python3 -c "from src.store.pgvector_store import PgVectorStore; print(PgVectorStore().count())" 2>/dev/null || echo '?')"
+log "  pgvector chunks: $($PYTHON_BIN -c "from src.store.pgvector_store import PgVectorStore; print(PgVectorStore().count())" 2>/dev/null || echo '?')"
 log "  FAISS index: $(ls -lh indexes/*.faiss 2>/dev/null | awk '{print $5}')"
 
 # ═══════════════════════════════════════════════════════════
@@ -117,7 +126,7 @@ log "进度: logs/eval.log"
 
 > logs/eval.log
 
-python3 scripts/run_eval.py \
+	$PYTHON_BIN scripts/run_eval.py \
     --dataset vidore/vidore_v3_industrial \
     --skip-index \
     2>&1 | tee -a logs/eval.log
@@ -151,7 +160,7 @@ log "  日志: $(du -sh logs/ 2>/dev/null | cut -f1)"
 log ""
 if [ -f results/ablation_results.json ]; then
     log "📈 消融结果摘要:"
-    python3 -c "
+	    $PYTHON_BIN -c "
 import json
 with open('results/ablation_results.json') as f:
     results = json.load(f)
