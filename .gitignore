@@ -59,6 +59,7 @@ dmypy.json
 !.env.example
 *.local
 secrets/
+.cloud-connection
 
 # ===== Project: data & model artifacts =====
 # 下载的原始数据集(ViDoRe / RealKIE / CHIC / Siemens 等)
