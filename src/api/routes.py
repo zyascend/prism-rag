@@ -42,9 +42,22 @@ class SearchResult(BaseModel):
     retrieval_type: str
 
 
+class RouteTraceItem(BaseModel):
+    chunk_id: str
+    page_id: int
+    score: float
+
+
+class RetrievalTrace(BaseModel):
+    bm25_top5: List[RouteTraceItem] = []
+    dense_top5: List[RouteTraceItem] = []
+    visual_top5: List[RouteTraceItem] = []
+
+
 class SearchResponse(BaseModel):
     query: str
     results: List[SearchResult]
+    retrieval_trace: RetrievalTrace = RetrievalTrace()
     num_results: int
 
 
@@ -98,7 +111,7 @@ async def health():
 async def search(request: SearchRequest):
     retriever = get_retriever()
     try:
-        results = retriever.search(
+        result = retriever.search_with_trace(
             query=request.query,
             k=request.k,
             use_rerank=request.use_rerank,
@@ -109,6 +122,11 @@ async def search(request: SearchRequest):
 
     return SearchResponse(
         query=request.query,
-        results=[SearchResult(**r) for r in results],
-        num_results=len(results),
+        results=[SearchResult(**r) for r in result["results"]],
+        retrieval_trace=RetrievalTrace(
+            bm25_top5=[RouteTraceItem(**t) for t in result["retrieval_trace"]["bm25_top5"]],
+            dense_top5=[RouteTraceItem(**t) for t in result["retrieval_trace"]["dense_top5"]],
+            visual_top5=[RouteTraceItem(**t) for t in result["retrieval_trace"]["visual_top5"]],
+        ),
+        num_results=len(result["results"]),
     )

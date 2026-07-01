@@ -1,0 +1,67 @@
+# PrismRAG — 一键启动全栈 Demo
+# 用法: docker compose up -d
+#
+# 首次启动前先拉取预编码索引:
+#   make fetch-indexes
+#
+# 服务:
+#   api       — FastAPI (port 8000)
+#   db        — PostgreSQL + pgvector (port 5432)
+#   ollama    — 本地 LLM (port 11434)
+
+version: "3.8"
+
+services:
+  api:
+    build: .
+    container_name: prismrag-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PGVECTOR_HOST=db
+      - PGVECTOR_PORT=5432
+      - PGVECTOR_DB=prismrag
+      - PGVECTOR_USER=prismrag
+      - PGVECTOR_PASSWORD=prismrag
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - ./indexes:/app/indexes:ro
+      - ./results:/app/results
+      - ./config:/app/config:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: prismrag-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: prismrag
+      POSTGRES_USER: prismrag
+      POSTGRES_PASSWORD: prismrag
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prismrag -d prismrag"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: prismrag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # 首次启动后需手动拉模型:
+    #   docker exec prismrag-ollama ollama pull qwen2:7b
+
+volumes:
+  pgdata:
+  ollama_data:

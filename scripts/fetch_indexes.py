@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 RELEASE_URL = "https://github.com/zyascend/prism-rag/releases/download/v0.1.0/indexes.zip"
 INDEXES_DIR = Path("indexes")
+# 版本化命名: colpali-v1.3-vidore-industrial
+EXPECTED_INDEX = INDEXES_DIR / "colpali-v1.3-vidore-industrial.faiss"
 
 
 def main():

@@ -1,0 +1,193 @@
+name: PrismRAG CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:        # 手动触发
+  schedule:
+    - cron: "0 2 * * 0"    # 每周日凌晨 2:00 全量跑
+
+env:
+  UV_SYSTEM_PYTHON: "true"
+
+jobs:
+  # ── 快速反馈: lint + test ──────────────────────────
+  quick:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run tests
+        run: python -m pytest tests/ -v --tb=short
+
+  # ── 消融评测: industrial 子集 (PR 级) ─────────────
+  ablation:
+    name: Ablation (ViDoRe Industrial)
+    needs: quick
+    runs-on: ubuntu-latest
+    # 仅在 PR 或 main push 时跑；scheduled job 跑 full 变体
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: prismrag
+          POSTGRES_USER: prismrag
+          POSTGRES_PASSWORD: prismrag
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Cache HuggingFace datasets
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-datasets-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: hf-datasets-${{ runner.os }}-
+
+      - name: "Run ablation (quick: 50 queries)"
+        run: make eval-vidore-quick
+        env:
+          PGVECTOR_HOST: localhost
+          PGVECTOR_PORT: 5432
+          PGVECTOR_DB: prismrag
+          PGVECTOR_USER: prismrag
+          PGVECTOR_PASSWORD: prismrag
+
+      - name: Upload ablation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ablation-results
+          path: results/ablation_results.json
+
+  # ── RAGAS 拒答 sanity ─────────────────────────────
+  ragas:
+    name: RAGAS Rejection Sanity
+    needs: quick
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: prismrag
+          POSTGRES_USER: prismrag
+          POSTGRES_PASSWORD: prismrag
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Cache HuggingFace datasets
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-datasets-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: hf-datasets-${{ runner.os }}-
+
+      - name: Run RAGAS sanity
+        run: make eval-ragas
+        env:
+          PGVECTOR_HOST: localhost
+          PGVECTOR_PORT: 5432
+          PGVECTOR_DB: prismrag
+          PGVECTOR_USER: prismrag
+          PGVECTOR_PASSWORD: prismrag
+        continue-on-error: true  # Ollama 在 CI 环境不可用，检测拒绝逻辑本身
+
+  # ── 全量评测: 仅 scheduled / manual dispatch ──────
+  full-eval:
+    name: Full ViDoRe Evaluation (Scheduled)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: prismrag
+          POSTGRES_USER: prismrag
+          POSTGRES_PASSWORD: prismrag
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Cache HuggingFace datasets
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-datasets-full-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Run full evaluation
+        run: make eval-vidore
+        env:
+          PGVECTOR_HOST: localhost
+          PGVECTOR_PORT: 5432
+          PGVECTOR_DB: prismrag
+          PGVECTOR_USER: prismrag
+          PGVECTOR_PASSWORD: prismrag
+        timeout-minutes: 360
+
+      - name: Generate leaderboard markdown
+        run: |
+          python -c "
+          import json
+          with open('results/ablation_results.json') as f:
+              data = json.load(f)
+          rows = []
+          for r in data:
+              rows.append(f'| {r[\"config\"]} | {r[\"ndcg@10\"]:.4f} | {r[\"recall@5\"]:.4f} | {r[\"mrr\"]:.4f} |')
+          header = '| Config | NDCG@10 | Recall@5 | MRR |'
+          sep = '|--------|---------|-----------|-----|'
+          print('\n'.join([header, sep] + rows))
+          " > results/leaderboard.md
+
+      - name: Upload full results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-eval-results
+          path: results/
