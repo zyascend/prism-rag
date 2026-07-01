@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from datasets import load_dataset
+from datasets import load_dataset as hf_load_dataset
 from tqdm import tqdm
 
 from src.evaluation.vidore_adapter import PrismRAGRetriever
@@ -60,16 +60,28 @@ def compute_mrr(relevant: set, ranked: List[str]) -> float:
     return 0.0
 
 
-def run_ablation(
-    retriever: PrismRAGRetriever,
-    dataset_path: str = "vidore/vidore_v3_industrial",
+def load_eval_data(
+    dataset_path: str,
     max_queries: Optional[int] = None,
-    output_dir: str = "results",
-) -> List[dict]:
-    """运行全量消融实验"""
-    logger.info("加载查询和 qrels...")
-    queries_ds = load_dataset(dataset_path, "queries", split="test")
-    qrels_ds = load_dataset(dataset_path, "qrels", split="test")
+    language: str = "en",
+) -> tuple:
+    """加载评测数据，按语言过滤，支持 query 数量限制
+
+    Args:
+        dataset_path: HuggingFace dataset 路径
+        max_queries: 可选，限制 query 数量
+        language: "en" 过滤英文，"all" 全部保留
+
+    Returns:
+        (queries_ds, qrel_map) 元组
+        - queries_ds: HuggingFace Dataset（已过滤和截断）
+        - qrel_map: Dict[int, set] — query_id -> set of corpus_ids
+    """
+    queries_ds = hf_load_dataset(dataset_path, "queries", split="test")
+    qrels_ds = hf_load_dataset(dataset_path, "qrels", split="test")
+
+    if language != "all":
+        queries_ds = queries_ds.filter(lambda x: x["query_lang"] == language)
 
     if max_queries:
         queries_ds = queries_ds.select(range(min(max_queries, len(queries_ds))))
@@ -81,6 +93,29 @@ def run_ablation(
         if qid not in qrel_map:
             qrel_map[qid] = set()
         qrel_map[qid].add(cid)
+
+    return queries_ds, qrel_map
+
+
+def run_ablation(
+    retriever: PrismRAGRetriever,
+    queries_ds,
+    qrel_map: Dict[int, set],
+    output_dir: str = "results",
+    pre_encoded_visual: Optional[Dict[int, "torch.Tensor"]] = None,
+    language: str = "en",
+) -> List[dict]:
+    """运行全量消融实验
+
+    Args:
+        retriever: PrismRAGRetriever 实例
+        queries_ds: 已加载和过滤的 queries dataset
+        qrel_map: query_id -> relevant corpus_id set
+        output_dir: 结果输出目录
+        pre_encoded_visual: {q_idx: tensor[1, n_q, 128]} 预编码的 visual query embedding
+        language: 当前评测语言，会写入结果元数据
+    """
+    import torch  # 仅在用到类型时延迟导入
 
     results = []
 
@@ -95,11 +130,16 @@ def run_ablation(
             qid = int(q["query_id"])
             query_text = str(q["query"])
 
+            visual_q_emb = None
+            if config.use_visual and pre_encoded_visual is not None and q_idx in pre_encoded_visual:
+                visual_q_emb = pre_encoded_visual[q_idx]
+
             start = time.time()
             retrieved = retriever.search(
                 query=query_text, k=10,
                 use_bm25=config.use_bm25, use_dense=config.use_dense,
                 use_visual=config.use_visual, use_rerank=config.use_rerank,
+                visual_query_embedding=visual_q_emb,
             )
             latencies.append((time.time() - start) * 1000)
 
@@ -122,6 +162,7 @@ def run_ablation(
             "recall@5": round(rec5, 4), "recall@10": round(rec10, 4),
             "mrr": round(mrr, 4), "avg_latency_ms": round(avg_lat, 1),
             "num_queries": n,
+            "language": language,
         }
         results.append(result)
         logger.info(f"  NDCG@10={ndcg10:.4f}, Recall@5={rec5:.4f}, MRR={mrr:.4f}")
