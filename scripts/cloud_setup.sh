@@ -8,7 +8,7 @@
 # 用法 (SSH 到云实例后):
 #   cd /root/prism-rag && bash scripts/cloud_setup.sh
 #
-# 耗时: 首次约 15-25 分钟（主要是模型下载 ~5GB）
+# 耗时: 首次约 15-20 分钟
 # 前置: 代码已上传到 /root/prism-rag/
 # ============================================================
 set -euo pipefail
@@ -30,51 +30,109 @@ log "磁盘: $(df -h / | tail -1 | awk '{print $4" avail"}')"
 $HAS_AUTODL && log "数据盘: $(df -h "$AUTODL_TMP" | tail -1 | awk '{print $4" avail"}')"
 
 # ═══════════════════════════════════════════════════════════
-# Step 1: Python 3.11
+# Step 1: Python 环境（智能检测 conda → 复用 或 apt 安装）
 # ═══════════════════════════════════════════════════════════
-log "[1/6] Python 3.11..."
-if python3.11 --version &>/dev/null; then
-    log "  ✅ Python $(python3.11 --version)"
-else
-    log "  安装中..."
-    apt-get update -qq
-    apt-get install -y -qq python3.11 python3.11-venv python3.11-dev 2>&1 | tail -3
-    log "  ✅ Python $(python3.11 --version)"
-fi
+log "[1/6] Python 环境..."
 
-# ═══════════════════════════════════════════════════════════
-# Step 2: 虚拟环境 + pip 依赖
-# ═══════════════════════════════════════════════════════════
-log "[2/6] venv + pip 依赖..."
+PYTHON_BIN=""
+CONDA_BASE="/root/miniconda3"
+CONDA_PYTHON="$CONDA_BASE/bin/python3"
 
-cd /root/prism-rag
-
-# 清理旧 venv（Python 版本不匹配时）
-if [ -f .venv/bin/python3 ]; then
-    VENV_VER=$(./.venv/bin/python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0")
-    if [ "$VENV_VER" != "3.11" ]; then
-        warn "  旧 venv (Python $VENV_VER) 不匹配，重建"
-        rm -rf .venv
+# 优先检测 conda（AutoDL 自带 torch + CUDA，省 2GB 下载）
+if [ -f "$CONDA_PYTHON" ]; then
+    CONDA_TORCH=$("$CONDA_PYTHON" -c "import torch; print(torch.__version__)" 2>/dev/null || echo "")
+    if [ -n "$CONDA_TORCH" ]; then
+        PYTHON_BIN="$CONDA_PYTHON"
+        log "  ✅ 复用 conda (Python $($PYTHON_BIN --version 2>&1), torch $CONDA_TORCH)"
+        log "  ⚡ 跳过 PyTorch/CUDA 下载 (~2GB)"
+    else
+        log "  conda 存在但无 torch，将完整安装"
     fi
 fi
 
-if [ ! -f .venv/bin/python3 ]; then
-    python3.11 -m venv .venv
+# 没有可复用的 → 安装 Python 3.11
+if [ -z "$PYTHON_BIN" ]; then
+    if python3.11 --version &>/dev/null; then
+        PYTHON_BIN="python3.11"
+    else
+        log "  安装 Python 3.11..."
+        apt-get update -qq
+        apt-get install -y -qq python3.11 python3.11-venv python3.11-dev 2>&1 | tail -3
+        PYTHON_BIN="python3.11"
+    fi
+    log "  ✅ $($PYTHON_BIN --version 2>&1)"
 fi
-source .venv/bin/activate
-pip install --upgrade pip -q
 
-# 安装依赖（包含 CUDA 版 torch/faiss，无 GPU 也能装）
-# 注意：此时不开 /etc/network_turbo 代理（代理会拖慢 PyPI），但保留阿里云 pip 镜像
-log "  pip install..."
-pip install -r requirements-cloud.txt 2>&1 | grep -E "(Successfully|ERROR|^Collecting|Downloading.*torch|Downloading.*faiss|Downloading.*transformers|Downloading.*colpali|Installing)" || true
+# ═══════════════════════════════════════════════════════════
+# Step 2: 项目依赖（只装缺失的部分）
+# ═══════════════════════════════════════════════════════════
+log "[2/6] 项目依赖..."
+
+cd /root/prism-rag
+
+if [ "$PYTHON_BIN" = "$CONDA_PYTHON" ]; then
+    # === conda 路径：只装缺失包 ===
+    log "  检测 conda 已有包 vs requirements-cloud.txt..."
+
+    # 列出 requirements 中需要但 conda 缺失的包
+	    MISSING=$($PYTHON_BIN << 'PYEOF'
+import subprocess, sys
+
+# 获取已安装包
+installed = subprocess.check_output(
+    ["/root/miniconda3/bin/pip", "list", "--format=columns"],
+    text=True
+).lower()
+
+# 检查 requirements-cloud.txt 每一行（只看包名，忽略版本约束）
+needed = []
+with open("requirements-cloud.txt") as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        # 提取包名（去掉版本约束、extras）
+        pkg = line.split(">=")[0].split("==")[0].split("[")[0].split(";")[0].strip().lower()
+        pkg = pkg.replace("_", "-")
+        if pkg not in installed:
+            needed.append(line)
+
+print(" ".join(repr(l) for l in needed))
+PYEOF
+)
+
+    if [ -z "$MISSING" ] || [ "$MISSING" = " " ]; then
+        log "  ✅ 所有依赖已满足"
+    else
+        log "  需安装 $(echo "$MISSING" | wc -w) 个缺失包..."
+        eval "$CONDA_PYTHON -m pip install $MISSING 2>&1 | grep -v '^Requirement already satisfied' || true"
+        log "  ✅ 依赖安装完成"
+    fi
+
+else
+    # === 非 conda 路径：完整 pip install ===
+    if [ ! -f .venv/bin/python3 ]; then
+        $PYTHON_BIN -m venv .venv
+    fi
+    source .venv/bin/activate
+    pip install --upgrade pip -q
+    log "  pip install（完整安装，约 10-15 min）..."
+    pip install -r requirements-cloud.txt 2>&1
+    log "  ✅ pip install 完成"
+fi
 
 # 快速验证
-python3 -c "
+if [ "$PYTHON_BIN" = "$CONDA_PYTHON" ]; then
+    VERIFY_PY="$CONDA_PYTHON"
+else
+    VERIFY_PY=".venv/bin/python3"
+fi
+
+$VERIFY_PY -c "
 import torch, faiss
 print(f'  ✅ PyTorch {torch.__version__} | FAISS {faiss.__version__}')
 print(f'  CUDA available: {torch.cuda.is_available()} (切有卡后将变为 True)')
-"
+" 2>&1 || warn "  ⚠️  基础包验证失败，但不阻塞流程"
 
 # ═══════════════════════════════════════════════════════════
 # Step 3: PostgreSQL + pgvector
@@ -83,8 +141,9 @@ log "[3/6] PostgreSQL + pgvector..."
 
 # 编译 pgvector（幂等：已安装则跳过）
 if [ ! -f /usr/lib/postgresql/14/lib/vector.so ]; then
-    log "  编译 pgvector..."
-    apt-get install -y -qq postgresql-14 postgresql-server-dev-14 2>&1 | tail -2
+	    log "  编译 pgvector..."
+	    apt-get update -qq 2>/dev/null
+	    apt-get install -y -qq postgresql-14 postgresql-server-dev-14 2>&1 | tail -2
 
     PGV_DIR="/tmp/pgvector"
     if [ ! -d "$PGV_DIR" ]; then
@@ -112,45 +171,39 @@ su - postgres -c "psql -d prismrag -c 'CREATE EXTENSION IF NOT EXISTS vector;'" 
     log "  ✅ PostgreSQL + pgvector 就绪" || \
     warn "  ⚠️  pgvector 扩展启用失败"
 
-# ── 网络加速（AutoDL 内网代理，加速 GitHub/HF，完成后才开） ──
-# 注意：pip install 必须先于此处执行，因为代理会拖慢 PyPI
-if $HAS_AUTODL; then
-    source /etc/network_turbo 2>/dev/null || true
-    log "  ✅ 网络代理已启用（加速 HF/GitHub）"
-fi
+# ═══════════════════════════════════════════════════════════
+# Step 4: 预下载模型（HF，约 5-10 min）
+# ═══════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════
-# Step 4: 预下载模型（CPU-only，约 5-10 min）
+# Step 4: 预下载模型（HF 镜像，约 5-10 min）
 # ═══════════════════════════════════════════════════════════
 log "[4/6] 预下载模型到 HF cache..."
 
 export HF_HOME="$AUTODL_TMP/huggingface"
+export HF_ENDPOINT="https://hf-mirror.com"  # 国内镜像更快更稳
+export HF_HUB_ENABLE_HF_TRANSFER=0
 mkdir -p "$HF_HOME"
 
-python3 << 'PYEOF'
-import os, sys
+$VERIFY_PY << 'PYEOF'
+import os
 os.environ["HF_HOME"] = "/root/autodl-tmp/huggingface"
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""  # 强制 CPU
 
+from huggingface_hub import snapshot_download
+
 print("  Downloading ColPali (vidore/colpali-v1.3, ~3.5GB)...")
-from colpali_engine.models import ColPali, ColPaliProcessor
-import torch
-ColPali.from_pretrained(
-    "vidore/colpali-v1.3",
-    torch_dtype=torch.bfloat16,
-    device_map="cpu"
-)
-ColPaliProcessor.from_pretrained("vidore/colpali-v1.3")
+snapshot_download("vidore/colpali-v1.3")
 print("  ✅ ColPali cached")
 
 print("  Downloading BGE (BAAI/bge-large-en-v1.5, ~1.3GB)...")
-from sentence_transformers import SentenceTransformer
-SentenceTransformer("BAAI/bge-large-en-v1.5", device="cpu")
+snapshot_download("BAAI/bge-large-en-v1.5")
 print("  ✅ BGE cached")
 
 print("  Downloading BGE Reranker (BAAI/bge-reranker-large, ~1.3GB)...")
-from sentence_transformers import CrossEncoder
-CrossEncoder("BAAI/bge-reranker-large", device="cpu")
+snapshot_download("BAAI/bge-reranker-large")
 print("  ✅ Reranker cached")
 
 print("  All models cached successfully!")
@@ -163,10 +216,13 @@ log "  ✅ 模型预下载完成 ($(du -sh "$HF_HOME" 2>/dev/null | cut -f1))"
 # ═══════════════════════════════════════════════════════════
 log "[5/6] 预缓存 ViDoRe 数据集..."
 
-python3 << 'PYEOF'
+$VERIFY_PY << 'PYEOF'
 import os
 os.environ["HF_HOME"] = "/root/autodl-tmp/huggingface"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
+# 数据集下载走代理（hf-mirror.com 对 datasets 库支持不稳定）
+os.environ["http_proxy"] = "http://172.26.1.26:12798"
+os.environ["https_proxy"] = "http://172.26.1.26:12798"
 
 from datasets import load_dataset
 DS = "vidore/vidore_v3_industrial"
@@ -197,14 +253,9 @@ else
     mkdir -p indexes results logs
 fi
 
-# 更新 config 中 HF cache 路径（确保重启后仍有效）
-python3 << 'PYEOF'
-import yaml
-with open("config/models.yaml") as f:
-    c = yaml.safe_load(f)
-# 保持默认值不变，HF_HOME 由环境变量控制
-print("config/models.yaml OK")
-PYEOF
+# ── 保存 Python 路径到标记文件，供 Phase 2 使用 ──
+echo "$VERIFY_PY" > .python_bin
+log "  Python 路径已保存: $VERIFY_PY → .python_bin"
 
 # ── 最终验证 ───────────────────────────────────────────────
 log ""
@@ -212,26 +263,23 @@ log "====== Phase 1 验证 ======"
 
 PASS=true
 
-# Python + 关键包
-python3 -c "import torch; print(f'  ✅ PyTorch {torch.__version__}')" || { warn "  ❌ PyTorch"; PASS=false; }
-python3 -c "import faiss; print(f'  ✅ FAISS {faiss.__version__}')" || { warn "  ❌ FAISS"; PASS=false; }
-python3 -c "import sentence_transformers; print(f'  ✅ sentence-transformers')" || { warn "  ❌ sentence-transformers"; PASS=false; }
-python3 -c "from colpali_engine.models import ColPali; print(f'  ✅ colpali-engine')" || { warn "  ❌ colpali-engine"; PASS=false; }
+$VERIFY_PY -c "import torch; print(f'  ✅ PyTorch {torch.__version__}')" 2>/dev/null || { warn "  ❌ PyTorch"; PASS=false; }
+$VERIFY_PY -c "import faiss; print(f'  ✅ FAISS {faiss.__version__}')" 2>/dev/null || { warn "  ❌ FAISS"; PASS=false; }
+$VERIFY_PY -c "import sentence_transformers; print(f'  ✅ sentence-transformers')" 2>/dev/null || { warn "  ❌ sentence-transformers"; PASS=false; }
+$VERIFY_PY -c "from colpali_engine.models import ColPali; print(f'  ✅ colpali-engine')" 2>/dev/null || { warn "  ❌ colpali-engine"; PASS=false; }
 
-# PostgreSQL
-pg_isready 2>/dev/null && log "  ✅ PostgreSQL running" || { warn "  ⚠️  PostgreSQL not running"; }
-python3 -c "
+pg_isready 2>/dev/null && log "  ✅ PostgreSQL running" || warn "  ⚠️  PostgreSQL not running"
+
+$VERIFY_PY -c "
 import psycopg2
 c = psycopg2.connect(host='localhost', dbname='prismrag', user='prismrag', password='prismrag')
 c.close()
 print('  ✅ PostgreSQL connection OK')
-" 2>/dev/null || { warn "  ⚠️  PostgreSQL connection failed"; }
+" 2>/dev/null || warn "  ⚠️  PostgreSQL connection failed"
 
-# HF cache
 HF_SIZE=$(du -sh "$HF_HOME" 2>/dev/null | cut -f1)
 log "  ✅ HF cache: $HF_SIZE"
 
-# Data disk
 if $HAS_AUTODL; then
     log "  ✅ Data disk avail: $(df -h "$AUTODL_TMP" | tail -1 | awk '{print $4}')"
 fi
@@ -250,13 +298,8 @@ log ""
 log "  cd /root/prism-rag && bash scripts/run_full_cloud.sh"
 log ""
 log "⏱  预计耗时: ~40-50 min"
-log "  - ColPali 编码 5244 页: ~10 min"
-log "  - BGE 编码 + BM25: ~3 min"
-log "  - ViDoRe 消融 1698 queries × 7 configs: ~20 min"
-log ""
 log "💾 磁盘占用预估:"
 log "  - 索引 (FAISS): ~2.5 GB"
 log "  - 结果: ~50 KB"
-log "  - 日志: ~1 MB"
 log "  - 模型 + 数据 (已缓存): ~8 GB"
 log "=========================================="

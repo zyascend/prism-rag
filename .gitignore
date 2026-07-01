@@ -116,4 +116,4 @@ pgdata/
 neo4j_data/
 
 .codebase-memory
-.firecrawl
+.firecrawlruns/
