@@ -55,9 +55,11 @@ class ColPaliEmbedder:
 
     @torch.no_grad()
     def encode_pages(
-        self, images: List[Image.Image], batch_size: int = 4, show_progress: bool = False
+        self, images: List[Image.Image], batch_size: int | None = None, show_progress: bool = False
     ) -> List[torch.Tensor]:
         """编码页面列表，每页返回 [n_patches, 128] 多向量"""
+        if batch_size is None:
+            batch_size = cfg.get("embedding.colpali_batch_size", 4)
         # 预热：首次 query 有 torch.compile 开销
         if not self._warmed_up:
             dummy = Image.new("RGB", (1000, 1600), color=255)

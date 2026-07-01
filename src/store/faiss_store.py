@@ -6,6 +6,7 @@
 加速策略:
   - flat: 全局矩阵乘 + 按页 MaxSim（精确，O(N)）
   - hnsw: HNSW 预筛选候选页 → 仅对候选页做精确 MaxSim（近似加速，~140x）
+  - GPU: 自动检测 CUDA，MaxSim 走 torch GPU 矩阵乘（50-100x vs numpy CPU）
 """
 
 from __future__ import annotations
@@ -23,9 +24,10 @@ from src.config import cfg
 class FaissColPaliStore:
     """FAISS ColPali 多向量存储 + MaxSim 查询
 
-    支持两种模式:
-      - index_type="flat": 精确全表 MaxSim（小数据集或离线评估）
-      - index_type="hnsw": HNSW 预筛 + 候选页精确 MaxSim（在线低延迟）
+    支持三种加速:
+      - flat: 精确全表 MaxSim（评测用）
+      - hnsw: HNSW 预筛 + 候选页精确 MaxSim（在线低延迟）
+      - GPU: CUDA 可用时自动将 MaxSim 矩阵乘切到 torch GPU
     """
 
     def __init__(self, index_path: str | None = None, id_map_path: str | None = None):
@@ -33,10 +35,16 @@ class FaissColPaliStore:
         self.id_map_path = id_map_path or cfg.get("storage.faiss.id_map_path", "indexes/colpali-vidore-industrial-ids.npy")
         self._index: Optional[faiss.Index] = None
         self._hnsw: Optional[faiss.IndexHNSWFlat] = None
-        self._vectors: Optional[np.ndarray] = None  # [total_patches, dim] flat storage for exact MaxSim
+        self._vectors: Optional[np.ndarray] = None          # numpy (FAISS 兼容)
+        self._vectors_torch: Optional[torch.Tensor] = None  # torch GPU（MaxSim 用）
         self._page_ids: Optional[np.ndarray] = None
         self._page_boundaries: Optional[List[Tuple[int, int]]] = None
         self._index_type: str = "flat"
+        self._device: Optional[torch.device] = None
+
+    @property
+    def _gpu_available(self) -> bool:
+        return torch.cuda.is_available()
 
     # ── build ──────────────────────────────────────────────
 
@@ -75,7 +83,17 @@ class FaissColPaliStore:
         self._num_pages = len(page_embeddings)
         self._num_patches = self._vectors.shape[0]
 
-        # 始终构建 IndexFlatIP 用于精确 MaxSim（hnsw 模式下也需要 fallback）
+        # GPU 加速：将向量也存为 torch tensor
+        if self._gpu_available:
+            self._device = torch.device("cuda")
+            self._vectors_torch = torch.from_numpy(self._vectors).to(self._device)
+            vram_mb = self._vectors_torch.element_size() * self._vectors_torch.numel() / (1024 * 1024)
+            print(f"  GPU MaxSim 已启用: {vram_mb:.0f} MB VRAM ({self._num_patches:,} patches)")
+        else:
+            self._device = torch.device("cpu")
+            self._vectors_torch = None
+
+        # 始终构建 IndexFlatIP（FAISS 兼容、save/load）
         self._index = faiss.IndexFlatIP(dim)
         self._index.add(self._vectors)
 
@@ -125,10 +143,10 @@ class FaissColPaliStore:
             self._vectors = np.load(vectors_path)
         else:
             # 兼容旧格式：从 IndexFlatIP 提取
-            self._index = faiss.read_index(self.index_path)
-            ntotal = self._index.ntotal
-            d = self._index.d
-            self._vectors = faiss.rev_swig_ptr(self._index.x, ntotal * d).reshape(ntotal, d).copy()
+            old_index = faiss.read_index(self.index_path)
+            ntotal = old_index.ntotal
+            d = old_index.d
+            self._vectors = faiss.rev_swig_ptr(old_index.x, ntotal * d).reshape(ntotal, d).copy()
 
         self._index = faiss.read_index(self.index_path)
         self._page_ids = np.load(self.id_map_path)
@@ -146,6 +164,16 @@ class FaissColPaliStore:
         self._page_boundaries = boundaries
         self._num_pages = len(boundaries)
         self._num_patches = len(self._page_ids)
+
+        # GPU 加速
+        if self._gpu_available:
+            self._device = torch.device("cuda")
+            self._vectors_torch = torch.from_numpy(self._vectors).to(self._device)
+            vram_mb = self._vectors_torch.element_size() * self._vectors_torch.numel() / (1024 * 1024)
+            print(f"  GPU MaxSim 已启用: {vram_mb:.0f} MB VRAM")
+        else:
+            self._device = torch.device("cpu")
+            self._vectors_torch = None
 
         # 尝试加载 HNSW
         hnsw_path = str(base) + "_hnsw.faiss"
@@ -165,14 +193,20 @@ class FaissColPaliStore:
     def maxsim_search(self, query_embedding: torch.Tensor, k: int = 20) -> List[dict]:
         """MaxSim 搜索：返回 Top-k 页（含分数）
 
-        策略：
-          - flat 模式：全局矩阵乘 → 按页 MaxSim（精确，O(N)）
-          - hnsw 模式：HNSW 预筛候选页 → 仅候选页精确 MaxSim（加速）
+        策略（按优先级）:
+          1. GPU 可用 → torch GPU 矩阵乘（最快）
+          2. HNSW 预筛 → 候选页精确 MaxSim
+          3. flat → numpy CPU 全量 MaxSim
         """
         assert self._vectors is not None, "索引未加载/构建"
         assert self._page_boundaries is not None
 
-        q = query_embedding.float().numpy().astype(np.float32)  # [n_q, 128]
+        # GPU 路径
+        if self._vectors_torch is not None:
+            return self._maxsim_torch(query_embedding, k)
+
+        # CPU 路径
+        q = query_embedding.float().numpy().astype(np.float32)
         n_q = q.shape[1]
 
         if self._hnsw is not None:
@@ -180,45 +214,59 @@ class FaissColPaliStore:
         else:
             return self._maxsim_exact(q, n_q, k)
 
+    # ── GPU MaxSim ─────────────────────────────────────────
+
+    def _maxsim_torch(self, query_embedding: torch.Tensor, k: int) -> List[dict]:
+        """torch GPU 加速 MaxSim"""
+        q = query_embedding.float().to(self._device)         # [batch, n_q, 128]
+        n_q = q.shape[1]
+        q_flat = q.reshape(n_q, -1)                          # [n_q, dim]
+
+        scores = q_flat @ self._vectors_torch.T              # [n_q, total_patches] ← GPU matmul
+
+        page_scores: Dict[int, float] = {}
+        for start, end in self._page_boundaries:
+            page_patch_scores = scores[:, start:end]          # [n_q, page_patches]
+            max_per_query = page_patch_scores.max(dim=1).values
+            page_score = float(max_per_query.mean().cpu())
+            page_id = int(self._page_ids[start])
+            page_scores[page_id] = page_score
+
+        return self._rank_pages(page_scores, k)
+
+    # ── CPU MaxSim (fallback) ──────────────────────────────
+
     def _maxsim_exact(self, q: np.ndarray, n_q: int, k: int) -> List[dict]:
-        """精确全局 MaxSim（flat 模式）"""
+        """精确全局 MaxSim（numpy CPU）"""
         q_flat = q.reshape(n_q, -1)
-        scores = q_flat @ self._vectors.T  # [n_q, total_patches]
+        scores = q_flat @ self._vectors.T
 
         page_scores = self._compute_page_scores(scores)
         return self._rank_pages(page_scores, k)
 
     def _maxsim_hnsw(self, q: np.ndarray, n_q: int, k: int) -> List[dict]:
         """HNSW 预筛 → 候选页精确 MaxSim"""
-        # 1. 每个 query patch 用 HNSW 找 top-M nearest patches
-        M = 50  # 每个 query patch 召回的 patch 数
+        M = 50
         candidate_page_ids: set[int] = set()
 
         for i in range(n_q):
-            q_vec = q[:, i : i + 1].T  # [1, dim]
+            q_vec = q[:, i : i + 1].T
             _, patch_indices = self._hnsw.search(q_vec, M)
             for idx in patch_indices[0]:
                 if idx >= 0:
-                    page_id = int(self._page_ids[idx])
-                    candidate_page_ids.add(page_id)
+                    candidate_page_ids.add(int(self._page_ids[idx]))
 
         if not candidate_page_ids:
             return []
 
-        # 2. 构建候选页的 patch mask
         candidate_mask = np.isin(self._page_ids, list(candidate_page_ids))
-
-        # 3. 仅对候选 patches 计算精确 dot product
         q_flat = q.reshape(n_q, -1)
-        candidate_vectors = self._vectors[candidate_mask]  # [candidate_patches, dim]
-        candidate_scores = q_flat @ candidate_vectors.T  # [n_q, candidate_patches]
-
-        # 4. 映射回 candidate indices → patch index，计算页面分数
-        candidate_indices = np.where(candidate_mask)[0]
-        candidate_page_ids_arr = self._page_ids[candidate_mask]
+        candidate_vectors = self._vectors[candidate_mask]
+        candidate_scores = q_flat @ candidate_vectors.T
 
         page_scores: Dict[int, float] = {}
         page_patch_map: Dict[int, List[int]] = {}
+        candidate_page_ids_arr = self._page_ids[candidate_mask]
         for ci, pid in enumerate(candidate_page_ids_arr):
             pid_int = int(pid)
             if pid_int not in page_patch_map:
@@ -260,7 +308,6 @@ class FaissColPaliStore:
         if self._vectors is not None:
             size += self._vectors.nbytes / (1024 * 1024)
         if self._hnsw is not None:
-            # HNSW 图结构的额外内存 ≈ M × 2 × num_patches × 4 bytes
             size += self._hnsw.ntotal * 32 * 2 * 4 / (1024 * 1024)
         return size
 
