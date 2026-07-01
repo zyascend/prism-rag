@@ -54,6 +54,15 @@ echo "[4/5] 创建配置文件..."
 cp -n .env.example .env 2>/dev/null || true
 mkdir -p indexes results logs
 
+# GPU 适配: 24GB 显存可提高 batch size
+if python3 -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
+    VRAM=$(python3 -c "import torch; print(torch.cuda.get_device_properties(0).total_mem // 1024**3)" 2>/dev/null || echo 0)
+    if [ "$VRAM" -ge 20 ]; then
+        echo "  检测到 ${VRAM}GB VRAM → ColPali batch_size=8"
+        sed -i 's/colpali_batch_size: 4/colpali_batch_size: 8/' config/models.yaml
+    fi
+fi
+
 # ── 5. 运行全量流程 ──
 echo ""
 echo "[5/5] 运行全量流程..."

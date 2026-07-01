@@ -8,6 +8,7 @@ embedding:
   bge_dim: 1024
   bge_device: "auto"
   colpali_device: "auto"
+  colpali_batch_size: 4  # 编码 batch size（GPU 24GB 可调到 8）
 
 retrieval:
   bm25_k: 20
