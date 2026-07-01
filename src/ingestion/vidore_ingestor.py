@@ -16,6 +16,7 @@ import torch
 from datasets import load_dataset
 from tqdm import tqdm
 
+from src.config import cfg
 from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
 from src.ingestion.progress import (
     clear_progress,
@@ -177,6 +178,8 @@ class ViDoReIngestor:
         if len(all_embeddings) < total_pages:
             logger.warning(f"⚠️  仅 {len(all_embeddings)}/{total_pages} 页可用")
         logger.info(f"FAISS 建索引: {len(all_embeddings)} 页...")
-        self.faiss.build_index(all_embeddings)
+        index_type = cfg.get("storage.faiss.index_type", "flat")
+        hnsw_m = cfg.get("storage.faiss.hnsw_m", 32)
+        self.faiss.build_index(all_embeddings, index_type=index_type, hnsw_m=hnsw_m)
         self.faiss.save()
         logger.info(f"✅ FAISS 索引完成: {self.faiss.num_pages} 页, {self.faiss.index_size_mb:.1f} MB")

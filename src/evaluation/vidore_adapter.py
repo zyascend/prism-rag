@@ -69,34 +69,67 @@ class PrismRAGRetriever:
             k: 返回 Top-k chunk
             use_bm25/dense/visual: 控制各路的开关（消融用）
             use_rerank: 是否使用 cross-encoder 重排
+
+        Returns:
+            结果列表，每个 dict 含 chunk_id, page_id, score, retrieval_type 等
+        """
+        result = self.search_with_trace(query, k, use_bm25, use_dense, use_visual, use_rerank)
+        return result["results"]
+
+    def search_with_trace(
+        self,
+        query: str,
+        k: int = 10,
+        use_bm25: bool = True,
+        use_dense: bool = True,
+        use_visual: bool = True,
+        use_rerank: bool = True,
+    ) -> dict:
+        """带 retrieval_trace 的统一检索接口
+
+        Returns:
+            {"results": [...], "retrieval_trace": {"bm25_top5": [...], "dense_top5": [...], "visual_top5": [...]}}
         """
         routes = []
+        trace = {"bm25_top5": [], "dense_top5": [], "visual_top5": []}
 
         if use_bm25:
             try:
                 bm25_results = self.bm25.search(query, k=20)
                 routes.append(bm25_results)
+                trace["bm25_top5"] = [
+                    {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
+                    for r in bm25_results[:5]
+                ]
             except RuntimeError:
                 logger.warning("BM25 未就绪，跳过")
 
         if use_dense:
             dense_results = self.dense.search(query, k=20)
             routes.append(dense_results)
+            trace["dense_top5"] = [
+                {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
+                for r in dense_results[:5]
+            ]
 
         if use_visual:
             try:
                 visual_results = self.visual.search(query, k=20)
                 routes.append(visual_results)
+                trace["visual_top5"] = [
+                    {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
+                    for r in visual_results[:5]
+                ]
             except Exception as e:
                 logger.warning(f"Visual 检索跳过: {e}")
 
         if not routes:
-            return []
+            return {"results": [], "retrieval_trace": trace}
 
         fused = self.fusion.fuse(routes, k=min(k * 2, 40))
 
         if use_rerank and fused:
             reranked = self.reranker.rerank(query, fused, top_k=k)
-            return reranked
+            return {"results": reranked, "retrieval_trace": trace}
 
-        return fused[:k]
+        return {"results": fused[:k], "retrieval_trace": trace}

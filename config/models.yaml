@@ -24,8 +24,12 @@ storage:
     user: "prismrag"
     password: "prismrag"
   faiss:
-    index_path: "indexes/colpali-vidore-industrial.faiss"
-    id_map_path: "indexes/colpali-vidore-industrial-ids.npy"
+    # 索引命名: <model_id>-<corpus_version>.faiss
+    # 可通过 make fetch-indexes 拉取预编码 Release artifact
+    index_path: "indexes/colpali-v1.3-vidore-industrial.faiss"
+    id_map_path: "indexes/colpali-v1.3-vidore-industrial-ids.npy"
+    index_type: "flat"  # "flat" 精确 | "hnsw" HNSW 预筛加速 (macOS FAISS bug, Linux OK)
+    hnsw_m: 32
 
 vidore:
   dataset_name: "vidore/vidore_v3_industrial"
