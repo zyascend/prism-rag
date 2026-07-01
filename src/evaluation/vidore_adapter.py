@@ -61,6 +61,7 @@ class PrismRAGRetriever:
         use_dense: bool = True,
         use_visual: bool = True,
         use_rerank: bool = True,
+        visual_query_embedding: Optional[torch.Tensor] = None,
     ) -> List[dict]:
         """统一检索接口
 
@@ -69,11 +70,16 @@ class PrismRAGRetriever:
             k: 返回 Top-k chunk
             use_bm25/dense/visual: 控制各路的开关（消融用）
             use_rerank: 是否使用 cross-encoder 重排
+            visual_query_embedding: 可选，预编码的 visual query embedding。
+                                    传入时 visual route 走 search_with_embedding() 跳过编码。
 
         Returns:
             结果列表，每个 dict 含 chunk_id, page_id, score, retrieval_type 等
         """
-        result = self.search_with_trace(query, k, use_bm25, use_dense, use_visual, use_rerank)
+        result = self.search_with_trace(
+            query, k, use_bm25, use_dense, use_visual, use_rerank,
+            visual_query_embedding=visual_query_embedding,
+        )
         return result["results"]
 
     def search_with_trace(
@@ -84,8 +90,13 @@ class PrismRAGRetriever:
         use_dense: bool = True,
         use_visual: bool = True,
         use_rerank: bool = True,
+        visual_query_embedding: Optional[torch.Tensor] = None,
     ) -> dict:
         """带 retrieval_trace 的统一检索接口
+
+        Args:
+            visual_query_embedding: 可选，预编码的 visual query embedding。
+                                    传入时 visual route 走 search_with_embedding() 而非现场编码。
 
         Returns:
             {"results": [...], "retrieval_trace": {"bm25_top5": [...], "dense_top5": [...], "visual_top5": [...]}}
@@ -114,7 +125,10 @@ class PrismRAGRetriever:
 
         if use_visual:
             try:
-                visual_results = self.visual.search(query, k=20)
+                if visual_query_embedding is not None:
+                    visual_results = self.visual.search_with_embedding(visual_query_embedding, k=20)
+                else:
+                    visual_results = self.visual.search(query, k=20)
                 routes.append(visual_results)
                 trace["visual_top5"] = [
                     {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
