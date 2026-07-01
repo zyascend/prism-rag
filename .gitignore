@@ -117,3 +117,7 @@ neo4j_data/
 
 .codebase-memory
 .firecrawlruns/
+.firecrawl
+.runs/
+.runs
+runs/**/*.sql
