@@ -1,0 +1,9 @@
+[
+  {"config": "BM25_only", "ndcg@5": 0.4358, "ndcg@10": 0.4432, "recall@5": 0.4206, "recall@10": 0.5154, "mrr": 0.5443, "avg_latency_ms": 30.0, "num_queries": 283, "language": "en"},
+  {"config": "Dense_only", "ndcg@5": 0.3838, "ndcg@10": 0.3938, "recall@5": 0.3739, "recall@10": 0.4694, "mrr": 0.5137, "avg_latency_ms": 95.5, "num_queries": 283, "language": "en"},
+  {"config": "Visual_only", "ndcg@5": 0.1014, "ndcg@10": 0.1313, "recall@5": 0.1332, "recall@10": 0.2853, "mrr": 0.1501, "avg_latency_ms": 203.5, "num_queries": 283, "language": "en"},
+  {"config": "BM25_Dense", "ndcg@5": 0.4403, "ndcg@10": 0.4528, "recall@5": 0.4389, "recall@10": 0.5525, "mrr": 0.5595, "avg_latency_ms": 128.3, "num_queries": 283, "language": "en"},
+  {"config": "BM25_Dense_Visual", "ndcg@5": 0.4247, "ndcg@10": 0.4357, "recall@5": 0.4507, "recall@10": 0.5524, "mrr": 0.535, "avg_latency_ms": 366.7, "num_queries": 283, "language": "en"},
+  {"config": "Full_no_rerank", "ndcg@5": 0.4247, "ndcg@10": 0.4357, "recall@5": 0.4507, "recall@10": 0.5524, "mrr": 0.535, "avg_latency_ms": 368.2, "num_queries": 283, "language": "en"},
+  {"config": "Full_with_rerank", "ndcg@5": 0.5467, "ndcg@10": 0.5507, "recall@5": 0.5117, "recall@10": 0.6105, "mrr": 0.6595, "avg_latency_ms": 577.7, "num_queries": 283, "language": "en"}
+]
