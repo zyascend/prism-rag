@@ -18,6 +18,7 @@ from src.ingestion.text_chunker import Chunk, TextChunker
 from src.retrieval.bm25_retriever import BM25Retriever
 from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.fusion import RRFFusion
+from src.retrieval.hyde import HyDEGenerator
 from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
 from src.store.faiss_store import FaissColPaliStore
@@ -41,6 +42,8 @@ class PrismRAGRetriever:
         visual: VisualRetriever,
         fusion: RRFFusion,
         reranker: Reranker,
+        hyde: Optional[HyDEGenerator] = None,
+        zerank_reranker: Optional[Reranker] = None,
     ):
         self.pg = pg_store
         self.faiss = faiss_store
@@ -52,6 +55,8 @@ class PrismRAGRetriever:
         self.visual = visual
         self.fusion = fusion
         self.reranker = reranker
+        self.hyde = hyde
+        self.zerank_reranker = zerank_reranker
 
     def search(
         self,
@@ -62,6 +67,8 @@ class PrismRAGRetriever:
         use_visual: bool = True,
         use_rerank: bool = True,
         visual_query_embedding: Optional[torch.Tensor] = None,
+        use_hyde: bool = False,
+        reranker_type: str = "bge",
     ) -> List[dict]:
         """统一检索接口
 
@@ -72,6 +79,8 @@ class PrismRAGRetriever:
             use_rerank: 是否使用 cross-encoder 重排
             visual_query_embedding: 可选，预编码的 visual query embedding。
                                     传入时 visual route 走 search_with_embedding() 跳过编码。
+            use_hyde: 是否启用 HyDE 查询改写
+            reranker_type: 重排器选择 ("bge" | "zerank")
 
         Returns:
             结果列表，每个 dict 含 chunk_id, page_id, score, retrieval_type 等
@@ -79,6 +88,7 @@ class PrismRAGRetriever:
         result = self.search_with_trace(
             query, k, use_bm25, use_dense, use_visual, use_rerank,
             visual_query_embedding=visual_query_embedding,
+            use_hyde=use_hyde, reranker_type=reranker_type,
         )
         return result["results"]
 
@@ -91,19 +101,32 @@ class PrismRAGRetriever:
         use_visual: bool = True,
         use_rerank: bool = True,
         visual_query_embedding: Optional[torch.Tensor] = None,
+        use_hyde: bool = False,
+        reranker_type: str = "bge",
     ) -> dict:
         """带 retrieval_trace 的统一检索接口
 
         Args:
             visual_query_embedding: 可选，预编码的 visual query embedding。
                                     传入时 visual route 走 search_with_embedding() 而非现场编码。
+            use_hyde: 是否启用 HyDE 查询改写。启用时会额外用 LLM 生成假设文档
+                      并作为额外查询送入 dense/visual 路线。
+            reranker_type: 重排器选择 ("bge" | "zerank")
 
         Returns:
-            {"results": [...], "retrieval_trace": {"bm25_top5": [...], "dense_top5": [...], "visual_top5": [...]}}
+            {"results": [...], "retrieval_trace": {"bm25_top5": [...], "dense_top5": [...],
+             "visual_top5": [...], "hyde": "<generated text>"}}
         """
         routes = []
-        trace = {"bm25_top5": [], "dense_top5": [], "visual_top5": []}
+        trace = {"bm25_top5": [], "dense_top5": [], "visual_top5": [], "hyde": ""}
 
+        # ── HyDE: 生成假设文档 ────────────────────────────────
+        hyde_answer = ""
+        if use_hyde and self.hyde is not None:
+            hyde_answer = self.hyde.generate(query)
+            trace["hyde"] = hyde_answer[:500] if hyde_answer else "(failed)"
+
+        # ── BM25 route（始终用原始 query）───────────────────
         if use_bm25:
             try:
                 bm25_results = self.bm25.search(query, k=20)
@@ -115,24 +138,47 @@ class PrismRAGRetriever:
             except RuntimeError:
                 logger.warning("BM25 未就绪，跳过")
 
+        # ── Dense route（原始 query + 可选 HyDE answer）─────
         if use_dense:
-            dense_results = self.dense.search(query, k=20)
-            routes.append(dense_results)
-            trace["dense_top5"] = [
-                {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
-                for r in dense_results[:5]
-            ]
+            dense_queries = [query]
+            if hyde_answer:
+                dense_queries.append(hyde_answer)
 
+            all_dense = []
+            for q in dense_queries:
+                results = self.dense.search(q, k=20)
+                routes.append(results)
+                all_dense.extend(results)
+
+            # Trace: 仅记录原始 query 的 top-5
+            if all_dense:
+                trace["dense_top5"] = [
+                    {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
+                    for r in all_dense[:5]
+                ]
+
+        # ── Visual route（原始 query + 可选 HyDE answer）────
         if use_visual:
             try:
+                # 原始 query — 优先使用预编码 embedding
                 if visual_query_embedding is not None:
-                    visual_results = self.visual.search_with_embedding(visual_query_embedding, k=20)
+                    vis_results = self.visual.search_with_embedding(visual_query_embedding, k=20)
                 else:
-                    visual_results = self.visual.search(query, k=20)
-                routes.append(visual_results)
+                    vis_results = self.visual.search(query, k=20)
+                routes.append(vis_results)
+
+                # HyDE answer — 现场编码（可能因 ColPali 已卸载而失败，不影响原始结果）
+                if hyde_answer:
+                    try:
+                        hyde_vis = self.visual.search(hyde_answer, k=20)
+                        routes.append(hyde_vis)
+                        vis_results = vis_results + hyde_vis
+                    except Exception as e:
+                        logger.debug(f"HyDE visual 跳过（ColPali 可能未加载）: {e}")
+
                 trace["visual_top5"] = [
                     {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
-                    for r in visual_results[:5]
+                    for r in vis_results[:5]
                 ]
             except Exception as e:
                 logger.warning(f"Visual 检索跳过: {e}")
@@ -142,8 +188,10 @@ class PrismRAGRetriever:
 
         fused = self.fusion.fuse(routes, k=min(k * 2, 40))
 
+        # ── Rerank（支持双 reranker）────────────────────────
         if use_rerank and fused:
-            reranked = self.reranker.rerank(query, fused, top_k=k)
+            reranker = self.zerank_reranker if reranker_type == "zerank" else self.reranker
+            reranked = reranker.rerank(query, fused, top_k=k)
             return {"results": reranked, "retrieval_trace": trace}
 
         return {"results": fused[:k], "retrieval_trace": trace}

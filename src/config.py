@@ -85,6 +85,14 @@ class Config:
         return self._data["models"]["bge_reranker"]
 
     @property
+    def zerank_reranker_model_id(self) -> str:
+        return self._data["models"]["zerank_reranker"]
+
+    @property
+    def llm_model_id(self) -> str:
+        return self._data["models"]["llm"]
+
+    @property
     def bge_dim(self) -> int:
         return self._data["embedding"]["bge_dim"]
 
