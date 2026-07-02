@@ -60,6 +60,17 @@ def compute_mrr(relevant: set, ranked: List[str]) -> float:
     return 0.0
 
 
+# ViDoRe dataset language field values (dataset uses full names, CLI uses short codes)
+_LANGUAGE_MAP = {
+    "en": "english",
+    "fr": "french",
+    "de": "german",
+    "it": "italian",
+    "es": "spanish",
+    "pt": "portuguese",
+}
+
+
 def load_eval_data(
     dataset_path: str,
     max_queries: Optional[int] = None,
@@ -70,7 +81,7 @@ def load_eval_data(
     Args:
         dataset_path: HuggingFace dataset 路径
         max_queries: 可选，限制 query 数量
-        language: "en" 过滤英文，"all" 全部保留
+        language: "en"/"fr"/... 过滤对应语言，"all" 全部保留
 
     Returns:
         (queries_ds, qrel_map) 元组
@@ -81,7 +92,8 @@ def load_eval_data(
     qrels_ds = hf_load_dataset(dataset_path, "qrels", split="test")
 
     if language != "all":
-        queries_ds = queries_ds.filter(lambda x: x["query_lang"] == language)
+        dataset_lang = _LANGUAGE_MAP.get(language, language)
+        queries_ds = queries_ds.filter(lambda x: x["language"] == dataset_lang)
 
     if max_queries:
         queries_ds = queries_ds.select(range(min(max_queries, len(queries_ds))))

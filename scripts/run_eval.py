@@ -49,14 +49,14 @@ def main():
     num_queries = len(queries_ds)
     logger.info(f"评测 query 数量: {num_queries}")
 
-    # 校验 query 数量（fail fast）
+    # 校验 query 数量（fail fast，仅在全量评测时校验）
     expected = args.expected_query_count
     if expected is None:
         expected = 283 if args.language == "en" else None
-    if expected is not None and num_queries != expected:
+    if expected is not None and args.max_queries is None and num_queries != expected:
         raise RuntimeError(
             f"query 数量校验失败: 预期 {expected}, 实际 {num_queries}。"
-            f"请检查 dataset 的 query_lang 字段分布。"
+            f"请检查 dataset 的 language 字段分布。"
         )
 
     # ── 基础设施初始化 ────────────────────────────────────────

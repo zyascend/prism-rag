@@ -19,7 +19,7 @@ def _make_mock_dataset(num_queries: int = 5):
         return {
             "query_id": idx,
             "query": f"test query {idx}",
-            "query_lang": "en",
+            "language": "english",
         }
     queries_ds.__getitem__.side_effect = getitem_side_effect
 
@@ -37,9 +37,9 @@ def _make_mock_dataset(num_queries: int = 5):
 def test_load_eval_data_filters_language(mock_load_dataset):
     """load_eval_data(language='en') 应调用 filter 并按 query_lang 过滤"""
     queries_ds, qrels_ds = _make_mock_dataset()
-    mock_load_dataset.side_effect = lambda path, split, *a, **kw: {
-        queries_ds if split == "queries" else qrels_ds
-    }.get(split, qrels_ds)
+    mock_load_dataset.side_effect = lambda path, name, *a, **kw: {
+        "queries": queries_ds, "qrels": qrels_ds
+    }[name]
 
     queries_out, qrel_map = load_eval_data(
         dataset_path="vidore/vidore_v3_industrial",
@@ -57,9 +57,9 @@ def test_load_eval_data_filters_language(mock_load_dataset):
 def test_load_eval_data_applies_max_queries(mock_load_dataset):
     """load_eval_data 应用 max_queries 限制"""
     queries_ds, qrels_ds = _make_mock_dataset(num_queries=10)
-    mock_load_dataset.side_effect = lambda path, split, *a, **kw: {
-        queries_ds if split == "queries" else qrels_ds
-    }.get(split, qrels_ds)
+    mock_load_dataset.side_effect = lambda path, name, *a, **kw: {
+        "queries": queries_ds, "qrels": qrels_ds
+    }[name]
 
     queries_out, qrel_map = load_eval_data(
         dataset_path="vidore/vidore_v3_industrial",
@@ -109,9 +109,9 @@ def test_expected_query_count_validation():
     """语言过滤后，可以验证 query 数量是否与预期一致"""
     queries_ds, qrels_ds = _make_mock_dataset(num_queries=3)
     with patch("src.evaluation.ablation.hf_load_dataset") as mock_load:
-        mock_load.side_effect = lambda path, split, *a, **kw: {
-            queries_ds if split == "queries" else qrels_ds
-        }.get(split, qrels_ds)
+        mock_load.side_effect = lambda path, name, *a, **kw: {
+            "queries": queries_ds, "qrels": qrels_ds
+        }[name]
 
         queries_out, qrel_map = load_eval_data(
             dataset_path="vidore/vidore_v3_industrial",
