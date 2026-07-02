@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List
+from typing import Dict, List
 
 import torch
 from colpali_engine.models import ColPali, ColPaliProcessor
@@ -52,12 +52,14 @@ class ColPaliEmbedder:
         ).eval()
         self.processor = ColPaliProcessor.from_pretrained(cfg.colpali_model_id)
         self._warmed_up = False
+        self._loaded = True
 
     @torch.no_grad()
     def encode_pages(
         self, images: List[Image.Image], batch_size: int | None = None, show_progress: bool = False
     ) -> List[torch.Tensor]:
         """编码页面列表，每页返回 [n_patches, 128] 多向量"""
+        self._require_loaded()
         if batch_size is None:
             batch_size = cfg.get("embedding.colpali_batch_size", 4)
         # 预热：首次 query 有 torch.compile 开销
@@ -89,6 +91,7 @@ class ColPaliEmbedder:
     @torch.no_grad()
     def encode_query(self, text: str) -> torch.Tensor:
         """编码单条文本查询为 [1, n_patches, 128]（ColPali 查询编码）"""
+        self._require_loaded()
         # PaliGemmaProcessor 需要 images 参数，即使是查询也要传一个 dummy image
         dummy = Image.new("RGB", (448, 448), color=255)
         inputs = self.processor(
@@ -98,3 +101,37 @@ class ColPaliEmbedder:
             padding=True,
         ).to(self.device)
         return self.model(**inputs).cpu()
+
+    @torch.no_grad()
+    def encode_queries_batch(self, texts: List[str], batch_size: int = 4) -> Dict[int, torch.Tensor]:
+        """批量编码多个 query，返回 {idx: tensor[1, n_patches, 128]}"""
+        self._require_loaded()
+        results: Dict[int, torch.Tensor] = {}
+        for i in trange(0, len(texts), batch_size, desc="ColPali encode queries"):
+            batch_texts = texts[i : i + batch_size]
+            dummy = Image.new("RGB", (448, 448), color=255)
+            inputs = self.processor(
+                images=[dummy] * len(batch_texts),
+                text=batch_texts,
+                return_tensors="pt",
+                padding=True,
+            ).to(self.device)
+            batch_outputs = self.model(**inputs)  # [batch, n_q, 128]
+            for j, emb in enumerate(batch_outputs):
+                results[i + j] = emb.unsqueeze(0).cpu()  # -> [1, n_q, 128]
+        return results
+
+    def unload(self):
+        """卸载模型并释放显存。之后调用任何 encode_* 方法都会抛 RuntimeError。"""
+        del self.model
+        self.model = None
+        torch.cuda.empty_cache()
+        self._loaded = False
+
+    def _require_loaded(self):
+        """检查模型是否可用，不可用时抛出 RuntimeError"""
+        if not self._loaded:
+            raise RuntimeError(
+                "ColPaliEmbedder 已通过 unload() 卸载，无法执行编码操作。"
+                "请重新创建 ColPaliEmbedder 实例后再调用。"
+            )
