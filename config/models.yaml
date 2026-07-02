@@ -2,6 +2,7 @@ models:
   colpali: "vidore/colpali-v1.3"
   bge_embedding: "BAAI/bge-large-en-v1.5"
   bge_reranker: "BAAI/bge-reranker-large"
+  zerank_reranker: "zeroentropy/zerank-2-reranker"
   llm: "qwen2:7b"
 
 embedding:

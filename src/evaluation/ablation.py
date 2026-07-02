@@ -24,9 +24,12 @@ class AblationConfig:
     use_dense: bool = True
     use_visual: bool = True
     use_rerank: bool = True
+    reranker_type: str = "bge"      # "bge" | "zerank"
+    use_hyde: bool = False
 
 
 ABLATION_CONFIGS = [
+    # ── 基础消融：各路检索器独立/组合 ──
     AblationConfig(name="BM25_only", use_bm25=True, use_dense=False, use_visual=False, use_rerank=False),
     AblationConfig(name="Dense_only", use_bm25=False, use_dense=True, use_visual=False, use_rerank=False),
     AblationConfig(name="Visual_only", use_bm25=False, use_dense=False, use_visual=True, use_rerank=False),
@@ -34,6 +37,16 @@ ABLATION_CONFIGS = [
     AblationConfig(name="BM25_Dense_Visual", use_bm25=True, use_dense=True, use_visual=True, use_rerank=False),
     AblationConfig(name="Full_no_rerank", use_bm25=True, use_dense=True, use_visual=True, use_rerank=False),
     AblationConfig(name="Full_with_rerank", use_bm25=True, use_dense=True, use_visual=True, use_rerank=True),
+    # ── 全管道 + HyDE / zerank-2 变体（消融对比用）──
+    AblationConfig(name="Full_BGE_HyDE",
+        use_bm25=True, use_dense=True, use_visual=True, use_rerank=True,
+        reranker_type="bge", use_hyde=True),
+    AblationConfig(name="Full_zerank2",
+        use_bm25=True, use_dense=True, use_visual=True, use_rerank=True,
+        reranker_type="zerank", use_hyde=False),
+    AblationConfig(name="Full_zerank2_HyDE",
+        use_bm25=True, use_dense=True, use_visual=True, use_rerank=True,
+        reranker_type="zerank", use_hyde=True),
 ]
 
 
@@ -116,6 +129,7 @@ def run_ablation(
     output_dir: str = "results",
     pre_encoded_visual: Optional[Dict[int, "torch.Tensor"]] = None,
     language: str = "en",
+    quick: bool = False,
 ) -> List[dict]:
     """运行全量消融实验
 
@@ -126,12 +140,21 @@ def run_ablation(
         output_dir: 结果输出目录
         pre_encoded_visual: {q_idx: tensor[1, n_q, 128]} 预编码的 visual query embedding
         language: 当前评测语言，会写入结果元数据
+        quick: 仅跑新增配置（跳过基线消融）
     """
     import torch  # 仅在用到类型时延迟导入
 
+    configs = ABLATION_CONFIGS
+    if quick:
+        # 仅跑 HyDE + zerank-2 相关的新配置
+        configs = [c for c in ABLATION_CONFIGS if c.name in (
+            "Full_BGE_HyDE", "Full_zerank2_HyDE"
+        )]
+        logger.info(f"Quick 模式：仅跑 {len(configs)} 组新配置")
+
     results = []
 
-    for config in ABLATION_CONFIGS:
+    for config in configs:
         logger.info(f"=== 消融配置: {config.name} ===")
         latencies = []
         all_ranked_page_ids: List[List[str]] = []
@@ -152,6 +175,7 @@ def run_ablation(
                 use_bm25=config.use_bm25, use_dense=config.use_dense,
                 use_visual=config.use_visual, use_rerank=config.use_rerank,
                 visual_query_embedding=visual_q_emb,
+                use_hyde=config.use_hyde, reranker_type=config.reranker_type,
             )
             latencies.append((time.time() - start) * 1000)
 

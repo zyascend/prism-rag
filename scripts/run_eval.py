@@ -6,6 +6,8 @@ import logging
 import sys
 from pathlib import Path
 
+import torch
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import cfg
@@ -16,6 +18,7 @@ from src.evaluation.vidore_adapter import PrismRAGRetriever
 from src.retrieval.bm25_retriever import BM25Retriever
 from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.fusion import RRFFusion
+from src.retrieval.hyde import HyDEGenerator
 from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
 from src.store.faiss_store import FaissColPaliStore
@@ -35,6 +38,8 @@ def main():
                         help="评测语言（'en'=论文对齐英文子集, 'all'=全量 1698 query）")
     parser.add_argument("--expected-query-count", type=int, default=None,
                         help="预期 query 数量校验（默认: en=283, all=不校验）")
+    parser.add_argument("--quick", action="store_true",
+                        help="仅跑新增配置（跳过 7 个基线消融）")
     args = parser.parse_args()
 
     cfg.load()
@@ -68,6 +73,8 @@ def main():
     dense = DenseRetriever(pg_store, bge)
     fusion = RRFFusion(rrf_k=60)
     reranker = Reranker()
+    hyde = HyDEGenerator()
+    # zerank-2 延迟到 ColPali 卸载后加载，避免三模型同时占满 24GB 显存
 
     # ── Phase A: 预编码 visual query ──────────────────────────
     # 仅占用 ColPali 模型显存，FAISS 向量尚未加载到 GPU
@@ -79,6 +86,28 @@ def main():
     logger.info(f"完成 {len(pre_encoded_visual)} 条 query 预编码")
     colpali.unload()
     logger.info("ColPali 模型已卸载，显存已释放")
+    torch.cuda.empty_cache()
+
+    # ── Phase A2: HyDE 预计算（Ollama 独占 GPU，完成后释放）──
+    logger.info("HyDE 预计算 283 条 query（Ollama GPU 加速）...")
+    import subprocess, time
+    # 确保 ollama 在运行
+    result = subprocess.run(["pgrep", "-f", "ollama serve"], capture_output=True)
+    if result.returncode != 0:
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(5)  # 等 ollama 启动
+    hyde.precompute(query_texts)
+    logger.info(f"HyDE 预计算完成，缓存 {len(hyde._cache)} 条")
+    # 关闭 Ollama 释放 GPU 显存给后续模型
+    subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True)
+    time.sleep(3)
+    torch.cuda.empty_cache()
+    logger.info("Ollama 已关闭，显存已释放")
+
+    # ── 加载 zerank-2（ColPali 已卸载，Ollama 已释放，显存充足）──
+    logger.info("加载 zerank-2 reranker (bf16)...")
+    zerank_reranker = Reranker(model_id=cfg.zerank_reranker_model_id,
+                               model_kwargs={"torch_dtype": torch.bfloat16})
 
     # ── Phase B: Ingest / Load FAISS ──────────────────────────
     # 此时 no ColPali 模型竞争，FAISS GPU 向量可以安全加载
@@ -110,7 +139,7 @@ def main():
     retriever = PrismRAGRetriever(
         pg_store=pg_store, faiss_store=faiss_store, bge=bge, colpali=colpali,
         chunker=chunker, bm25=bm25, dense=dense, visual=visual,
-        fusion=fusion, reranker=reranker,
+        fusion=fusion, reranker=reranker, hyde=hyde, zerank_reranker=zerank_reranker,
     )
 
     # ── 执行消融实验 ──────────────────────────────────────────
@@ -121,6 +150,7 @@ def main():
         output_dir=args.output_dir,
         pre_encoded_visual=pre_encoded_visual,
         language=args.language,
+        quick=args.quick,
     )
 
 
