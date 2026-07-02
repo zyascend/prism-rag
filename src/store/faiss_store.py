@@ -217,20 +217,40 @@ class FaissColPaliStore:
     # ── GPU MaxSim ─────────────────────────────────────────
 
     def _maxsim_torch(self, query_embedding: torch.Tensor, k: int) -> List[dict]:
-        """torch GPU 加速 MaxSim"""
-        q = query_embedding.float().to(self._device)         # [batch, n_q, 128]
-        n_q = q.shape[1]
-        q_flat = q.reshape(n_q, -1)                          # [n_q, dim]
+        """torch GPU 加速 MaxSim（分页批处理避免 OOM）
 
-        scores = q_flat @ self._vectors_torch.T              # [n_q, total_patches] ← GPU matmul
+        ColPali query 可产出 ~1000+ patches，全量 matmul 的中间矩阵
+        [n_q, total_patches] ≈ 1050 × 5.3M × 4B ≈ 21 GB。按页 batch 计算，
+        每个 batch 的中间矩阵 [n_q, batch_patches] ≤ 几百 MB，安全可控。
+        """
+        q = query_embedding.float().to(self._device)         # [1, n_q, 128]
+        n_q = q.shape[1]
+        q_flat = q.reshape(n_q, -1)                          # [n_q, 128]
 
         page_scores: Dict[int, float] = {}
-        for start, end in self._page_boundaries:
-            page_patch_scores = scores[:, start:end]          # [n_q, page_patches]
-            max_per_query = page_patch_scores.max(dim=1).values
-            page_score = float(max_per_query.mean().cpu())
-            page_id = int(self._page_ids[start])
-            page_scores[page_id] = page_score
+
+        # 按页 batch 计算，每个 batch 最多 200 页（~200k patches → ~800 MB intermediate）
+        PAGE_BATCH = 200
+        boundaries = self._page_boundaries
+        for b_start in range(0, len(boundaries), PAGE_BATCH):
+            b_end = min(b_start + PAGE_BATCH, len(boundaries))
+            batch_start_patch = boundaries[b_start][0]
+            batch_end_patch = boundaries[b_end - 1][1]
+
+            # 该 batch 的所有 patches → [n_q, batch_patches]
+            batch_vectors = self._vectors_torch[batch_start_patch:batch_end_patch]
+            batch_scores = q_flat @ batch_vectors.T           # [n_q, batch_patches]
+
+            # 对该 batch 内每页计算 MaxSim
+            for i in range(b_start, b_end):
+                start, end = boundaries[i]
+                local_start = start - batch_start_patch
+                local_end = end - batch_start_patch
+                page_patch_scores = batch_scores[:, local_start:local_end]
+                max_per_query = page_patch_scores.max(dim=1).values
+                page_score = float(max_per_query.mean().cpu())
+                page_id = int(self._page_ids[start])
+                page_scores[page_id] = page_score
 
         return self._rank_pages(page_scores, k)
 
