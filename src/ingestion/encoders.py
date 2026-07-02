@@ -71,12 +71,11 @@ class ColPaliEmbedder:
         batches = []
         for i in trange(0, len(images), batch_size, disable=not show_progress, desc="ColPali encode"):
             batch_imgs = images[i : i + batch_size]
-            batch_inputs = self.processor(
-                images=batch_imgs,
-                text=[""] * len(batch_imgs),
-                return_tensors="pt",
-                padding=True,
-            ).to(self.device)
+            # 使用 process_images 确保页面编码含 "Describe the image." prompt，
+            # 与 ColPali 训练时的输入格式对齐。之前传 text=[""] 缺失了
+            # 5 个关键 token (<bos>Describe the image.)，导致 page embedding
+            # 语义质量下降，Visual 路 NDCG@10 损失约 30-50%。
+            batch_inputs = self.processor.process_images(images=batch_imgs).to(self.device)
             batch_outputs = self.model(**batch_inputs)
             # batch_outputs: [batch, n_patches, 128]
             batches.extend(list(batch_outputs.cpu()))
@@ -85,37 +84,32 @@ class ColPaliEmbedder:
 
     def _warmup(self, dummy_image: Image.Image):
         """MPS 首次查询预热"""
-        inputs = self.processor(images=[dummy_image], text=[""], return_tensors="pt", padding=True).to(self.device)
+        inputs = self.processor.process_images(images=[dummy_image]).to(self.device)
         _ = self.model(**inputs)
 
     @torch.no_grad()
     def encode_query(self, text: str) -> torch.Tensor:
-        """编码单条文本查询为 [1, n_patches, 128]（ColPali 查询编码）"""
+        """编码单条文本查询为 [1, n_patches, 128]（ColPali 查询编码）
+
+        使用 processor.process_queries() 做纯文本编码。
+        之前传 dummy white image 导致 1024 个白图 patch 淹没 ~10 个文本 token，
+        MaxSim 退化到 NDCG@10 ≈ 0.1（应为 ~0.35）。
+        """
         self._require_loaded()
-        # PaliGemmaProcessor 需要 images 参数，即使是查询也要传一个 dummy image
-        dummy = Image.new("RGB", (448, 448), color=255)
-        inputs = self.processor(
-            images=[dummy],
-            text=[text],
-            return_tensors="pt",
-            padding=True,
-        ).to(self.device)
+        inputs = self.processor.process_queries([text]).to(self.device)
         return self.model(**inputs).cpu()
 
     @torch.no_grad()
     def encode_queries_batch(self, texts: List[str], batch_size: int = 4) -> Dict[int, torch.Tensor]:
-        """批量编码多个 query，返回 {idx: tensor[1, n_patches, 128]}"""
+        """批量编码多个 query，返回 {idx: tensor[1, n_patches, 128]}
+
+        纯文本编码，理由同 encode_query。
+        """
         self._require_loaded()
         results: Dict[int, torch.Tensor] = {}
         for i in trange(0, len(texts), batch_size, desc="ColPali encode queries"):
             batch_texts = texts[i : i + batch_size]
-            dummy = Image.new("RGB", (448, 448), color=255)
-            inputs = self.processor(
-                images=[dummy] * len(batch_texts),
-                text=batch_texts,
-                return_tensors="pt",
-                padding=True,
-            ).to(self.device)
+            inputs = self.processor.process_queries(batch_texts).to(self.device)
             batch_outputs = self.model(**inputs)  # [batch, n_q, 128]
             for j, emb in enumerate(batch_outputs):
                 results[i + j] = emb.unsqueeze(0).cpu()  # -> [1, n_q, 128]
