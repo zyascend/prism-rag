@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "PrismRAG Architecture",
+    "subtitle": "多模态 PDF RAG — 三路检索（BM25 · Dense · Visual）+ RRF 融合 + Cross-encoder 重排",
+    "output": "prismrag-architecture.html",
+    "viewBox": [1600, 1000]
+  },
+  "components": [
+    { "id": "dataset", "type": "database", "label": "ViDoRe Dataset", "sublabel": "~5,244 PDF pages", "pos": [120, 120], "size": [130, 60] },
+    { "id": "chunker", "type": "backend", "label": "TextChunker", "sublabel": "≤512 tokens/chunk", "pos": [120, 220], "size": [130, 60] },
+    { "id": "bge", "type": "backend", "label": "BGE Embedder", "sublabel": "1024-dim vectors", "pos": [60, 340], "size": [130, 60] },
+    { "id": "colpali", "type": "backend", "label": "ColPali/ColQwen2", "sublabel": "Multi-vector encoding", "pos": [210, 340], "size": [140, 60] },
+
+    { "id": "pgvector", "type": "database", "label": "pgvector", "sublabel": "chunks + BGE vectors", "pos": [460, 340], "size": [140, 65] },
+    { "id": "faiss", "type": "database", "label": "FAISS", "sublabel": "page multi-vectors", "pos": [460, 430], "size": [140, 65] },
+
+    { "id": "query", "type": "external", "label": "User Query", "sublabel": "natural language", "pos": [750, 100], "size": [130, 45] },
+    { "id": "bm25", "type": "backend", "label": "BM25 (Lexical)", "sublabel": "keyword matching", "pos": [750, 210], "size": [130, 60] },
+    { "id": "dense", "type": "backend", "label": "Dense (Semantic)", "sublabel": "BGE → pgvector HNSW", "pos": [750, 300], "size": [130, 60] },
+    { "id": "visual", "type": "backend", "label": "Visual (Page Image)", "sublabel": "ColPali → FAISS", "pos": [750, 390], "size": [130, 60] },
+
+    { "id": "fusion", "type": "backend", "label": "RRF Fusion", "sublabel": "score = Σ 1/(k+rank)", "pos": [1030, 210], "size": [180, 60] },
+    { "id": "reranker", "type": "backend", "label": "Cross-encoder", "sublabel": "BGE / zerank-2", "pos": [1030, 300], "size": [180, 60] },
+    { "id": "output", "type": "frontend", "label": "Top-k Results", "sublabel": "chunk_id + page_id", "pos": [1030, 390], "size": [180, 50] },
+
+    { "id": "api", "type": "backend", "label": "FastAPI", "sublabel": "/search + /health", "pos": [1050, 510], "size": [110, 50] },
+
+    { "id": "ablation", "type": "backend", "label": "Ablation Experiments", "sublabel": "10 configs · BM25/Dense/Visual toggles", "pos": [80, 650], "size": [290, 60] },
+    { "id": "metrics", "type": "backend", "label": "ViDoRe Metrics", "sublabel": "NDCG@5/10 · Recall · MRR", "pos": [430, 650], "size": [290, 60] },
+    { "id": "hyde", "type": "backend", "label": "HyDE + Reranker", "sublabel": "Qwen2:7b HyDE · zerank-2", "pos": [780, 650], "size": [290, 60] },
+    { "id": "config", "type": "database", "label": "models.yaml", "sublabel": "model IDs · devices · paths", "pos": [1130, 650], "size": [250, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "📥 Offline Ingestion", "wraps": ["dataset", "chunker", "bge", "colpali"], "pad": 20 },
+    { "kind": "region", "label": "🗄️ Storage", "wraps": ["pgvector", "faiss"], "pad": 20 },
+    { "kind": "region", "label": "🔍 Online Retrieval", "wraps": ["query", "bm25", "dense", "visual"], "pad": 20 },
+    { "kind": "region", "label": "🧩 Fusion & Output", "wraps": ["fusion", "reranker", "output"], "pad": 20 },
+    { "kind": "region", "label": "📊 Evaluation & Config", "wraps": ["ablation", "metrics", "hyde", "config"], "pad": 20 }
+  ],
+  "connections": [
+    { "from": "dataset", "to": "chunker" },
+    { "from": "chunker", "to": "bge" },
+    { "from": "chunker", "to": "colpali" },
+    { "from": "bge", "to": "pgvector", "variant": "dashed" },
+    { "from": "colpali", "to": "faiss", "variant": "dashed" },
+
+    { "from": "query", "to": "bm25" },
+    { "from": "query", "to": "dense" },
+    { "from": "query", "to": "visual" },
+    { "from": "pgvector", "to": "dense", "variant": "dashed", "fromSide": "right", "toSide": "left" },
+    { "from": "faiss", "to": "visual", "variant": "dashed", "fromSide": "right", "toSide": "left" },
+
+    { "from": "bm25", "to": "fusion", "fromSide": "right", "toSide": "left" },
+    { "from": "dense", "to": "fusion", "fromSide": "right", "toSide": "left" },
+    { "from": "visual", "to": "fusion", "fromSide": "right", "toSide": "left" },
+    { "from": "fusion", "to": "reranker" },
+    { "from": "reranker", "to": "output" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Three Retrieval Routes", "items": ["BM25 (blue): keyword/lexical matching on chunk text", "Dense (green): BGE query → pgvector HNSW cosine search", "Visual (purple): ColPali query → FAISS MaxSim → pgvector grounding"] },
+    { "dot": "emerald", "title": "Fusion Pipeline", "items": ["RRF Fusion: reciprocal rank fusion of all 3 routes", "Cross-encoder rerank: BGE-reranker-large / zerank-2 (Top-20 → Top-5)", "HyDE: Qwen2:7b generates hypothetical document for query expansion"] },
+    { "dot": "rose", "title": "Evaluation", "items": ["Ablation: 10 configs toggle BM25/Dense/Visual + reranker type", "ViDoRe benchmark: NDCG@5/10, Recall@5/10, MRR", "Config: models.yaml controls devices, paths, model IDs"] }
+  ]
+}
