@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 import torch
-from colpali_engine.models import ColPali, ColPaliProcessor
+from colpali_engine.models import ColPali, ColPaliProcessor, ColQwen2, ColQwen2Processor
 from PIL import Image
 from sentence_transformers import SentenceTransformer
 from tqdm import trange
@@ -139,16 +139,101 @@ class ColPaliEmbedder:
             )
 
 
+class ColQwen2Embedder:
+    """ColQwen2 多向量编码器（接口与 ColPaliEmbedder 对齐）
+
+    基于 Qwen2-VL backbone，较 PaliGemma 有更好的视觉理解能力，
+    尤其对技术图纸、示意图、表格等工业文档更敏感。
+    """
+
+    def __init__(self, device: str | None = None):
+        self.device = device if device is not None else cfg.get("embedding.colpali_device", "cpu")
+        self.model = ColQwen2.from_pretrained(
+            cfg.colqwen2_model_id,
+            torch_dtype=torch.bfloat16,
+            device_map=self.device,
+        ).eval()
+        self.processor = ColQwen2Processor.from_pretrained(cfg.colqwen2_model_id)
+        self._warmed_up = False
+        self._loaded = True
+
+    @torch.no_grad()
+    def encode_pages(
+        self, images: List[Image.Image], batch_size: int | None = None, show_progress: bool = False
+    ) -> List[torch.Tensor]:
+        """编码页面列表，每页返回 [n_patches, 128] 多向量"""
+        self._require_loaded()
+        if batch_size is None:
+            batch_size = cfg.get("embedding.colpali_batch_size", 4)
+        if not self._warmed_up:
+            dummy = Image.new("RGB", (1000, 1600), color=255)
+            self._warmup(dummy)
+            self._warmed_up = True
+
+        batches = []
+        for i in trange(0, len(images), batch_size, disable=not show_progress, desc="ColQwen2 encode"):
+            batch_imgs = images[i : i + batch_size]
+            batch_inputs = self.processor.process_images(images=batch_imgs).to(self.device)
+            batch_outputs = self.model(**batch_inputs)
+            batches.extend(list(batch_outputs.cpu()))
+
+        return batches
+
+    def _warmup(self, dummy_image: Image.Image):
+        inputs = self.processor.process_images(images=[dummy_image]).to(self.device)
+        _ = self.model(**inputs)
+
+    @torch.no_grad()
+    def encode_query(self, text: str) -> torch.Tensor:
+        """编码单条文本查询为 [1, n_patches, 128]"""
+        self._require_loaded()
+        inputs = self.processor.process_queries([text], max_length=128).to(self.device)
+        return self.model(**inputs).cpu()
+
+    @torch.no_grad()
+    def encode_queries_batch(self, texts: List[str], batch_size: int = 4) -> Dict[int, torch.Tensor]:
+        """批量编码多个 query，返回 {idx: tensor[1, n_q, 128]}"""
+        self._require_loaded()
+        results: Dict[int, torch.Tensor] = {}
+        for i in trange(0, len(texts), batch_size, desc="ColQwen2 encode queries"):
+            batch_texts = texts[i : i + batch_size]
+            inputs = self.processor.process_queries(batch_texts, max_length=128).to(self.device)
+            batch_outputs = self.model(**inputs)
+            for j, emb in enumerate(batch_outputs):
+                results[i + j] = emb.unsqueeze(0).cpu()
+        return results
+
+    def unload(self):
+        del self.model
+        self.model = None
+        torch.cuda.empty_cache()
+        self._loaded = False
+
+    def _require_loaded(self):
+        if not self._loaded:
+            raise RuntimeError(
+                "ColQwen2Embedder 已通过 unload() 卸载，无法执行编码操作。"
+                "请重新创建 ColQwen2Embedder 实例后再调用。"
+            )
+
+
 def create_visual_encoder(
     model_name: str = "colpali",
     device: str | None = None,
-) -> ColPaliEmbedder:
+) -> ColPaliEmbedder | ColQwen2Embedder:
     """工厂函数：按模型名前缀创建视觉编码器。
 
     model_name 前缀匹配规则:
       - "colpali" → ColPaliEmbedder (vidore/colpali-v1.3)
-      - "colembed" → ColembedEncoder (需切换 feature 分支)
+      - "colqwen2" → ColQwen2Embedder (vidore/colqwen2-v1.0)
+      - "colembed" → ColembedEncoder (需切换 feature/colembed-3b-visual-upgrade 分支)
     """
-    if not model_name.startswith("colpali"):
-        raise ValueError(f"不支持的 visual model: {model_name}（主分支仅支持 colpali，colembed 在 feature 分支）")
-    return ColPaliEmbedder(device=device)
+    if model_name.startswith("colqwen2"):
+        return ColQwen2Embedder(device=device)
+    elif model_name.startswith("colembed"):
+        raise ValueError(
+            "ColembedEncoder 在 feature/colembed-3b-visual-upgrade 分支，"
+            "请切换分支后使用。"
+        )
+    else:
+        return ColPaliEmbedder(device=device)

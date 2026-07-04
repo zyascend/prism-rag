@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import cfg
-from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
+from src.ingestion.encoders import BGEEmbedder, create_visual_encoder
 from src.ingestion.text_chunker import TextChunker
 from src.ingestion.vidore_ingestor import ViDoReIngestor
 from src.store.pgvector_store import PgVectorStore
@@ -23,14 +23,23 @@ def main():
     parser.add_argument("--max-pages", type=int, default=None, help="Limit pages (for testing)")
     parser.add_argument("--skip-faiss", action="store_true", help="Skip ColPali + FAISS (BGE only)")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint")
+    parser.add_argument("--visual-model", default="colpali",
+                        choices=["colpali", "colqwen2"],
+                        help="Visual embedding model (default: colpali)")
     args = parser.parse_args()
 
     # 初始化
     cfg.load()
     pg_store = PgVectorStore()
-    faiss_store = FaissColPaliStore()
+    if args.visual_model == "colqwen2":
+        faiss_store = FaissColPaliStore(
+            index_path=cfg.get("storage.faiss.colqwen2_index_path"),
+            id_map_path=cfg.get("storage.faiss.colqwen2_id_map_path"),
+        )
+    else:
+        faiss_store = FaissColPaliStore()
     bge = BGEEmbedder()
-    colpali = ColPaliEmbedder()
+    colpali = create_visual_encoder(model_name=args.visual_model)
     chunker = TextChunker()
 
     ingestor = ViDoReIngestor(pg_store, faiss_store, bge, colpali, chunker)

@@ -77,6 +77,10 @@ class Config:
         return self._data["models"]["colpali"]
 
     @property
+    def colqwen2_model_id(self) -> str:
+        return self._data["models"]["colqwen2"]
+
+    @property
     def bge_model_id(self) -> str:
         return self._data["models"]["bge_embedding"]
 

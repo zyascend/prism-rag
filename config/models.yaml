@@ -1,5 +1,6 @@
 models:
   colpali: "vidore/colpali-v1.3"
+  colqwen2: "vidore/colqwen2-v1.0"
   bge_embedding: "BAAI/bge-large-en-v1.5"
   bge_reranker: "BAAI/bge-reranker-large"
   zerank_reranker: "zeroentropy/zerank-2-reranker"
@@ -9,7 +10,7 @@ embedding:
   bge_dim: 1024
   bge_device: "auto"
   colpali_device: "auto"
-  colpali_batch_size: 4  # 编码 batch size（GPU 24GB 可调到 8）
+  colpali_batch_size: 4  # 编码 batch size（GPU 24GB 可调到 8；ColQwen2-2B 可调 8-16）
 
 retrieval:
   bm25_k: 20
@@ -30,6 +31,8 @@ storage:
     # 可通过 make fetch-indexes 拉取预编码 Release artifact
     index_path: "indexes/colpali-v1.3-vidore-industrial.faiss"
     id_map_path: "indexes/colpali-v1.3-vidore-industrial-ids.npy"
+    colqwen2_index_path: "indexes/colqwen2-v1.0-vidore-industrial.faiss"
+    colqwen2_id_map_path: "indexes/colqwen2-v1.0-vidore-industrial-ids.npy"
     index_type: "flat"  # "flat" 精确 | "hnsw" HNSW 预筛加速 (macOS FAISS bug, Linux OK)
     hnsw_m: 32
 
