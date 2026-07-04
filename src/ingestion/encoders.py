@@ -137,3 +137,18 @@ class ColPaliEmbedder:
                 "ColPaliEmbedder 已通过 unload() 卸载，无法执行编码操作。"
                 "请重新创建 ColPaliEmbedder 实例后再调用。"
             )
+
+
+def create_visual_encoder(
+    model_name: str = "colpali",
+    device: str | None = None,
+) -> ColPaliEmbedder:
+    """工厂函数：按模型名前缀创建视觉编码器。
+
+    model_name 前缀匹配规则:
+      - "colpali" → ColPaliEmbedder (vidore/colpali-v1.3)
+      - "colembed" → ColembedEncoder (需切换 feature 分支)
+    """
+    if not model_name.startswith("colpali"):
+        raise ValueError(f"不支持的 visual model: {model_name}（主分支仅支持 colpali，colembed 在 feature 分支）")
+    return ColPaliEmbedder(device=device)
