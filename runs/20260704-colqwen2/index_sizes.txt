@@ -1,0 +1,8 @@
+total 7959548
+drwxr-xr-x 2 root root       4096 Jul  4 12:23 .
+drwxr-xr-x 7 root root        106 Jul  1 18:15 ..
+-rw-r--r-- 1 root root   31707552 Jul  4 12:23 colqwen2-v1.0-vidore-industrial-ids.npy
+-rw-r--r-- 1 root root 2029275181 Jul  4 12:23 colqwen2-v1.0-vidore-industrial.faiss
+-rw-r--r-- 1 root root 2029275264 Jul  4 12:23 colqwen2-v1.0-vidore-industrial_vectors.npy
+-rw-r--r-- 1 root root         50 Jul  4 12:23 ingest_state.json
+-rw-r--r-- 1 root root 4060287704 Jul  4 12:23 page_embeddings_cache.pkl

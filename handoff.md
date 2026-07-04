@@ -248,15 +248,17 @@ prism-rag/
 
 ## 6. 当前状态 & 下一步
 
-### 📊 消融结果 (ViDoRe V3 Industrial, English 283 queries, 2026-07-02)
+### 📊 消融结果 (ViDoRe V3 Industrial, English 283 queries, 2026-07-04)
 
 | 配置 | NDCG@10 | Recall@5 | MRR | Latency | 备注 |
 |---|---|---|---|---|---|
 | BM25_only | 0.4432 | 0.4206 | 0.5443 | 24ms | |
 | Dense_only | 0.3938 | 0.3739 | 0.5137 | 101ms | |
-| Visual_only | 0.1302 | 0.1328 | 0.1462 | 181ms | |
+| Visual_only (ColPali) | 0.1365 | 0.1447 | 0.1518 | 171ms | |
+| **Visual_only (ColQwen2)** 🆕 | **0.1564** | 0.1438 | **0.1808** | 166ms | +14.6% vs ColPali |
 | BM25_Dense | 0.4528 | 0.4389 | 0.5595 | 126ms | |
-| BM25_Dense_Visual | 0.4402 | 0.4538 | 0.5413 | 334ms | |
+| BM25_Dense_Visual (ColPali) | 0.4452 | 0.4630 | 0.5429 | 312ms | |
+| BM25_Dense_Visual (ColQwen2) 🆕 | 0.4525 | 0.4855 | 0.5403 | 312ms | |
 | Full_no_rerank | 0.4402 | 0.4538 | 0.5413 | 335ms | |
 | Full_with_rerank (BGE) | 0.5506 | 0.5123 | 0.6589 | 544ms | 基线 |
 | **Full_zerank2** 🆕 | **0.5715** | 0.5240 | 0.6777 | 1192ms | zerank-2 +0.0209 |
@@ -264,22 +266,24 @@ prism-rag/
 | Full_zerank2_HyDE 🆕 | 0.5733 | 0.5316 | 0.6844 | 1421ms | HyDE≈无效 |
 
 > 🏆 Full+zerank2 NDCG@10=0.5715，比 BGE 基线 +0.0209，比论文 pipeline SOTA (0.532) 高 0.04
-> HyDE 在 Industrial 短查询场景无效（假设文档偏离原文风格，引入噪声）
+> 🆕 ColQwen2 提升约 15%，但 Visual_only 绝对分数仍很低（0.1564），根因待查
 
 ### ✅ 已完成
 - [x] P0 Code Review 修复
 - [x] Visual 路 CUDA OOM 修复
 - [x] 评测口径对齐 (English-only 283 query)
-- [x] Query/Page 编码修复
+- [x] Query/Page 编码修复（use_fast=True, max_length=128）
 - [x] **zerank-2 Reranker 替换** (+0.0209 NDCG@10)
 - [x] **HyDE 查询改写实验** (结论：本场景无效)
 - [x] 消融框架扩展 (reranker_type + use_hyde 双维度)
-- [x] `--quick` flag 跳过基线快速验证
+- [x] `--quick` / `--config-filter` 按名过滤消融配置
+- [x] **ColQwen2 集成** (+14.6% Visual_only NDCG@10)
+- [x] **Visual-only 差距根因分析**（排除索引大小、评分公式、管道 API；锁定环境版本不一致/图像处理器/query 截断）
 
 ### 🔜 下一步
-1. **换 Visual 模型**: ColPali v1.3 → ColEmbed-3B（需重编码，预期 +0.10~0.16）
+1. **排查 Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等
 2. **zerank-2 加速**: 研究加 padding token 恢复批量推理（目前逐条，2x 慢）
-3. **HyDE 改进**: 尝试更适合工业文档的 prompt，或放弃此方向
+3. **换视觉模型**: ColEmbed-3B（feature 分支已有，需跑消融对比）
 
 ### 📁 运行记录
 | Run | 日期 | 说明 | NDCG@10 |
@@ -288,10 +292,12 @@ prism-rag/
 | `runs/20260702-visual-fix/` | 7/2 | OOM 修复 (283q) | 0.5362 |
 | `runs/20260702-query-fix/` | 7/2 | Query 编码 fix | 0.5507 |
 | `runs/20260702_1902/` | 7/2 | **zerank-2 + HyDE 实验** | 0.5715 |
+| `runs/20260704-colqwen2/` | 7/4 | **ColQwen2 视觉编码实验** | 0.5715 |
 
 ### 📄 复盘文档
 - `docs/solutions/2026-07-02-visual-oom-fix-retrospective.md` — Visual OOM 修复
 - `docs/solutions/2026-07-02-zerank2-hyde-experiment.md` — zerank-2 + HyDE 实验
+- `docs/solutions/2026-07-04-visual-sota-gap-analysis.md` — Visual-only 距 SOTA 3.6x 差距根因分析
 
 ---
 

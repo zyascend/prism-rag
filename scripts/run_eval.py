@@ -11,7 +11,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import cfg
-from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
+from src.ingestion.encoders import BGEEmbedder, create_visual_encoder
 from src.ingestion.text_chunker import TextChunker
 from src.evaluation.ablation import load_eval_data, run_ablation
 from src.evaluation.vidore_adapter import PrismRAGRetriever
@@ -42,6 +42,9 @@ def main():
                         help="仅跑新增配置（跳过 7 个基线消融）")
     parser.add_argument("--config-filter", type=str, default=None,
                         help="仅跑名称包含该子串的消融配置（如 Visual 匹配 Visual_only、BM25_Dense_Visual 等）")
+    parser.add_argument("--visual-model", default="colpali",
+                        choices=["colpali", "colqwen2"],
+                        help="Visual embedding model (default: colpali)")
     args = parser.parse_args()
 
     cfg.load()
@@ -68,7 +71,13 @@ def main():
 
     # ── 基础设施初始化 ────────────────────────────────────────
     pg_store = PgVectorStore()
-    faiss_store = FaissColPaliStore()
+    if args.visual_model == "colqwen2":
+        faiss_store = FaissColPaliStore(
+            index_path=cfg.get("storage.faiss.colqwen2_index_path"),
+            id_map_path=cfg.get("storage.faiss.colqwen2_id_map_path"),
+        )
+    else:
+        faiss_store = FaissColPaliStore()
     bge = BGEEmbedder()
     chunker = TextChunker()
     bm25 = BM25Retriever()
@@ -81,13 +90,13 @@ def main():
     # ── Phase A: 预编码 visual query ──────────────────────────
     # 仅占用 ColPali 模型显存，FAISS 向量尚未加载到 GPU
     pre_encoded_visual = None
-    logger.info("预编码 visual query...")
-    colpali = ColPaliEmbedder()
+    logger.info(f"预编码 visual query ({args.visual_model})...")
+    visual_encoder = create_visual_encoder(model_name=args.visual_model)
     query_texts = [str(queries_ds[i]["query"]) for i in range(num_queries)]
-    pre_encoded_visual = colpali.encode_queries_batch(query_texts, batch_size=8)
+    pre_encoded_visual = visual_encoder.encode_queries_batch(query_texts, batch_size=8)
     logger.info(f"完成 {len(pre_encoded_visual)} 条 query 预编码")
-    colpali.unload()
-    logger.info("ColPali 模型已卸载，显存已释放")
+    visual_encoder.unload()
+    logger.info(f"Visual encoder ({args.visual_model})已卸载，显存已释放")
     torch.cuda.empty_cache()
 
     # ── Phase A2: HyDE 预计算（Ollama 独占 GPU，完成后释放）──
@@ -112,15 +121,15 @@ def main():
                                model_kwargs={"torch_dtype": torch.bfloat16})
 
     # ── Phase B: Ingest / Load FAISS ──────────────────────────
-    # 此时 no ColPali 模型竞争，FAISS GPU 向量可以安全加载
+    # 此时 Visual 模型已卸载，FAISS GPU 向量可以安全加载
     if not args.skip_index:
-        colpali_for_ingest = ColPaliEmbedder()
+        encoder_for_ingest = create_visual_encoder(model_name=args.visual_model)
         from src.ingestion.vidore_ingestor import ViDoReIngestor
-        ingestor = ViDoReIngestor(pg_store, faiss_store, bge, colpali_for_ingest, chunker)
+        ingestor = ViDoReIngestor(pg_store, faiss_store, bge, encoder_for_ingest, chunker)
         ingestor.ingest(dataset_path=args.dataset)
         bm25.fit_from_pgvector(pg_store)
         logger.info("BM25 索引构建完成")
-        colpali_for_ingest.unload()
+        encoder_for_ingest.unload()
     else:
         faiss_loaded = faiss_store.load()
         if faiss_loaded:
@@ -128,16 +137,16 @@ def main():
             logger.info("索引加载成功，跳过构建")
         else:
             logger.warning("FAISS 索引不存在，重新构建")
-            colpali_for_ingest = ColPaliEmbedder()
+            encoder_for_ingest = create_visual_encoder(model_name=args.visual_model)
             from src.ingestion.vidore_ingestor import ViDoReIngestor
-            ingestor = ViDoReIngestor(pg_store, faiss_store, bge, colpali_for_ingest, chunker)
+            ingestor = ViDoReIngestor(pg_store, faiss_store, bge, encoder_for_ingest, chunker)
             ingestor.ingest(dataset_path=args.dataset)
             bm25.fit_from_pgvector(pg_store)
             logger.info("BM25 索引构建完成")
-            colpali_for_ingest.unload()
+            encoder_for_ingest.unload()
 
     # ── 构造检索器 ────────────────────────────────────────────
-    visual = VisualRetriever(faiss_store, pg_store, colpali)
+    visual = VisualRetriever(faiss_store, pg_store, visual_encoder)
     retriever = PrismRAGRetriever(
         pg_store=pg_store, faiss_store=faiss_store, bge=bge, colpali=colpali,
         chunker=chunker, bm25=bm25, dense=dense, visual=visual,
