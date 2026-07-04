@@ -50,7 +50,12 @@ class ColPaliEmbedder:
             torch_dtype=torch.bfloat16,
             device_map=self.device,
         ).eval()
-        self.processor = ColPaliProcessor.from_pretrained(cfg.colpali_model_id)
+        # 强制 use_fast=True：慢速图像处理器可能在 resize/padding 上有细微差异
+        # 导致页面编码与查询编码进入不同潜空间（见 docs/solutions/.../visual-sota-gap-analysis.md）
+        self.processor = ColPaliProcessor.from_pretrained(
+            cfg.colpali_model_id,
+            use_fast=True,
+        )
         self._warmed_up = False
         self._loaded = True
 
@@ -96,11 +101,13 @@ class ColPaliEmbedder:
         MaxSim 退化到 NDCG@10 ≈ 0.1（应为 ~0.35）。
         """
         self._require_loaded()
-        inputs = self.processor.process_queries([text]).to(self.device)
+        # max_length=128：工业级查询长达 40+ token，默认 50 会截断 pad buffer 和查询尾部
+        # 导致 query embedding 语义残缺，MaxSim 找不到相关页
+        inputs = self.processor.process_queries([text], max_length=128).to(self.device)
         return self.model(**inputs).cpu()
 
     @torch.no_grad()
-    def encode_queries_batch(self, texts: List[str], batch_size: int = 4) -> Dict[int, torch.Tensor]:
+    def encode_queries_batch(self, texts: List[str], batch_size: int = 4, max_length: int = 128) -> Dict[int, torch.Tensor]:
         """批量编码多个 query，返回 {idx: tensor[1, n_patches, 128]}
 
         纯文本编码，理由同 encode_query。
@@ -109,7 +116,8 @@ class ColPaliEmbedder:
         results: Dict[int, torch.Tensor] = {}
         for i in trange(0, len(texts), batch_size, desc="ColPali encode queries"):
             batch_texts = texts[i : i + batch_size]
-            inputs = self.processor.process_queries(batch_texts).to(self.device)
+            # max_length=128：默认 50 可能截断长查询（工业集含 40+ token 查询）
+            inputs = self.processor.process_queries(batch_texts, max_length=max_length).to(self.device)
             batch_outputs = self.model(**inputs)  # [batch, n_q, 128]
             for j, emb in enumerate(batch_outputs):
                 results[i + j] = emb.unsqueeze(0).cpu()  # -> [1, n_q, 128]
