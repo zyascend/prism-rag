@@ -130,6 +130,7 @@ def run_ablation(
     pre_encoded_visual: Optional[Dict[int, "torch.Tensor"]] = None,
     language: str = "en",
     quick: bool = False,
+    config_filter: Optional[str] = None,
 ) -> List[dict]:
     """运行全量消融实验
 
@@ -141,6 +142,7 @@ def run_ablation(
         pre_encoded_visual: {q_idx: tensor[1, n_q, 128]} 预编码的 visual query embedding
         language: 当前评测语言，会写入结果元数据
         quick: 仅跑新增配置（跳过基线消融）
+        config_filter: 可选，按名称子串过滤消融配置（如 "Visual" 匹配 Visual_only、BM25_Dense_Visual）
     """
     import torch  # 仅在用到类型时延迟导入
 
@@ -151,6 +153,9 @@ def run_ablation(
             "Full_BGE_HyDE", "Full_zerank2_HyDE"
         )]
         logger.info(f"Quick 模式：仅跑 {len(configs)} 组新配置")
+    if config_filter:
+        configs = [c for c in configs if config_filter.lower() in c.name.lower()]
+        logger.info(f"Config filter '{config_filter}': 仅跑 {len(configs)} 组配置 ({[c.name for c in configs]})")
 
     results = []
 

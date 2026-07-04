@@ -40,6 +40,8 @@ def main():
                         help="预期 query 数量校验（默认: en=283, all=不校验）")
     parser.add_argument("--quick", action="store_true",
                         help="仅跑新增配置（跳过 7 个基线消融）")
+    parser.add_argument("--config-filter", type=str, default=None,
+                        help="仅跑名称包含该子串的消融配置（如 Visual 匹配 Visual_only、BM25_Dense_Visual 等）")
     args = parser.parse_args()
 
     cfg.load()
@@ -151,6 +153,7 @@ def main():
         pre_encoded_visual=pre_encoded_visual,
         language=args.language,
         quick=args.quick,
+        config_filter=args.config_filter,
     )
 
 
