@@ -148,7 +148,7 @@ def main():
     # ── 构造检索器 ────────────────────────────────────────────
     visual = VisualRetriever(faiss_store, pg_store, visual_encoder)
     retriever = PrismRAGRetriever(
-        pg_store=pg_store, faiss_store=faiss_store, bge=bge, colpali=colpali,
+        pg_store=pg_store, faiss_store=faiss_store, bge=bge, colpali=visual_encoder,
         chunker=chunker, bm25=bm25, dense=dense, visual=visual,
         fusion=fusion, reranker=reranker, hyde=hyde, zerank_reranker=zerank_reranker,
     )
