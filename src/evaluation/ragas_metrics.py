@@ -496,12 +496,13 @@ def evaluate_generation(
             f_result.query = query_text
             faithfulness_results.append(f_result)
         else:
-            faithfulness_results.append(FaithfulnessResult(
+            f_result = FaithfulnessResult(
                 query=query_text,
                 answer=answer,
                 context_length=len(context),
                 faithfulness_score=0.0,
-            ))
+            )
+            faithfulness_results.append(f_result)
         
         # Step 4: Answer Relevancy（对拒答也有意义：拒答本身是否相关）
         r_result = compute_answer_relevancy(query_text, answer)
