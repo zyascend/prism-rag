@@ -23,10 +23,9 @@ PDF → MinerU 解析 → markdown + 截图
 
 ### 评测体系
 
-- **ViDoRe v3 Industrial**: 27 份工业 PDF, 5244 页, 1698 条 query
-- **10 路消融**: 7 基线 + zerank-2 + 2×HyDE 变体
-- **RAGAS 拒答**: 20 条无答案 query，验证拒答率
-- **RAGAS 生成层评测**: Faithfulness（声明分解 + LLM 验证）+ Answer Relevancy（反向问题 + cosine 相似度）
+- **Layer 1 — 检索层**: ViDoRe v3 Industrial NDCG@10 / Recall@5 / MRR + 10 路消融
+- **Layer 2 — 生成层**: RAGAS Faithfulness（声明分解 + LLM 验证）+ Answer Relevancy（反向问题 + cosine 相似度）
+- **Layer 3 — 端到端 QA**: 50 条可回答 QA（LLM-as-judge 判正确性）+ 20 条拒答（拒答准确率）
 
 ---
 
@@ -182,33 +181,39 @@ bash scripts/pull_from_cloud.sh <host> <port> <password>
 ```
 prism-rag/
 ├── scripts/
-│   ├── cloud_setup.sh        ← Phase 1: 无卡环境准备
-│   ├── run_full_cloud.sh     ← Phase 2: 全量流水线
-│   ├── pull_from_cloud.sh    ← 拉取云端产出
-│   ├── ingest_vidore.py      ← 数据导入入口
-│   ├── run_eval.py           ← 消融评测入口
-│   ├── run_ragas_metrics.py  ← RAGAS 生成层评测（Faithfulness + Relevancy）
-│   └── run_ragas_sanity.py   ← RAGAS 拒答评测
-├── src/
-│   ├── config.py             ← 配置加载器 (models.yaml)
-│   ├── ingestion/
-│   │   ├── vidore_ingestor.py  ← 主导入管道 (断点续传, 幂等)
-│   │   ├── encoders.py        ← BGE + ColPali 编码器
-│   │   ├── text_chunker.py    ← Markdown → chunk 拆分
-│   │   └── progress.py        ← 进度保存 (append-only pickle)
-│   ├── retrieval/
-│   │   ├── bm25_retriever.py  ← BM25 (rank-bm25, fit from pgvector)
-│   │   ├── dense_retriever.py ← BGE pgvector cosine
-│   │   ├── visual_retriever.py← ColPali MaxSim via FAISS
-│   │   ├── fusion.py          ← RRF 融合
-│   │   ├── reranker.py        ← Cross-encoder (BGE/zerank-2 双模型)
-│   │   └── hyde.py            ← HyDE 查询改写 (Ollama)
-│   ├── evaluation/
-│   │   ├── ablation.py        ← 10 路消融评测 (+ zerank-2 + HyDE)
-│   │   ├── ragas_metrics.py   ← RAGAS 自实现（声明分解/验证/反向问题/余弦相似度）
-│   │   ├── ragas_sanity.py    ← RAGAS 拒答检测
-│   │   └── vidore_adapter.py  ← PrismRAGRetriever 统一接口
-│   ├── store/
+	│   ├── cloud_setup.sh         ← Phase 1: 无卡环境准备
+	│   ├── run_full_cloud.sh      ← Phase 2: 全量流水线
+	│   ├── pull_from_cloud.sh     ← 拉取云端产出
+	│   ├── ingest_vidore.py       ← 数据导入入口
+	│   ├── run_eval.py            ← 消融评测入口（Layer 1）
+	│   ├── run_ragas_metrics.py   ← RAGAS 生成层评测（Layer 2）
+	│   ├── run_ragas_sanity.py    ← RAGAS 拒答评测（Layer 3b）
+	│   ├── run_e2e_qa.py          ← 端到端 QA 评测（Layer 3a+3b）
+	│   └── generate_e2e_qa.py     ← 端到端 QA 数据集生成器
+	├── src/
+	│   ├── config.py             ← 配置加载器 (models.yaml)
+	│   ├── ingestion/
+	│   │   ├── vidore_ingestor.py  ← 主导入管道 (断点续传, 幂等)
+	│   │   ├── encoders.py        ← BGE + ColPali 编码器
+	│   │   ├── text_chunker.py    ← Markdown → chunk 拆分
+	│   │   └── progress.py        ← 进度保存 (append-only pickle)
+	│   ├── retrieval/
+	│   │   ├── bm25_retriever.py  ← BM25 (rank-bm25, fit from pgvector)
+	│   │   ├── dense_retriever.py ← BGE pgvector cosine
+	│   │   ├── visual_retriever.py← ColPali MaxSim via FAISS
+	│   │   ├── fusion.py          ← RRF 融合
+	│   │   ├── reranker.py        ← Cross-encoder (BGE/zerank-2 双模型)
+	│   │   └── hyde.py            ← HyDE 查询改写 (Ollama)
+	│   ├── evaluation/
+	│   │   ├── ablation.py        ← 10 路消融评测 (+ zerank-2 + HyDE)
+	│   │   ├── ragas_metrics.py   ← RAGAS 自实现（声明分解/验证/反向问题/余弦相似度）
+	│   │   ├── ragas_sanity.py    ← RAGAS 拒答检测
+	│   │   ├── e2e_qa.py          ← 端到端 QA 评测（LLM-as-judge 答案正确性 + 拒答准确率）
+	│   │   └── vidore_adapter.py  ← PrismRAGRetriever 统一接口
+	│   ├── data/
+	│   │   ├── e2e_qa.json        ← 50 QA 对 + 20 拒答（端到端评测数据集）
+	│   │   └── rejection_qa.json  ← 20 条拒答问题（原始）
+	│   ├── store/
 	│   │   ├── faiss_store.py     ← FAISS (flat + hnsw, GPU MaxSim torch matmul)
 	│   │   └── pgvector_store.py  ← PostgreSQL + pgvector
 	│   ├── observability/         ← 核心可观测性模块（嵌入 pipeline）
@@ -301,6 +306,8 @@ prism-rag/
 - [x] **Observability 模块实现**（tracer => collector => alerting => logging => middleware => dashboard => reporter，38 测试全过，lint 干净）
 - [x] **Span 注入**：BM25/Dense/Visual/HyDE/Reranker + PrismRAGRetriever + RAGAS metrics
 - [x] **API Middleware**：自动 HTTP Trace + X-Trace-Id 响应头
+- [x] **端到端 QA 评测（Layer 3）**：50 条可回答 QA + 20 条拒答，LLM-as-judge 答案正确性
+- [x] **QA 数据集生成器**：从 ViDoRe 283 条英文查询半自动生成 50 QA 对 + 预期答案
 
 ### 🔜 下一步
 1. **排查 Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等
@@ -309,6 +316,7 @@ prism-rag/
 4. **RAGAS 全量 283 条评测**: 看结果是否稳定
 5. **RAGAS 云 API Judge**: 用 gpt-4o-mini 替换 Ollama qwen2:7b，从分钟级加速到秒级
 6. **RAGAS 标尺修复**: 拒答不计入 Faithfulness、Relevancy 改用 LLM 评分替代 cosine
+7. **运行端到端 QA 评测**: 在云端执行 `python scripts/run_e2e_qa.py --skip-index`
 
 ### 📁 运行记录
 | Run | 日期 | 说明 | 关键指标 |
@@ -319,6 +327,7 @@ prism-rag/
 | `runs/20260702_1902/` | 7/2 | **zerank-2 + HyDE 实验** | NDCG@10=0.5715 |
 | `runs/20260704-colqwen2/` | 7/4 | **ColQwen2 视觉编码实验** | NDCG@10=0.5715 |
 | `runs/20260705-ragas-eval/` | 7/5 | **RAGAS 生成层评测** | Faith=0.8867, Rel=0.8147 |
+| `data/e2e_qa.json` | 7/5 | **端到端 QA 数据集** | 50 可回答 + 20 拒答 |
 
 ### 📄 复盘文档
 - `docs/solutions/2026-07-02-visual-oom-fix-retrospective.md` — Visual OOM 修复
@@ -341,6 +350,21 @@ prism-rag/
 - 🟠 真正 Hallucination 1 条（氮气罐颜色代码编造，检索未召回相关文档）
 - 🔵 Relevancy 标尺偏差 5 条（cosine similarity 对词面不同不敏感）
 - 标尺缺陷：拒答应跳过 Faithfulness 计算、Relevancy 应改用 LLM 评分
+
+### 🗂️ 端到端 QA 评测（Layer 3）
+
+| 文件 | 说明 |
+|------|------|
+| `data/e2e_qa.json` | 50 条可回答 QA + 20 条拒答，含预期答案和 ground-truth 页面 ID |
+| `src/evaluation/e2e_qa.py` | 评测核心：LLM-as-judge 答案正确性 + 拒答准确率 |
+| `scripts/run_e2e_qa.py` | CLI 入口，用法：`python scripts/run_e2e_qa.py --skip-index` |
+| `scripts/generate_e2e_qa.py` | 数据集生成器：从 ViDoRe 查询半自动生成 QA 对 |
+| `tests/test_e2e_qa.py` | 27 个单元测试（数据序列化、拒答检测、数据集加载、汇总计算） |
+
+**评估指标：**
+- **Answer Correctness**: 可回答问题的答案正确性（LLM-as-judge 判断语义等价）
+- **Rejection Accuracy**: 拒答准确率（20 条域外问题是否被正确拒绝）
+- **Combined Score**: 综合分数 = 0.7 × 正确率 + 0.3 × 拒答准确率
 
 ---
 
