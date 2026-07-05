@@ -39,6 +39,7 @@ from src.evaluation.ragas_metrics import (
 from src.evaluation.vidore_adapter import PrismRAGRetriever
 from src.ingestion.encoders import BGEEmbedder, create_visual_encoder
 from src.ingestion.text_chunker import TextChunker
+from src.observability import dump_collector
 from src.retrieval.bm25_retriever import BM25Retriever
 from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.fusion import RRFFusion
@@ -204,6 +205,7 @@ def main():
         )
 
     logger.info("评测完成。")
+    dump_collector(f"ragas_{Path(args.output_dir).name}")
 
 
 if __name__ == "__main__":

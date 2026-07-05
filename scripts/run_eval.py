@@ -15,6 +15,7 @@ from src.ingestion.encoders import BGEEmbedder, create_visual_encoder
 from src.ingestion.text_chunker import TextChunker
 from src.evaluation.ablation import load_eval_data, run_ablation
 from src.evaluation.vidore_adapter import PrismRAGRetriever
+from src.observability import dump_collector
 from src.retrieval.bm25_retriever import BM25Retriever
 from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.fusion import RRFFusion
@@ -168,6 +169,8 @@ def main():
         quick=args.quick,
         config_filter=args.config_filter,
     )
+
+    dump_collector(f"ablation_{Path(args.output_dir).name}")
 
 
 if __name__ == "__main__":
