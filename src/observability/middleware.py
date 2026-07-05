@@ -1,7 +1,6 @@
 """FastAPI 中间件 — 自动为 HTTP 请求创建 Trace"""
 from __future__ import annotations
 
-import time
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
