@@ -33,6 +33,12 @@ eval-full: .env ## 全 8 子集 ViDoRe 评测（长跑，按需租云）
 eval-ragas: .env ## 运行 RAGAS 拒答 sanity
 	python scripts/run_ragas_sanity.py
 
+eval-ragas-metrics: .env ## 运行 RAGAS 生成层评测（Faithfulness + Answer Relevancy）
+	python scripts/run_ragas_metrics.py
+
+eval-ragas-metrics-quick: .env ## 快速 RAGAS 生成层评测（10 条查询）
+	python scripts/run_ragas_metrics.py --max-queries 10
+
 demo: .env ## 启动 Docker Compose 在线 Demo
 	docker compose up -d
 	@echo "Demo 已启动: http://localhost:8000"
