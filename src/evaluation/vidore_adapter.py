@@ -21,6 +21,7 @@ from src.retrieval.fusion import RRFFusion
 from src.retrieval.hyde import HyDEGenerator
 from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
+from src.observability import get_tracer, get_collector
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
 
@@ -117,6 +118,10 @@ class PrismRAGRetriever:
             {"results": [...], "retrieval_trace": {"bm25_top5": [...], "dense_top5": [...],
              "visual_top5": [...], "hyde": "<generated text>"}}
         """
+        tracer = get_tracer()
+        collector = get_collector()
+        tracer.start_trace(query=query, config_label="")
+
         routes = []
         trace = {"bm25_top5": [], "dense_top5": [], "visual_top5": [], "hyde": ""}
 
@@ -184,6 +189,9 @@ class PrismRAGRetriever:
                 logger.warning(f"Visual 检索跳过: {e}")
 
         if not routes:
+            obs_trace = tracer.finish_trace()
+            if obs_trace:
+                collector.ingest_trace(obs_trace)
             return {"results": [], "retrieval_trace": trace}
 
         fused = self.fusion.fuse(routes, k=min(k * 2, 40))
@@ -191,7 +199,19 @@ class PrismRAGRetriever:
         # ── Rerank（支持双 reranker）────────────────────────
         if use_rerank and fused:
             reranker = self.zerank_reranker if reranker_type == "zerank" else self.reranker
-            reranked = reranker.rerank(query, fused, top_k=k)
+            # Wrap fusion+rerank in a span
+            with tracer.start_span("fusion_rerank") as fusion_span:
+                reranked = reranker.rerank(query, fused, top_k=k)
+                fusion_span.set_metadata({
+                    "num_fused_input": len(fused),
+                    "num_reranked_output": len(reranked),
+                })
+            obs_trace = tracer.finish_trace()
+            if obs_trace:
+                collector.ingest_trace(obs_trace)
             return {"results": reranked, "retrieval_trace": trace}
 
+        obs_trace = tracer.finish_trace()
+        if obs_trace:
+            collector.ingest_trace(obs_trace)
         return {"results": fused[:k], "retrieval_trace": trace}
