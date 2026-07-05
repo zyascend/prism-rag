@@ -42,3 +42,13 @@ vidore:
   split_queries: "test"
   split_qrels: "test"
   num_pages: 5244
+
+observability:
+  log_level: "INFO"
+  log_file: "logs/app.jsonl"
+  trace_enabled: true
+  dashboard_enabled: true
+  alerting:
+    latency_p95_threshold_ms: 5000
+    recall_at_5_min: 0.5
+    faithfulness_min: 0.6
