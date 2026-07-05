@@ -15,6 +15,7 @@ from src.ingestion.encoders import BGEEmbedder, create_visual_encoder
 from src.ingestion.text_chunker import TextChunker
 from src.evaluation.ablation import load_eval_data, run_ablation
 from src.evaluation.vidore_adapter import PrismRAGRetriever
+from src.observability import dump_collector
 from src.retrieval.bm25_retriever import BM25Retriever
 from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.fusion import RRFFusion
@@ -42,9 +43,9 @@ def main():
                         help="仅跑新增配置（跳过 7 个基线消融）")
     parser.add_argument("--config-filter", type=str, default=None,
                         help="仅跑名称包含该子串的消融配置（如 Visual 匹配 Visual_only、BM25_Dense_Visual 等）")
-    parser.add_argument("--visual-model", default="colpali",
+    parser.add_argument("--visual-model", default="colqwen2",
                         choices=["colpali", "colqwen2"],
-                        help="Visual embedding model (default: colpali)")
+                        help="Visual embedding model (default: colqwen2)")
     args = parser.parse_args()
 
     cfg.load()
@@ -168,6 +169,8 @@ def main():
         quick=args.quick,
         config_filter=args.config_filter,
     )
+
+    dump_collector(f"ablation_{Path(args.output_dir).name}")
 
 
 if __name__ == "__main__":
