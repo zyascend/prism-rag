@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from src.observability.tracer import Trace
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -120,7 +122,7 @@ class MetricsCollector:
             self._ragas_scores.clear()
             self._alerts.clear()
 
-    def ingest_trace(self, trace: Any) -> None:
+    def ingest_trace(self, trace: Trace) -> None:
         """接收一个已完成的 Trace，提取指标并聚合"""
         with self._lock:
             label = trace.config_label

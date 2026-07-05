@@ -71,6 +71,8 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
             qual = m.get("quality", {})
             faith = qual.get("avg_faithfulness")
             relev = qual.get("avg_answer_relevancy")
+            faith_str = f"{faith:.3f}" if faith is not None else "—"
+            relev_str = f"{relev:.3f}" if relev is not None else "—"
             lines.append(
                 f"| {label} "
                 f"| {m.get('num_queries', 0)} "
@@ -80,9 +82,9 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
                 f"| {hits.get('avg_bm25', 0):.1f} "
                 f"| {hits.get('avg_dense', 0):.1f} "
                 f"| {hits.get('avg_visual', 0):.1f} "
-                f"| {faith:.3f}" if faith is not None else "| —"
-                f" | {relev:.3f}" if relev is not None else " | —"
-                " |"
+                f"| {faith_str} "
+                f"| {relev_str} "
+                "|"
             )
 
     # Alerts

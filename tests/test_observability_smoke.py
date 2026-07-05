@@ -97,7 +97,23 @@ def test_observability_imports_all():
         get_tracer,
         get_collector,
         init_logging,
+        Tracer,
+        Trace,
+        Span,
+        NoopSpan,
+        MetricsCollector,
+        ConfigMetrics,
+        AlertEvent,
+        AlertChecker,
     )
     assert get_tracer is not None
     assert get_collector is not None
     assert init_logging is not None
+    assert Tracer is not None
+    assert Trace is not None
+    assert Span is not None
+    assert NoopSpan is not None
+    assert MetricsCollector is not None
+    assert ConfigMetrics is not None
+    assert AlertEvent is not None
+    assert AlertChecker is not None
