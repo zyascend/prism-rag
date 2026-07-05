@@ -1,8 +1,8 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: main | 远程: origin
-> 最后 commit: (zerank-2 + HyDE 实验完成)
-> 更新: 2026-07-02（zerank-2 reranker 替换 + HyDE 实验，Full+zerank2 NDCG@10=0.5715）
+> 分支: feat/ragas-faithfulness | 远程: origin
+> 最后 commit: (RAGAS 生成层评测 — Faithfulness + Answer Relevancy 自实现)
+> 更新: 2026-07-05（新增 RAGAS 生成层评测体系，Feithfulness=0.8867, Relevancy=0.8147）
 
 ---
 
@@ -26,6 +26,7 @@ PDF → MinerU 解析 → markdown + 截图
 - **ViDoRe v3 Industrial**: 27 份工业 PDF, 5244 页, 1698 条 query
 - **10 路消融**: 7 基线 + zerank-2 + 2×HyDE 变体
 - **RAGAS 拒答**: 20 条无答案 query，验证拒答率
+- **RAGAS 生成层评测**: Faithfulness（声明分解 + LLM 验证）+ Answer Relevancy（反向问题 + cosine 相似度）
 
 ---
 
@@ -185,8 +186,9 @@ prism-rag/
 │   ├── run_full_cloud.sh     ← Phase 2: 全量流水线
 │   ├── pull_from_cloud.sh    ← 拉取云端产出
 │   ├── ingest_vidore.py      ← 数据导入入口
-│   ├── run_eval.py           ← 评测入口
-│   └── run_ragas_sanity.py   ← RAGAS 拒答
+│   ├── run_eval.py           ← 消融评测入口
+│   ├── run_ragas_metrics.py  ← RAGAS 生成层评测（Faithfulness + Relevancy）
+│   └── run_ragas_sanity.py   ← RAGAS 拒答评测
 ├── src/
 │   ├── config.py             ← 配置加载器 (models.yaml)
 │   ├── ingestion/
@@ -203,6 +205,8 @@ prism-rag/
 │   │   └── hyde.py            ← HyDE 查询改写 (Ollama)
 │   ├── evaluation/
 │   │   ├── ablation.py        ← 10 路消融评测 (+ zerank-2 + HyDE)
+│   │   ├── ragas_metrics.py   ← RAGAS 自实现（声明分解/验证/反向问题/余弦相似度）
+│   │   ├── ragas_sanity.py    ← RAGAS 拒答检测
 │   │   └── vidore_adapter.py  ← PrismRAGRetriever 统一接口
 │   ├── store/
 │   │   ├── faiss_store.py     ← FAISS (flat + hnsw, GPU MaxSim torch matmul)
@@ -279,25 +283,50 @@ prism-rag/
 - [x] `--quick` / `--config-filter` 按名过滤消融配置
 - [x] **ColQwen2 集成** (+14.6% Visual_only NDCG@10)
 - [x] **Visual-only 差距根因分析**（排除索引大小、评分公式、管道 API；锁定环境版本不一致/图像处理器/query 截断）
+- [x] **RAGAS 生成层自实现**（Faithfulness 声明分解+LLM验证 / Answer Relevancy 反向问题+cosine）
+- [x] **RAGAS 云端评测**（50 条，全量检索，Faithfulness=0.8867, Relevancy=0.8147）
+- [x] **`run_ragas_metrics.py` `--skip-index` 修复**（正确加载 FAISS + BM25）
+- [x] **RAGAS Bad Case 分析**（含标尺缺陷分析）
 
 ### 🔜 下一步
 1. **排查 Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等
 2. **zerank-2 加速**: 研究加 padding token 恢复批量推理（目前逐条，2x 慢）
 3. **换视觉模型**: ColEmbed-3B（feature 分支已有，需跑消融对比）
+4. **RAGAS 全量 283 条评测**: 看结果是否稳定
+5. **RAGAS 云 API Judge**: 用 gpt-4o-mini 替换 Ollama qwen2:7b，从分钟级加速到秒级
+6. **RAGAS 标尺修复**: 拒答不计入 Faithfulness、Relevancy 改用 LLM 评分替代 cosine
 
 ### 📁 运行记录
-| Run | 日期 | 说明 | NDCG@10 |
+| Run | 日期 | 说明 | 关键指标 |
 |-----|------|------|---------|
-| `runs/20260701_2118/` | 7/1 | 首轮消融 (1698q, Visual OOM) | 0.3136 |
-| `runs/20260702-visual-fix/` | 7/2 | OOM 修复 (283q) | 0.5362 |
-| `runs/20260702-query-fix/` | 7/2 | Query 编码 fix | 0.5507 |
-| `runs/20260702_1902/` | 7/2 | **zerank-2 + HyDE 实验** | 0.5715 |
-| `runs/20260704-colqwen2/` | 7/4 | **ColQwen2 视觉编码实验** | 0.5715 |
+| `runs/20260701_2118/` | 7/1 | 首轮消融 (1698q, Visual OOM) | NDCG@10=0.3136 |
+| `runs/20260702-visual-fix/` | 7/2 | OOM 修复 (283q) | NDCG@10=0.5362 |
+| `runs/20260702-query-fix/` | 7/2 | Query 编码 fix | NDCG@10=0.5507 |
+| `runs/20260702_1902/` | 7/2 | **zerank-2 + HyDE 实验** | NDCG@10=0.5715 |
+| `runs/20260704-colqwen2/` | 7/4 | **ColQwen2 视觉编码实验** | NDCG@10=0.5715 |
+| `runs/20260705-ragas-eval/` | 7/5 | **RAGAS 生成层评测** | Faith=0.8867, Rel=0.8147 |
 
 ### 📄 复盘文档
 - `docs/solutions/2026-07-02-visual-oom-fix-retrospective.md` — Visual OOM 修复
 - `docs/solutions/2026-07-02-zerank2-hyde-experiment.md` — zerank-2 + HyDE 实验
 - `docs/solutions/2026-07-04-visual-sota-gap-analysis.md` — Visual-only 距 SOTA 3.6x 差距根因分析
+- `runs/20260705-ragas-eval/badcase_ragas_analysis.md` — RAGAS 评测 Bad Case 分析
+
+### 📊 RAGAS 生成层评测（50 条，全量检索，2026-07-05）
+
+| 指标 | 数值 | 说明 |
+|------|:----:|------|
+| Faithfulness | **0.8867** | 回答 88.7% 的声明被检索上下文支持 |
+| Relevancy | **0.8147** | 回答与问题高度相关 |
+| 生成回答 | 45/50 (90%) | |
+| 拒答 | 5/50 (10%) | 全部合理 |
+| 耗时 | 8 min 35 s | RTX 4090, Ollama qwen2:7b |
+
+**Bad Case 总结：**
+- 🟡 合理拒答 4 条（Faithfulness=0 误伤）
+- 🟠 真正 Hallucination 1 条（氮气罐颜色代码编造，检索未召回相关文档）
+- 🔵 Relevancy 标尺偏差 5 条（cosine similarity 对词面不同不敏感）
+- 标尺缺陷：拒答应跳过 Faithfulness 计算、Relevancy 应改用 LLM 评分
 
 ---
 
@@ -313,7 +342,21 @@ prism-rag/
    - 刚开无卡 → `bash scripts/cloud_setup.sh`（首次 ~10 min，再次 ~2 min）
    - 已完成 Phase 1、刚切有卡 → `bash scripts/run_full_cloud.sh`
    - 已完成 Phase 2 → `bash scripts/pull_from_cloud.sh`
-6. 如果是从零开始的新实例，需要先上传代码：
+6. RAGAS 评测需确保 Ollama 已安装：
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ollama pull qwen2:7b
+   ollama pull nomic-embed-text
+   ```
+7. 运行 RAGAS 评测：
+   ```bash
+   cd /root/prism-rag
+   source /etc/network_turbo
+   export HF_HOME=/root/autodl-tmp/huggingface
+   python scripts/run_ragas_metrics.py --skip-index --visual-model colqwen2 --max-queries 50
+   ```
+8. RAGAS 评测需要 `source /etc/network_turbo` 才能访问 HuggingFace 数据集
+9. 如果是从零开始的新实例，需要先上传代码：
    ```bash
    tar czf /tmp/prism-rag.tar.gz --exclude='.venv' --exclude='.git' --exclude='runs' .
    sshpass -p '<pwd>' scp -P <port> /tmp/prism-rag.tar.gz root@<host>:/root/

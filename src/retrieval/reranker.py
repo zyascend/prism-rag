@@ -22,13 +22,15 @@ class Reranker:
     """
 
     def __init__(self, device: str | None = None, model_id: str | None = None,
-                 model_kwargs: dict | None = None):
+                 automodel_args: dict | None = None):
         self.device = device or cfg.get("embedding.colpali_device", "cpu")
         self.model_id = model_id or cfg.reranker_model_id
+        kwargs = {"device": self.device}
+        if automodel_args:
+            kwargs["automodel_args"] = automodel_args
         self.model = CrossEncoder(
             self.model_id,
-            device=self.device,
-            model_kwargs=model_kwargs,
+            **kwargs,
         )
 
     @torch.no_grad()
