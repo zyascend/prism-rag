@@ -8,6 +8,7 @@ import numpy as np
 
 from src.ingestion.encoders import BGEEmbedder
 from src.store.pgvector_store import PgVectorStore
+from src.observability import get_tracer
 
 
 class DenseRetriever:
@@ -19,12 +20,18 @@ class DenseRetriever:
 
     def search(self, query: str, k: int = 20) -> List[dict]:
         """检索 Top-k chunk"""
+        tracer = get_tracer()
+
         # 1. BGE 编码查询
-        query_emb = self.bge.encode([query])
-        query_vec = query_emb.cpu().numpy().astype(np.float32)[0]
+        with tracer.start_span("dense_encode") as span:
+            query_emb = self.bge.encode([query])
+            query_vec = query_emb.cpu().numpy().astype(np.float32)[0]
+            span.set_metadata({"dim": int(query_vec.shape[0])})
 
         # 2. pgvector HNSW 搜索
-        results = self.pg.search_by_vector(query_vec, k=k)
+        with tracer.start_span("dense_search") as span:
+            results = self.pg.search_by_vector(query_vec, k=k)
+            span.set_metadata({"num_results": len(results), "k": k})
 
         # 3. 添加 retrieval_type 标记
         for r in results:

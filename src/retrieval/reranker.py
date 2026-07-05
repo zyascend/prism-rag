@@ -8,6 +8,7 @@ import torch
 from sentence_transformers import CrossEncoder
 
 from src.config import cfg
+from src.observability import get_tracer
 
 
 class Reranker:
@@ -38,22 +39,27 @@ class Reranker:
         if not candidates:
             return []
 
-        pairs = [(query, c["text"]) for c in candidates]
+        tracer = get_tracer()
+        with tracer.start_span("rerank") as span:
+            pairs = [(query, c["text"]) for c in candidates]
+            scores = []
+            for pair in pairs:
+                score = self.model.predict([pair], convert_to_tensor=True)
+                scores.append(score.item() if hasattr(score, "item") else float(score))
 
-        # 逐条预测，兼容不支持 batch>1 的模型（如 zerank-2 无 padding token）
-        scores = []
-        for pair in pairs:
-            score = self.model.predict([pair], convert_to_tensor=True)
-            scores.append(score.item() if hasattr(score, "item") else float(score))
+            scored = list(zip(candidates, scores))
+            scored.sort(key=lambda x: x[1], reverse=True)
 
-        scored = list(zip(candidates, scores))
-        scored.sort(key=lambda x: x[1], reverse=True)
+            results = []
+            for cand, score in scored[:top_k]:
+                result = dict(cand)
+                result["rerank_score"] = float(score)
+                result["retrieval_type"] = "reranked"
+                results.append(result)
 
-        results = []
-        for cand, score in scored[:top_k]:
-            result = dict(cand)
-            result["rerank_score"] = float(score)
-            result["retrieval_type"] = "reranked"
-            results.append(result)
-
-        return results
+            span.set_metadata({
+                "num_candidates": len(candidates),
+                "num_results": len(results),
+                "top_k": top_k,
+            })
+            return results
