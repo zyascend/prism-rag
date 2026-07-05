@@ -19,7 +19,8 @@ PDF → MinerU 解析 → markdown + 截图
   └─ ColPali 编码 → FAISS IndexFlatIP (Visual 路, MaxSim)
         ↓
 查询 → [可选 HyDE 改写] → 三路检索 → RRF 融合 → BGE/zerank-2 Reranker → Top-K
-```
+        ↓
+可观测性: Tracer → MetricsCollector(延迟/命中/质量) → [Dashboard | Reporter → runs/]
 
 ### 评测体系
 
@@ -268,27 +269,19 @@ prism-rag/
 
 ## 6. 当前状态 & 下一步
 
-### 📊 消融结果 (ViDoRe V3 Industrial, English 283 queries, 2026-07-04)
+> 三层评测全部就绪，最新数据已汇总到 [README.md](README.md#实验结果)。
 
-| 配置 | NDCG@10 | Recall@5 | MRR | Latency | 备注 |
-|---|---|---|---|---|---|
-| BM25_only | 0.4432 | 0.4206 | 0.5443 | 24ms | |
-| Dense_only | 0.3938 | 0.3739 | 0.5137 | 101ms | |
-| Visual_only (ColPali) | 0.1365 | 0.1447 | 0.1518 | 171ms | |
-| **Visual_only (ColQwen2)** 🆕 | **0.1564** | 0.1438 | **0.1808** | 166ms | +14.6% vs ColPali |
-| BM25_Dense | 0.4528 | 0.4389 | 0.5595 | 126ms | |
-| BM25_Dense_Visual (ColPali) | 0.4452 | 0.4630 | 0.5429 | 312ms | |
-| BM25_Dense_Visual (ColQwen2) 🆕 | 0.4525 | 0.4855 | 0.5403 | 312ms | |
-| Full_no_rerank | 0.4402 | 0.4538 | 0.5413 | 335ms | |
-| Full_with_rerank (BGE) | 0.5506 | 0.5123 | 0.6589 | 544ms | 基线 |
-| **Full_zerank2** 🆕 | **0.5715** | 0.5240 | 0.6777 | 1192ms | zerank-2 +0.0209 |
-| Full_BGE_HyDE 🆕 | 0.5458 | 0.5109 | 0.6527 | 842ms | HyDE 无效 |
-| Full_zerank2_HyDE 🆕 | 0.5733 | 0.5316 | 0.6844 | 1421ms | HyDE≈无效 |
+### 📊 三层评测总览
 
-> 🏆 Full+zerank2 NDCG@10=0.5715，比 BGE 基线 +0.0209，比论文 pipeline SOTA (0.532) 高 0.04
-> 🆕 ColQwen2 提升约 15%，但 Visual_only 绝对分数仍很低（0.1564），根因待查
+| 层 | 核心指标 | 数值 | 最新 Run |
+|:--:|:---------|:----:|:---------|
+| **Layer 1** — 检索消融 | Full+zerank2 NDCG@10 | **0.5715** 🏆 | `20260704-colqwen2` |
+| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy | **0.8867 / 0.8147** | `20260705-ragas-eval` |
+| **Layer 3** — 端到端 QA | Correctness / Rejection / Combined | **0.64 / 0.95 / 0.733** | `20260705-e2e-qa` |
 
 ### ✅ 已完成
+
+**检索层（Layer 1）：**
 - [x] P0 Code Review 修复
 - [x] Visual 路 CUDA OOM 修复
 - [x] 评测口径对齐 (English-only 283 query)
@@ -296,25 +289,36 @@ prism-rag/
 - [x] **zerank-2 Reranker 替换** (+0.0209 NDCG@10)
 - [x] **HyDE 查询改写实验** (结论：本场景无效)
 - [x] 消融框架扩展 (reranker_type + use_hyde 双维度)
-- [x] `--quick` / `--config-filter` 按名过滤消融配置
 - [x] **ColQwen2 集成** (+14.6% Visual_only NDCG@10)
 - [x] **Visual-only 差距根因分析**（排除索引大小、评分公式、管道 API；锁定环境版本不一致/图像处理器/query 截断）
+- [x] 12 路消融全量运行（含 zerank-2、ColQwen2、HyDE 对比）
+
+**生成层（Layer 2）：**
 - [x] **RAGAS 生成层自实现**（Faithfulness 声明分解+LLM验证 / Answer Relevancy 反向问题+cosine）
 - [x] **RAGAS 云端评测**（50 条，全量检索，Faithfulness=0.8867, Relevancy=0.8147）
 - [x] **`run_ragas_metrics.py` `--skip-index` 修复**（正确加载 FAISS + BM25）
-- [x] **RAGAS Bad Case 分析**（含标尺缺陷分析）
-- [x] **Observability 模块实现**（tracer => collector => alerting => logging => middleware => dashboard => reporter，38 测试全过，lint 干净）
+- [x] **RAGAS Bad Case 分析**：合理拒答误伤 4 条、真正 Hallucination 4 条、Relevancy 标尺偏差 5 条
+
+**端到端 QA 层（Layer 3）：**
+- [x] **QA 数据集生成器**：从 ViDoRe 283 条英文查询半自动生成 50 QA 对 + 预期答案
+- [x] **端到端 QA 评测**：50 条可回答 QA + 20 条拒答，LLM-as-judge 答案正确性
+- [x] **Bad Case 分析**：18 条错误中 6 条合理拒答被误判、5 条检索缺失、4 条数值错误
+- [x] 评测指标定义：Answer Correctness (0.64) / Rejection Accuracy (0.95) / Combined (0.733)
+
+**可观测性：**
+- [x] **Observability 模块实现**（tracer → collector → alerting → logging → middleware → dashboard → reporter，38 测试全过，lint 干净）
 - [x] **Span 注入**：BM25/Dense/Visual/HyDE/Reranker + PrismRAGRetriever + RAGAS metrics
 - [x] **API Middleware**：自动 HTTP Trace + X-Trace-Id 响应头
-- [x] **端到端 QA 评测（Layer 3）**：50 条可回答 QA + 20 条拒答，LLM-as-judge 答案正确性
-- [x] **QA 数据集生成器**：从 ViDoRe 283 条英文查询半自动生成 50 QA 对 + 预期答案
 
 ### 🔜 下一步
-1. **排查 Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等
-2. **zerank-2 加速**: 研究加 padding token 恢复批量推理（目前逐条，2x 慢）
-3. **换视觉模型**: ColEmbed-3B（feature 分支已有，需跑消融对比）
-4. **RAGAS 全量 283 条评测**: 看结果是否稳定
-5. **RAGAS 云 API Judge**: 用 gpt-4o-mini 替换 Ollama qwen2:7b，从分钟级加速到秒级
+1. **Layer 1 — Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等。ColQwen2+14.6% 仍远低预期，已排除模型选择因素
+2. **Layer 1 — zerank-2 加速**: 加 padding token 恢复批量推理（目前逐条，2x 慢）
+3. **Layer 1 — ColEmbed-3B 对比**: feature 分支已有，需跑消融对比
+4. **Layer 2 — RAGAS 全量 283 条**: 看结果是否稳定（约 45 分钟云上）
+5. **Layer 2 — 云 API Judge**: gpt-4o-mini 替换 Ollama qwen2:7b，从分钟级加速到秒级
+6. **Layer 2 — 标尺修复**: 拒答跳过 Faithfulness 计算、Relevancy 改用 LLM 评分替代 cosine
+7. **Layer 3 — 检索改善**: Bad Case 中 5 条因检索缺失导致答案错误，需优化召回策略
+8. **Layer 3 — 数据集精化**: 6 条合理拒答被误判的 case 需优化预期答案或检索上下文
 6. **RAGAS 标尺修复**: 拒答不计入 Faithfulness、Relevancy 改用 LLM 评分替代 cosine
 7. **运行端到端 QA 评测**: 在云端执行 `python scripts/run_e2e_qa.py --skip-index`
 
