@@ -4,6 +4,19 @@ import os
 from pathlib import Path
 from typing import Any
 import yaml
+from dataclasses import dataclass
+
+
+@dataclass
+class ObservabilityConfig:
+    """Observability 配置，从 YAML observability 段加载，缺失时使用默认值"""
+    log_level: str = "INFO"
+    log_file: str = "logs/app.jsonl"
+    trace_enabled: bool = True
+    dashboard_enabled: bool = True
+    latency_p95_threshold_ms: int = 5000
+    recall_at_5_min: float = 0.5
+    faithfulness_min: float = 0.6
 
 
 class Config:
@@ -95,6 +108,21 @@ class Config:
     @property
     def llm_model_id(self) -> str:
         return self._data["models"]["llm"]
+
+    @property
+    def observability(self) -> ObservabilityConfig:
+        """返回 observability 配置，YAML 缺失时回退到默认值"""
+        raw = self.get("observability", {})
+        alerting_raw = raw.get("alerting", {})
+        return ObservabilityConfig(
+            log_level=raw.get("log_level", "INFO"),
+            log_file=raw.get("log_file", "logs/app.jsonl"),
+            trace_enabled=raw.get("trace_enabled", True),
+            dashboard_enabled=raw.get("dashboard_enabled", True),
+            latency_p95_threshold_ms=alerting_raw.get("latency_p95_threshold_ms", 5000),
+            recall_at_5_min=alerting_raw.get("recall_at_5_min", 0.5),
+            faithfulness_min=alerting_raw.get("faithfulness_min", 0.6),
+        )
 
     @property
     def bge_dim(self) -> int:

@@ -9,6 +9,7 @@ import torch
 from src.ingestion.encoders import ColPaliEmbedder
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
+from src.observability import get_tracer
 
 
 class VisualRetriever:
@@ -26,19 +27,24 @@ class VisualRetriever:
 
     def search(self, query: str, k: int = 20) -> List[dict]:
         """检索 Top-k 页 → 反查该页所有 chunk"""
+        tracer = get_tracer()
+
         # 1. ColPali 编码查询
-        q_emb = self.colpali.encode_query(query)
+        with tracer.start_span("visual_encode") as span:
+            q_emb = self.colpali.encode_query(query)
+            span.set_metadata({"batch_size": 1})
 
         # 2. FAISS MaxSim 搜索 → Top-k 页
-        page_results = self.faiss.maxsim_search(q_emb, k=k)
+        with tracer.start_span("visual_search") as span:
+            page_results = self.faiss.maxsim_search(q_emb, k=k)
+            span.set_metadata({"num_pages": len(page_results), "k": k})
 
         if not page_results:
             return []
 
-        # 3. Grounding 反查：命中页的所有 BGE chunk
+        # 3. Grounding 反查
         page_ids = [pr["page_id"] for pr in page_results]
         page_score_map = {pr["page_id"]: pr["score"] for pr in page_results}
-
         chunks = self.pg.get_chunks_by_page_ids(page_ids)
 
         # 4. 合并分数
@@ -62,19 +68,20 @@ class VisualRetriever:
         Returns:
             与 search() 相同格式的结果列表
         """
-        # 1. FAISS MaxSim 搜索 → Top-k 页
-        page_results = self.faiss.maxsim_search(q_emb, k=k)
+        tracer = get_tracer()
+
+        # 1. FAISS MaxSim 搜索 (pre-encoded, skip encode span)
+        with tracer.start_span("visual_search") as span:
+            page_results = self.faiss.maxsim_search(q_emb, k=k)
+            span.set_metadata({"num_pages": len(page_results), "k": k, "pre_encoded": True})
 
         if not page_results:
             return []
 
-        # 2. Grounding 反查：命中页的所有 BGE chunk
         page_ids = [pr["page_id"] for pr in page_results]
         page_score_map = {pr["page_id"]: pr["score"] for pr in page_results}
-
         chunks = self.pg.get_chunks_by_page_ids(page_ids)
 
-        # 3. 合并分数
         results = []
         for chunk in chunks:
             results.append({

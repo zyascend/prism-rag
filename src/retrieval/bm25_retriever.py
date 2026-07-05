@@ -9,6 +9,7 @@ from rank_bm25 import BM25Okapi
 
 from src.ingestion.text_chunker import Chunk
 from src.store.pgvector_store import PgVectorStore
+from src.observability import get_tracer
 
 
 class BM25Retriever:
@@ -62,24 +63,27 @@ class BM25Retriever:
         if self._bm25 is None:
             raise RuntimeError("BM25 索引未构建，请先调用 fit()")
 
-        tokenized_query = self._tokenize(query)
-        scores = self._bm25.get_scores(tokenized_query)
+        tracer = get_tracer()
+        with tracer.start_span("bm25_search") as span:
+            tokenized_query = self._tokenize(query)
+            scores = self._bm25.get_scores(tokenized_query)
 
-        top_indices = sorted(
-            range(len(scores)),
-            key=lambda i: scores[i],
-            reverse=True,
-        )[:k]
+            top_indices = sorted(
+                range(len(scores)),
+                key=lambda i: scores[i],
+                reverse=True,
+            )[:k]
 
-        results = []
-        for idx in top_indices:
-            score = scores[idx]
-            if score > 0:
-                chunk = self._chunks[idx]
-                results.append({
-                    **chunk,
-                    "score": float(score),
-                    "retrieval_type": "bm25",
-                })
+            results = []
+            for idx in top_indices:
+                score = scores[idx]
+                if score > 0:
+                    chunk = self._chunks[idx]
+                    results.append({
+                        **chunk,
+                        "score": float(score),
+                        "retrieval_type": "bm25",
+                    })
 
-        return results
+            span.set_metadata({"num_results": len(results), "k": k})
+            return results

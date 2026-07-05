@@ -24,6 +24,7 @@ import numpy as np
 import requests
 
 from src.config import cfg
+from src.observability import get_tracer, get_collector
 
 logger = logging.getLogger(__name__)
 
@@ -367,8 +368,14 @@ def generate_answer(query: str, context: str) -> str:
     if not context:
         return "I cannot answer this question based on the available documents."
 
-    prompt = GENERATION_PROMPT.format(context=context[:12000], question=query)
-    answer = call_llm(prompt)
+    tracer = get_tracer()
+    with tracer.start_span("llm_generate") as span:
+        prompt = GENERATION_PROMPT.format(context=context[:12000], question=query)
+        answer = call_llm(prompt)
+        span.set_metadata({
+            "context_chars": len(context[:12000]),
+            "answer_length": len(answer) if answer else 0,
+        })
     return answer if answer else ""
 
 
@@ -489,16 +496,26 @@ def evaluate_generation(
             f_result.query = query_text
             faithfulness_results.append(f_result)
         else:
-            faithfulness_results.append(FaithfulnessResult(
+            f_result = FaithfulnessResult(
                 query=query_text,
                 answer=answer,
                 context_length=len(context),
                 faithfulness_score=0.0,
-            ))
+            )
+            faithfulness_results.append(f_result)
         
         # Step 4: Answer Relevancy（对拒答也有意义：拒答本身是否相关）
         r_result = compute_answer_relevancy(query_text, answer)
         relevancy_results.append(r_result)
+
+        # Record observability metrics
+        collector = get_collector()
+        collector.record_ragas_score(
+            config_label=label or "default",
+            query_id=query_text,
+            faithfulness=f_result.faithfulness_score,
+            answer_relevancy=r_result.relevancy_score,
+        )
     
     # ── 汇总 ──
     faithfulness_scores = [r.faithfulness_score for r in faithfulness_results if r.claims]

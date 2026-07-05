@@ -10,6 +10,7 @@ import logging
 import requests
 
 from src.config import cfg
+from src.observability import get_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +67,14 @@ class HyDEGenerator:
         Returns:
             生成的假设文档文本。失败时返回空字符串。
         """
-        if query in self._cache:
-            return self._cache[query]
-        return self._generate_impl(query)
+        tracer = get_tracer()
+        with tracer.start_span("hyde_generate") as span:
+            if query in self._cache:
+                span.set_metadata({"cache_hit": True})
+                return self._cache[query]
+            span.set_metadata({"cache_hit": False})
+            result = self._generate_impl(query)
+            return result
 
     def _generate_impl(self, query: str) -> str:
         """实际调用 Ollama 生成 HyDE 答案。"""

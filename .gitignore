@@ -121,3 +121,4 @@ neo4j_data/
 .runs/
 .runs
 runs/**/*.sql
+.superpowers

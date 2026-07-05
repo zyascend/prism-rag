@@ -1,8 +1,8 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: feat/ragas-faithfulness | 远程: origin
-> 最后 commit: (RAGAS 生成层评测 — Faithfulness + Answer Relevancy 自实现)
-> 更新: 2026-07-05（新增 RAGAS 生成层评测体系，Feithfulness=0.8867, Relevancy=0.8147）
+> 分支: feat/observability | 远程: origin
+> 最后 commit: (Observability 模块实现 — tracer, collector, alerting, dashboard, reporter)
+> 更新: 2026-07-05（新增内建可观测性模块 — 38 测试全过，lint 干净）
 
 ---
 
@@ -209,11 +209,22 @@ prism-rag/
 │   │   ├── ragas_sanity.py    ← RAGAS 拒答检测
 │   │   └── vidore_adapter.py  ← PrismRAGRetriever 统一接口
 │   ├── store/
-│   │   ├── faiss_store.py     ← FAISS (flat + hnsw, GPU MaxSim torch matmul)
-│   │   └── pgvector_store.py  ← PostgreSQL + pgvector
-│   └── api/
-│       └── routes.py          ← FastAPI /search (含 retrieval_trace)
-├── config/
+	│   │   ├── faiss_store.py     ← FAISS (flat + hnsw, GPU MaxSim torch matmul)
+	│   │   └── pgvector_store.py  ← PostgreSQL + pgvector
+	│   ├── observability/         ← 核心可观测性模块（嵌入 pipeline）
+	│   │   ├── __init__.py        ← 公共 API 导出
+	│   │   ├── tracer.py          ← Trace/Span 模型 + Tracer 上下文管理器（contextvars 线程安全）
+	│   │   ├── collectors.py      ← MetricsCollector 单例（延迟/命中/质量聚合）
+	│   │   ├── alerting.py        ← AlertChecker 阈值检测 + 异常分类
+	│   │   ├── logging_setup.py   ← structlog 统一初始化
+	│   │   └── middleware.py      ← FastAPI 中间件（自动 HTTP Trace）
+	│   ├── api/
+	│       └── routes.py          ← FastAPI /search（已注入 ObservabilityMiddleware）
+	├── observability/             ← 消费端（读取 collector 数据渲染）
+	│   ├── __init__.py
+	│   ├── dashboard.py           ← rich Live 终端面板
+	│   └── reporter.py            ← Markdown/JSON 报告生成
+	├── config/
 │   └── models.yaml            ← 模型路径、embedding 参数、检索配置
 ├── tests/
 │   ├── test_dense_retriever.py
@@ -287,6 +298,9 @@ prism-rag/
 - [x] **RAGAS 云端评测**（50 条，全量检索，Faithfulness=0.8867, Relevancy=0.8147）
 - [x] **`run_ragas_metrics.py` `--skip-index` 修复**（正确加载 FAISS + BM25）
 - [x] **RAGAS Bad Case 分析**（含标尺缺陷分析）
+- [x] **Observability 模块实现**（tracer => collector => alerting => logging => middleware => dashboard => reporter，38 测试全过，lint 干净）
+- [x] **Span 注入**：BM25/Dense/Visual/HyDE/Reranker + PrismRAGRetriever + RAGAS metrics
+- [x] **API Middleware**：自动 HTTP Trace + X-Trace-Id 响应头
 
 ### 🔜 下一步
 1. **排查 Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等
