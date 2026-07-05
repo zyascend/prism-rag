@@ -98,9 +98,9 @@ def main():
                         help="跳过 FAISS 索引加载（适用于已有索引）")
     parser.add_argument("--output-dir", default="results",
                         help="结果输出目录")
-    parser.add_argument("--visual-model", default="colpali",
+    parser.add_argument("--visual-model", default="colqwen2",
                         choices=["colpali", "colqwen2"],
-                        help="视觉检索模型")
+                        help="视觉检索模型（默认 colqwen2，云端 colpali 基座模型缓存不完整）")
     parser.add_argument("--no-rerank", action="store_true", default=False,
                         help="禁用重排序")
     parser.add_argument("--k", type=int, default=5,

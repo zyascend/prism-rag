@@ -102,7 +102,7 @@ def main():
     parser.add_argument("--skip-index", action="store_true", default=False)
     parser.add_argument("--output-dir", default="results")
     parser.add_argument("--language", default="en", choices=["en", "all"])
-    parser.add_argument("--visual-model", default="colpali", choices=["colpali", "colqwen2"])
+    parser.add_argument("--visual-model", default="colqwen2", choices=["colpali", "colqwen2"])
     parser.add_argument("--skip-retrieval", action="store_true",
                         help="跳过检索，从已有 JSON 文件读取答案（debug 用）")
     parser.add_argument("--input-json", type=str, default=None,

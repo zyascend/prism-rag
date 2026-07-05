@@ -25,7 +25,7 @@ import numpy as np
 import requests
 
 from src.config import cfg
-from src.observability import get_tracer, get_collector
+from src.observability import get_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +258,15 @@ def compute_answer_correctness(
             judgment_line = line_stripped
         elif line_stripped.upper().startswith("REASONING:"):
             reasoning_lines.append(line_stripped)
+
+    # 如果无 JUDGMENT: 前缀，模型可能直接输出 YES/NO
+    # （prompt 末尾已是 JUDGMENT:，模型只填 YES/NO 不重复前缀）
+    if not judgment_line:
+        for line in lines:
+            ls = line.strip().upper()
+            if ls in ("YES", "NO") or ls.startswith("YES") or ls.startswith("NO"):
+                judgment_line = f"JUDGMENT: {ls}"
+                break
 
     judgment_text = judgment_line.replace("JUDGMENT:", "", 1).strip().upper()
     result.judge_reasoning = "\n".join(reasoning_lines) if reasoning_lines else judge_response

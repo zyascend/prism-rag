@@ -23,9 +23,9 @@ def main():
     parser.add_argument("--max-pages", type=int, default=None, help="Limit pages (for testing)")
     parser.add_argument("--skip-faiss", action="store_true", help="Skip ColPali + FAISS (BGE only)")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint")
-    parser.add_argument("--visual-model", default="colpali",
+    parser.add_argument("--visual-model", default="colqwen2",
                         choices=["colpali", "colqwen2"],
-                        help="Visual embedding model (default: colpali)")
+                        help="Visual embedding model (default: colqwen2)")
     args = parser.parse_args()
 
     # 初始化

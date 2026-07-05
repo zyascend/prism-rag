@@ -42,9 +42,9 @@ def main():
                         help="仅跑新增配置（跳过 7 个基线消融）")
     parser.add_argument("--config-filter", type=str, default=None,
                         help="仅跑名称包含该子串的消融配置（如 Visual 匹配 Visual_only、BM25_Dense_Visual 等）")
-    parser.add_argument("--visual-model", default="colpali",
+    parser.add_argument("--visual-model", default="colqwen2",
                         choices=["colpali", "colqwen2"],
-                        help="Visual embedding model (default: colpali)")
+                        help="Visual embedding model (default: colqwen2)")
     args = parser.parse_args()
 
     cfg.load()
