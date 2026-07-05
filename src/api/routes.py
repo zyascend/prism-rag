@@ -17,12 +17,14 @@ from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.fusion import RRFFusion
 from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
+from src.observability.middleware import ObservabilityMiddleware
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="PrismRAG API", version="0.1.0")
+app.add_middleware(ObservabilityMiddleware)
 _retriever: Optional[PrismRAGRetriever] = None
 
 
