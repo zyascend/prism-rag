@@ -7,7 +7,6 @@ from pathlib import Path
 def test_end_to_end_trace_collect_report():
     """完整链路：Trace → Collector → Report"""
     from src.observability import get_tracer, get_collector
-    from src.observability.collectors import AlertEvent
 
     tracer = get_tracer()
     collector = get_collector()
@@ -37,7 +36,6 @@ def test_end_to_end_trace_collect_report():
     assert metrics.avg_faithfulness == 0.85
 
     # Generate report
-    from observability.reporter import generate_report
     with tempfile.TemporaryDirectory() as tmpdir:
         # Override runs/ path by monkey-patching
         import observability.reporter as rp
@@ -99,14 +97,6 @@ def test_observability_imports_all():
         get_tracer,
         get_collector,
         init_logging,
-        Tracer,
-        Trace,
-        Span,
-        NoopSpan,
-        MetricsCollector,
-        ConfigMetrics,
-        AlertEvent,
-        AlertChecker,
     )
     assert get_tracer is not None
     assert get_collector is not None

@@ -50,9 +50,9 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
 
     lines = [
         f"# Observability Report — {now}",
-        f"",
+        "",
         f"**Run:** `{run_id}`",
-        f"",
+        "",
         "## Summary",
         "",
     ]
@@ -82,7 +82,7 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
                 f"| {hits.get('avg_visual', 0):.1f} "
                 f"| {faith:.3f}" if faith is not None else "| —"
                 f" | {relev:.3f}" if relev is not None else " | —"
-                f" |"
+                " |"
             )
 
     # Alerts

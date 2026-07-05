@@ -23,16 +23,6 @@ def init_logging(
     """
     log_level = getattr(logging, level.upper(), logging.INFO)
 
-    # 共享处理器列表
-    processors = [
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.add_logger_name,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.dev.ConsoleRenderer()
-        if console
-        else structlog.processors.JSONRenderer(),
-    ]
-
     # 文件输出: JSON
     if log_file:
         from pathlib import Path

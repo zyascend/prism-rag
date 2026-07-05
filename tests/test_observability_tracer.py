@@ -1,5 +1,4 @@
 """Tests for src/observability/tracer.py"""
-import pytest
 from src.observability.tracer import Tracer, Trace, Span, NoopSpan
 
 

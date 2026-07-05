@@ -1,7 +1,6 @@
 """Tests for src/observability/alerting.py"""
-import pytest
 from src.observability.alerting import AlertChecker
-from src.observability.collectors import MetricsCollector, AlertEvent
+from src.observability.collectors import MetricsCollector
 
 
 class TestAlertCheckerThresholds:
