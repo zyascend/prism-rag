@@ -1,0 +1,24 @@
+[
+  {
+    "config": "Visual_only",
+    "ndcg@5": 0.1236,
+    "ndcg@10": 0.1564,
+    "recall@5": 0.1438,
+    "recall@10": 0.3254,
+    "mrr": 0.1808,
+    "avg_latency_ms": 166.3,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "BM25_Dense_Visual",
+    "ndcg@5": 0.4384,
+    "ndcg@10": 0.4525,
+    "recall@5": 0.4855,
+    "recall@10": 0.5953,
+    "mrr": 0.5403,
+    "avg_latency_ms": 311.7,
+    "num_queries": 283,
+    "language": "en"
+  }
+]
