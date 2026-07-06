@@ -60,10 +60,10 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
     # Summary table
     if configs:
         lines.append(
-            "| Config | N | P50 | P95 | Avg Latency | B-Hits | D-Hits | V-Hits | Faithfulness | Relevancy |"
+            "| Config | N | P50 | P95 | Avg Latency | B-Hits | D-Hits | V-Hits | Faith | Relev | CtxRel |"
         )
         lines.append(
-            "|--------|---|---|-----|-------------|--------|--------|--------|-------------|-----------|"
+            "|--------|---|---|-----|-------------|--------|--------|--------|-------|-------|--------|"
         )
         for label, m in configs.items():
             lat = m.get("latency", {})
@@ -71,8 +71,10 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
             qual = m.get("quality", {})
             faith = qual.get("avg_faithfulness")
             relev = qual.get("avg_answer_relevancy")
+            ctxrel = qual.get("avg_context_relevancy")
             faith_str = f"{faith:.3f}" if faith is not None else "—"
             relev_str = f"{relev:.3f}" if relev is not None else "—"
+            ctxrel_str = f"{ctxrel:.3f}" if ctxrel is not None and ctxrel > 0 else "—"
             lines.append(
                 f"| {label} "
                 f"| {m.get('num_queries', 0)} "
@@ -84,6 +86,7 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
                 f"| {hits.get('avg_visual', 0):.1f} "
                 f"| {faith_str} "
                 f"| {relev_str} "
+                f"| {ctxrel_str} "
                 "|"
             )
 
@@ -124,6 +127,9 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
         if qual.get("avg_faithfulness") is not None:
             lines.append(f"- **Faithfulness:** {qual.get('avg_faithfulness', 0):.3f}")
             lines.append(f"- **Answer Relevancy:** {qual.get('avg_answer_relevancy', 0):.3f}")
+        ctxrel = qual.get("avg_context_relevancy", 0)
+        if ctxrel > 0:
+            lines.append(f"- **Context Relevance:** {ctxrel:.3f}")
         lines.append("")
 
     return "\n".join(lines)

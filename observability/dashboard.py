@@ -85,6 +85,7 @@ class Dashboard:
         table.add_column("B/D/V Hits", width=16)
         table.add_column("Faith", justify="right", width=7)
         table.add_column("Relev", justify="right", width=7)
+        table.add_column("CtxRel", justify="right", width=7)
 
         if self._collector:
             snap = self._collector.snapshot()
@@ -92,6 +93,7 @@ class Dashboard:
                 lat = m.get("latency", {})
                 hits = m.get("hits", {})
                 qual = m.get("quality", {})
+                ctxrel = qual.get("avg_context_relevancy", 0)
                 table.add_row(
                     label[:20],
                     str(m.get("num_queries", 0)),
@@ -101,6 +103,7 @@ class Dashboard:
                     f"{hits.get('avg_bm25', 0):.0f}/{hits.get('avg_dense', 0):.0f}/{hits.get('avg_visual', 0):.0f}",
                     f"{qual.get('avg_faithfulness', 0):.3f}" if qual.get("avg_faithfulness") else "—",
                     f"{qual.get('avg_answer_relevancy', 0):.3f}" if qual.get("avg_answer_relevancy") else "—",
+                    f"{ctxrel:.3f}" if ctxrel > 0 else "—",
                 )
         return table
 

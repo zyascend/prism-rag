@@ -40,6 +40,7 @@ class ConfigMetrics:
     # 质量
     avg_faithfulness: float = 0.0
     avg_answer_relevancy: float = 0.0
+    avg_context_relevancy: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -64,6 +65,7 @@ class ConfigMetrics:
             "quality": {
                 "avg_faithfulness": round(self.avg_faithfulness, 4),
                 "avg_answer_relevancy": round(self.avg_answer_relevancy, 4),
+                "avg_context_relevancy": round(self.avg_context_relevancy, 4),
             },
         }
 
@@ -155,6 +157,7 @@ class MetricsCollector:
     def record_ragas_score(
         self, config_label: str, query_id: str,
         faithfulness: float, answer_relevancy: float,
+        context_relevancy: float = 0.0,
     ) -> None:
         with self._lock:
             if config_label not in self._ragas_scores:
@@ -163,6 +166,7 @@ class MetricsCollector:
                 "query_id": query_id,
                 "faithfulness": faithfulness,
                 "answer_relevancy": answer_relevancy,
+                "context_relevancy": context_relevancy,
             })
 
     def record_alert(self, event: AlertEvent) -> None:
@@ -217,6 +221,10 @@ class MetricsCollector:
                     metrics.avg_answer_relevancy = statistics.mean(
                         [s["answer_relevancy"] for s in scores]
                     )
+                    # Context Relevancy (may be missing from older records)
+                    cr_scores = [s.get("context_relevancy", 0.0) for s in scores]
+                    if any(cr_scores):
+                        metrics.avg_context_relevancy = statistics.mean(cr_scores)
 
             if metrics.num_queries == 0:
                 return None
