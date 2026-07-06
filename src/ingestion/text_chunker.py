@@ -1,6 +1,7 @@
 """ViDoRe 语料的文本分块策略
 
 策略：
+0. 预处理：正则清洗 TO 军事手册特有的噪音（表格碎片、文档编号、断词等）
 1. 按双换行切段落
 2. 段落 ≤ 512 tokens → 直接作为一块
 3. 段落 > 512 tokens → 按句号/换行边界切到 ≤ 512
@@ -34,9 +35,59 @@ class TextChunker:
     # 简单 token 估算：英文约 4 chars/token
     TOKEN_EST_RATIO = 4
 
+    # ── TO 手册清洗正则（编译一次，复用）─────────────────────
+    # 表格行：仅移除含空单元格的碎片行（如 "|  | TO WP 011 |"），
+    # 保留正常的 markdown 表格（如 "| Col1 | Col2 |"）
+    _RE_EMPTY_TABLE_ROW = re.compile(
+        r"^\s*\|\s*\|.+\|\s*$", re.MULTILINE
+    )
+    _RE_TO_REF = re.compile(
+        r"^\s*TO\s+[\dA-Z][\dA-Z\-/]+\s*(?:,?\s*(?:WP|Page|para|and)[\s\d\-A-Za-z]+)*\s*$",
+        re.MULTILINE,
+    )
+    _RE_DOC_ID = re.compile(
+        r"^\s*[\d]{1,2}[A-Z]\d[\dA-Z\-/]{3,}\s*(?:\d{2})?\s*$",
+        re.MULTILINE,
+    )
+    _RE_ALLCAPS_LINE = re.compile(
+        r"^\s*[A-Z][A-Z\s/\-–]{15,60}\s*$", re.MULTILINE,
+    )
+    _RE_HYPHEN_BREAK = re.compile(r"(\w)-\n(\w)")
+    _RE_MULTI_BLANK = re.compile(r"\n{3,}")
+
     def __init__(self, max_tokens: int = MAX_TOKENS):
         self.max_tokens = max_tokens
         self.max_chars = max_tokens * self.TOKEN_EST_RATIO
+
+    @classmethod
+    def clean_to_markdown(cls, text: str | None) -> str:
+        """清洗 TO 军事手册特有的噪音。
+
+        处理顺序很重要：先修复断词，再去噪音行，最后压缩空行。
+        """
+        if not text or not text.strip():
+            return ""
+
+        # 1. 修复 PDF 断词（"Protec-\ntive" → "Protective"）
+        text = cls._RE_HYPHEN_BREAK.sub(r"\1\2", text)
+
+        # 2. 去含空单元格的表格碎片行（"|  | TO WP 011 |"），保留正常表格
+        text = cls._RE_EMPTY_TABLE_ROW.sub("", text)
+
+        # 3. 去 TO 文档引用行（"TO 35E1-2-13-1, WP 004 00, Page 3 and 4"）
+        text = cls._RE_TO_REF.sub("", text)
+
+        # 4. 去纯文档编号行（"35E1-2-13-1 00"）
+        text = cls._RE_DOC_ID.sub("", text)
+
+        # 5. 去全大写短行（章节标题如 "PRINCIPLES OF OPERATION"）
+        #    注意：必须足够短且不含小写字母，避免误删正文中的缩写
+        text = cls._RE_ALLCAPS_LINE.sub("", text)
+
+        # 6. 压缩多余空行（≥3个换行 → 2个）
+        text = cls._RE_MULTI_BLANK.sub("\n\n", text)
+
+        return text.strip()
 
     def chunk_page(
         self,
@@ -47,6 +98,11 @@ class TextChunker:
     ) -> List[Chunk]:
         """将一页 markdown 文本切成 chunk 列表"""
         if not markdown_text or not markdown_text.strip():
+            return []
+
+        # ── 预处理：清洗 TO 手册噪音 ──────────────────────
+        markdown_text = self.clean_to_markdown(markdown_text)
+        if not markdown_text:
             return []
 
         paragraphs = re.split(r"\n\s*\n", markdown_text.strip())
