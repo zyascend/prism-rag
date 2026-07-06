@@ -56,7 +56,7 @@
 ```
 make eval-vidore      # clone 仓库后第一条命令:跑 ViDoRe industrial 消融
 make eval-full        # 全 8 子集(按需租云或本地长跑)
-make demo             # 起 docker compose,在线 demo 可点
+make demo             # 启动在线 demo
 make fetch-indexes    # 首次拉取预编码索引(Release artifact)
 ```
 
@@ -74,9 +74,9 @@ make fetch-indexes    # 首次拉取预编码索引(Release artifact)
 - CI 产出消融对比:本 PR vs main 的 NDCG@10 / Recall@5 / MRR diff。**回归 > 容忍带则 CI 红**,强制纪律 1 自动生效。
 - 重活(全量重编码)走 **scheduled job**(夜跑或手动 dispatch),不卡 PR。
 
-### 2.4 容器化 demo
+### 2.4 Demo 服务
 
-- `docker compose up` 起 api/frontend/db/minio/ollama,带一份预编码好的 Demo 知识库索引(350 份 ~3.5GB,放 Release artifact 挂载)。
+- API 服务 + 前端（可选），带一份预编码好的 Demo 知识库索引(350 份 ~3.5GB,放 Release artifact 挂载)。
 - 这是"外部可复现"的第二张脸:不只跑得出评测,还能点得到 demo。
 
 ### 2.5 Leaderboard 自动更新

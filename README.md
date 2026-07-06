@@ -116,7 +116,7 @@ PDF Pages ───→ Offline Ingestion ───→ Storage ───→ Onlin
 ### 环境要求
 
 - Python ≥ 3.11
-- PostgreSQL + pgvector（本地 via Docker 或远程）
+- PostgreSQL + pgvector（本地或远程）
 - macOS M 系列 / Linux (GPU)
 - 推荐：uv（Python 包管理器）
 
@@ -128,13 +128,7 @@ uv venv .venv --python 3.11
 source .venv/bin/activate
 uv pip install -e ".[dev]"
 
-# 2. 启动 PostgreSQL + pgvector（Docker）
-docker run -d --name prismrag-db \
-    -e POSTGRES_DB=prismrag \
-    -e POSTGRES_USER=prismrag \
-    -e POSTGRES_PASSWORD=prismrag \
-    -p 5432:5432 \
-    pgvector/pgvector:pg16
+# 2. 启动 PostgreSQL + pgvector（需本地安装 pgvector 或使用远程服务）
 
 # 3. 数据导入（首次：10 页快速验证）
 python scripts/ingest_vidore.py --max-pages 10
@@ -233,8 +227,6 @@ curl -X POST http://localhost:8000/search \
 ├── docs/
 │   ├── prismrag-architecture.html  # 架构图
 │   └── solutions/                  # 技术复盘文档
-├── Dockerfile                    # API Docker 部署
-└── docker-compose.yml           # API + PostgreSQL
 ```
 
 ## 技术栈

@@ -38,7 +38,7 @@ PDF → MinerU 解析 → markdown + 截图
 | Python | 3.11 (via uv, venv at `.venv/`) |
 | PyTorch | 2.11.0 MPS |
 | FAISS | faiss-cpu 1.14.3 (macOS HNSW segfault, 只用 flat) |
-| PostgreSQL | 无本地安装（用 Docker `pgvector/pgvector:pg16` 或 remote） |
+| PostgreSQL | 无本地安装（用远程 pgvector 服务） |
 
 ### 本地快速验证（全流程最小数据量）
 
@@ -46,10 +46,7 @@ PDF → MinerU 解析 → markdown + 截图
 # 1. 安装
 uv venv .venv --python 3.11 && uv pip install -e ".[dev]"
 
-# 2. 启动 PG (Docker)
-docker run -d --name prismrag-db \
-    -e POSTGRES_DB=prismrag -e POSTGRES_USER=prismrag -e POSTGRES_PASSWORD=prismrag \
-    -p 5432:5432 pgvector/pgvector:pg16
+# 2. 启动 PG（需本地安装 pgvector 或使用远程服务）
 
 # 3. 最小数据跑通
 python scripts/ingest_vidore.py --max-pages 10
@@ -236,8 +233,6 @@ prism-rag/
 ├── tests/
 │   ├── test_dense_retriever.py
 │   └── test_visual_retriever.py
-├── Dockerfile
-├── docker-compose.yml
 ├── requirements-cloud.txt     ← 云端依赖 (faiss-gpu)
 ├── pyproject.toml
 └── Makefile

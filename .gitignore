@@ -108,13 +108,6 @@ dist/
 .npm/
 .pnpm-store/
 
-# ===== Docker 卷 =====
-*.db
-*.sqlite
-*.sqlite3
-pgdata/
-neo4j_data/
-
 .codebase-memory
 .firecrawlruns/
 .firecrawl

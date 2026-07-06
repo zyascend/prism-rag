@@ -1,4 +1,4 @@
-.PHONY: help install ingest-vidore eval-vidore eval-full eval-ragas demo fetch-indexes clean lint test
+.PHONY: help install ingest-vidore eval-vidore eval-full eval-ragas clean lint test
 
 help: ## 显示帮助
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -38,11 +38,6 @@ eval-ragas-metrics: .env ## 运行 RAGAS 生成层评测（Faithfulness + Answer
 
 eval-ragas-metrics-quick: .env ## 快速 RAGAS 生成层评测（10 条查询）
 	python scripts/run_ragas_metrics.py --max-queries 10
-
-demo: .env ## 启动 Docker Compose 在线 Demo
-	docker compose up -d
-	@echo "Demo 已启动: http://localhost:8000"
-	@echo "Health check: http://localhost:8000/health"
 
 fetch-indexes: ## 从 GitHub Release 拉取预编码索引
 	python scripts/fetch_indexes.py

@@ -338,16 +338,7 @@ python -m evaluation.vidore_eval \
 
 ### 8.3 部署
 
-单机 Docker Compose：
-```yaml
-services:
-  api:        # FastAPI
-  frontend:   # React (nginx 静态服务)
-  db:         # PostgreSQL + pgvector
-  minio:      # 对象存储
-  ollama:     # 本地 LLM
-  neo4j:      # 第二阶段
-```
+单机部署（API + PostgreSQL + MinIO + Ollama），详见 `scripts/` 下的启动脚本。
 
 ---
 
