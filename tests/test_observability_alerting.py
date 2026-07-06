@@ -64,6 +64,53 @@ class TestAlertCheckerThresholds:
         alerts = checker.check_thresholds(mc)
         assert alerts == []
 
+    def test_context_relevancy_threshold_alert(self):
+        """Context Relevance < 0.05 应触发告警"""
+        mc = MetricsCollector()
+        mc.record_ragas_score(
+            "cfg_c", "q1",
+            faithfulness=0.85, answer_relevancy=0.80, context_relevancy=0.03,
+        )
+        mc.record_ragas_score(
+            "cfg_c", "q2",
+            faithfulness=0.75, answer_relevancy=0.70, context_relevancy=0.04,
+        )
+
+        checker = AlertChecker(
+            latency_p95_threshold_ms=5000,
+            recall_at_5_min=0.5,
+            faithfulness_min=0.6,
+            context_relevancy_min=0.05,
+        )
+        alerts = checker.check_thresholds(mc)
+        ctxrel_alerts = [a for a in alerts if "context relevance" in a.message.lower()]
+        assert len(ctxrel_alerts) >= 1
+
+    def test_context_relevancy_above_threshold_no_alert(self):
+        """Context Relevance >= 0.05 不触发告警"""
+        mc = MetricsCollector()
+        mc.record_ragas_score(
+            "cfg_c", "q1",
+            faithfulness=0.85, answer_relevancy=0.80, context_relevancy=0.08,
+        )
+
+        checker = AlertChecker(
+            context_relevancy_min=0.05,
+        )
+        alerts = checker.check_thresholds(mc)
+        ctxrel_alerts = [a for a in alerts if "context relevance" in a.message.lower()]
+        assert len(ctxrel_alerts) == 0
+
+    def test_rerank_score_min_default_zero_skips(self):
+        """rerank_score_min=0 时不触发告警（暂不启用）"""
+        mc = MetricsCollector()
+        mc.record_ragas_score("cfg", "q", faithfulness=0.9, answer_relevancy=0.8)
+
+        checker = AlertChecker(rerank_score_min=0.0)
+        alerts = checker.check_thresholds(mc)
+        # No rerank_score checks when threshold is 0
+        assert all("rerank" not in a.message.lower() for a in alerts)
+
 
 class TestAlertCheckerExceptionWrapping:
     def test_wrap_oom(self):

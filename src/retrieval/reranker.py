@@ -8,7 +8,6 @@ import torch
 from sentence_transformers import CrossEncoder
 
 from src.config import cfg
-from src.observability import get_tracer
 
 
 class Reranker:
@@ -36,30 +35,27 @@ class Reranker:
 
     @torch.no_grad()
     def rerank(self, query: str, candidates: List[dict], top_k: int = 5) -> List[dict]:
+        """纯业务逻辑：cross-encoder 评分 + 排序。不创建 observability span。
+
+        调用方（vidore_adapter / ragas_metrics）负责在外层包裹 span 并记录 metadata。
+        """
         if not candidates:
             return []
 
-        tracer = get_tracer()
-        with tracer.start_span("rerank") as span:
-            pairs = [(query, c["text"]) for c in candidates]
-            scores = []
-            for pair in pairs:
-                score = self.model.predict([pair], convert_to_tensor=True)
-                scores.append(score.item() if hasattr(score, "item") else float(score))
+        pairs = [(query, c["text"]) for c in candidates]
+        scores = []
+        for pair in pairs:
+            score = self.model.predict([pair], convert_to_tensor=True)
+            scores.append(score.item() if hasattr(score, "item") else float(score))
 
-            scored = list(zip(candidates, scores))
-            scored.sort(key=lambda x: x[1], reverse=True)
+        scored = list(zip(candidates, scores))
+        scored.sort(key=lambda x: x[1], reverse=True)
 
-            results = []
-            for cand, score in scored[:top_k]:
-                result = dict(cand)
-                result["rerank_score"] = float(score)
-                result["retrieval_type"] = "reranked"
-                results.append(result)
+        results = []
+        for cand, score in scored[:top_k]:
+            result = dict(cand)
+            result["rerank_score"] = float(score)
+            result["retrieval_type"] = "reranked"
+            results.append(result)
 
-            span.set_metadata({
-                "num_candidates": len(candidates),
-                "num_results": len(results),
-                "top_k": top_k,
-            })
-            return results
+        return results

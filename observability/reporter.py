@@ -36,6 +36,13 @@ def generate_report(snapshot: dict[str, Any], run_id: str) -> Path:
         json.dumps(alerts, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
+    # Per-query RAGAS details
+    ragas_details = snapshot.get("ragas_details", {})
+    if ragas_details:
+        (out_dir / "ragas_details.json").write_text(
+            json.dumps(ragas_details, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
     # Markdown report
     md = _build_markdown(snapshot, run_id)
     (out_dir / "report.md").write_text(md, encoding="utf-8")
@@ -132,4 +139,49 @@ def _build_markdown(snapshot: dict[str, Any], run_id: str) -> str:
             lines.append(f"- **Context Relevance:** {ctxrel:.3f}")
         lines.append("")
 
+    # RAGAS distribution summary
+    ragas_details = snapshot.get("ragas_details", {})
+    if ragas_details:
+        lines.append("## RAGAS Score Distribution")
+        lines.append("")
+        for label, queries in ragas_details.items():
+            if not queries:
+                continue
+            faith_scores = [q["faithfulness"] for q in queries]
+            relev_scores = [q["answer_relevancy"] for q in queries]
+            ctxrel_scores = [q["context_relevancy"] for q in queries if q.get("context_relevancy", 0) > 0]
+            lines.append(f"### {label} ({len(queries)} queries)")
+            lines.append("")
+            lines.append("| Metric | Min | P25 | P50 | P75 | Max | Mean |")
+            lines.append("|--------|-----|-----|-----|-----|-----|------|")
+            for name, scores in [("Faithfulness", faith_scores), ("Answer Relevancy", relev_scores)]:
+                if scores:
+                    s = sorted(scores)
+                    n = len(s)
+                    lines.append(
+                        f"| {name} | {s[0]:.3f} | {_pctl(s, 25):.3f} | {_pctl(s, 50):.3f} "
+                        f"| {_pctl(s, 75):.3f} | {s[-1]:.3f} | {sum(s)/n:.3f} |"
+                    )
+            if ctxrel_scores:
+                s = sorted(ctxrel_scores)
+                n = len(s)
+                lines.append(
+                    f"| Context Relevance | {s[0]:.4f} | {_pctl(s, 25):.4f} | {_pctl(s, 50):.4f} "
+                    f"| {_pctl(s, 75):.4f} | {s[-1]:.4f} | {sum(s)/n:.4f} |"
+                )
+            lines.append("")
+
     return "\n".join(lines)
+
+
+def _pctl(sorted_data: list[float], p: float) -> float:
+    """百分位数辅助函数"""
+    n = len(sorted_data)
+    if n == 0:
+        return 0.0
+    k = (p / 100.0) * (n - 1)
+    f = int(k)
+    c = k - f
+    if f + 1 < n:
+        return sorted_data[f] + c * (sorted_data[f + 1] - sorted_data[f])
+    return sorted_data[f]

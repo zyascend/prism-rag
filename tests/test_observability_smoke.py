@@ -15,18 +15,39 @@ def test_end_to_end_trace_collect_report():
     # Simulate a retrieval pipeline for one query
     tracer.start_trace("What is the safety protocol?", "Full_zerank2")
     with tracer.start_span("bm25_search") as span:
-        span.finish(metadata={"num_results": 18})
+        span.finish(metadata={"num_results": 18, "k": 20})
     with tracer.start_span("dense_encode") as span:
         span.finish(metadata={"dim": 1024})
     with tracer.start_span("dense_search") as span:
-        span.finish(metadata={"num_results": 15})
+        span.finish(metadata={"num_results": 15, "k": 20})
     with tracer.start_span("fusion_rerank") as span:
-        span.finish(metadata={"num_fused_input": 40, "num_reranked_output": 5})
+        span.finish(metadata={
+            "num_fused_input": 40,
+            "num_reranked_output": 5,
+            "num_results": 5,
+            "max_rerank_score": 0.95,
+            "min_rerank_score": 0.12,
+            "mean_rerank_score": 0.53,
+        })
     trace = tracer.finish_trace()
     collector.ingest_trace(trace)
 
-    # Simulate RAGAS evaluation
-    collector.record_ragas_score("Full_zerank2", "q1", faithfulness=0.85, answer_relevancy=0.72)
+    # Simulate RAGAS evaluation with details
+    collector.record_ragas_score(
+        "Full_zerank2", "q1", faithfulness=0.85, answer_relevancy=0.72,
+        context_relevancy=0.08,
+        context_relevancy_details={
+            "num_sentences": 25,
+            "num_relevant": 2,
+            "per_sentence": [{"id": 0, "text": "s1", "relevant": False}],
+        },
+        faithfulness_details={
+            "num_claims": 5,
+            "num_supported": 4,
+            "claims": ["c1", "c2"],
+            "supported": [True, True, True, True, False],
+        },
+    )
 
     # Verify collector has data
     metrics = collector.get_config_metrics("Full_zerank2")
@@ -35,42 +56,49 @@ def test_end_to_end_trace_collect_report():
     assert metrics.avg_bm25_hits == 18.0
     assert metrics.avg_faithfulness == 0.85
 
-    # Generate report
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Override runs/ path by monkey-patching
-        import observability.reporter as rp
-        original_path = rp.Path
-        rp.Path = lambda p: Path(tmpdir) / p if str(p).startswith("runs") else original_path(p)
+    # Verify snapshot includes ragas_details
+    snap = collector.snapshot()
+    assert "ragas_details" in snap
+    assert "Full_zerank2" in snap["ragas_details"]
+    details = snap["ragas_details"]["Full_zerank2"]
+    assert len(details) == 1
+    assert details[0]["faithfulness"] == 0.85
+    assert "context_relevancy_per_sentence" in details[0]
+    assert "faithfulness_details" in details[0]
 
-        # Use a temp run_id
-        snapshot = collector.snapshot()
+    # Generate report files (manual write, verifying new fields)
+    with tempfile.TemporaryDirectory() as tmpdir:
         out_dir = Path(tmpdir) / "runs" / "smoke_test" / "observability"
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write files manually
-        (out_dir / "metrics.json").write_text(json.dumps(snapshot["configs"], indent=2))
-        (out_dir / "alerts.json").write_text(json.dumps(snapshot["alerts"], indent=2))
+        (out_dir / "metrics.json").write_text(json.dumps(snap["configs"], indent=2))
+        (out_dir / "alerts.json").write_text(json.dumps(snap["alerts"], indent=2))
+        (out_dir / "ragas_details.json").write_text(
+            json.dumps(snap["ragas_details"], indent=2)
+        )
         with open(out_dir / "traces.jsonl", "w") as f:
-            for t in snapshot["traces"]:
+            for t in snap["traces"]:
                 f.write(json.dumps(t) + "\n")
 
-        # Verify files exist
+        # Verify all files exist
         assert (out_dir / "metrics.json").exists()
         assert (out_dir / "traces.jsonl").exists()
         assert (out_dir / "alerts.json").exists()
+        assert (out_dir / "ragas_details.json").exists()
 
-        # Verify content
-        metrics_data = json.loads((out_dir / "metrics.json").read_text())
-        assert "Full_zerank2" in metrics_data
-        assert metrics_data["Full_zerank2"]["num_queries"] == 2
+        # Verify ragas_details content
+        details_data = json.loads((out_dir / "ragas_details.json").read_text())
+        assert "Full_zerank2" in details_data
+        assert details_data["Full_zerank2"][0]["context_relevancy"] == 0.08
 
+        # Verify fusion_rerank span has rerank_score metadata
         traces_data = [
-            json.loads(line)
-            for line in (out_dir / "traces.jsonl").read_text().strip().split("\n")
-            if line
+            json.loads(line) for line in
+            (out_dir / "traces.jsonl").read_text().strip().split("\n") if line
         ]
-        assert len(traces_data) == 1
-        assert len(traces_data[0]["spans"]) == 4
+        rerank_span = [s for s in traces_data[0]["spans"] if s["name"] == "fusion_rerank"][0]
+        assert rerank_span["metadata"]["max_rerank_score"] == 0.95
+        assert rerank_span["metadata"]["num_results"] == 5
 
 
 def test_disabled_tracer_noop():

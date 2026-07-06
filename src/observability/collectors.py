@@ -107,12 +107,14 @@ class MetricsCollector:
         self._hit_data: dict[str, dict[str, list[float]]] = {}  # config_label -> {span_name: [counts]}
         self._hyde_data: dict[str, dict[str, int]] = {}  # config_label -> {hits, misses}
         self._ragas_scores: dict[str, list[dict[str, float]]] = {}  # config_label -> [{f, ar}]
+        self._ragas_details: dict[str, list[dict[str, Any]]] = {}  # config_label -> [per-query detail]
         self._alerts: list[AlertEvent] = []
         self._span_hit_names = {
             "bm25_search": "bm25",
             "dense_search": "dense",
             "visual_search": "visual",
             "fusion_rerank": "fused",
+            "rerank": "reranked",
         }
 
     def reset(self) -> None:
@@ -122,6 +124,7 @@ class MetricsCollector:
             self._hit_data.clear()
             self._hyde_data.clear()
             self._ragas_scores.clear()
+            self._ragas_details.clear()
             self._alerts.clear()
 
     def ingest_trace(self, trace: Trace) -> None:
@@ -158,6 +161,8 @@ class MetricsCollector:
         self, config_label: str, query_id: str,
         faithfulness: float, answer_relevancy: float,
         context_relevancy: float = 0.0,
+        context_relevancy_details: dict[str, Any] | None = None,
+        faithfulness_details: dict[str, Any] | None = None,
     ) -> None:
         with self._lock:
             if config_label not in self._ragas_scores:
@@ -168,6 +173,20 @@ class MetricsCollector:
                 "answer_relevancy": answer_relevancy,
                 "context_relevancy": context_relevancy,
             })
+            # Per-query details for snapshot persistence
+            if config_label not in self._ragas_details:
+                self._ragas_details[config_label] = []
+            detail: dict[str, Any] = {
+                "query_id": query_id,
+                "faithfulness": faithfulness,
+                "answer_relevancy": answer_relevancy,
+                "context_relevancy": context_relevancy,
+            }
+            if context_relevancy_details is not None:
+                detail["context_relevancy_per_sentence"] = context_relevancy_details
+            if faithfulness_details is not None:
+                detail["faithfulness_details"] = faithfulness_details
+            self._ragas_details[config_label].append(detail)
 
     def record_alert(self, event: AlertEvent) -> None:
         with self._lock:
@@ -247,6 +266,7 @@ class MetricsCollector:
                 "configs": configs,
                 "traces": list(self._traces),
                 "alerts": [a.to_dict() for a in self._alerts],
+                "ragas_details": dict(self._ragas_details),
             }
 
 

@@ -22,10 +22,14 @@ class AlertChecker:
         latency_p95_threshold_ms: int = 5000,
         recall_at_5_min: float = 0.5,
         faithfulness_min: float = 0.6,
+        rerank_score_min: float = 0.0,
+        context_relevancy_min: float = 0.05,
     ):
         self.latency_p95_threshold_ms = latency_p95_threshold_ms
         self.recall_at_5_min = recall_at_5_min
         self.faithfulness_min = faithfulness_min
+        self.rerank_score_min = rerank_score_min
+        self.context_relevancy_min = context_relevancy_min
 
     @classmethod
     def from_config(cls, config: "ObservabilityConfig") -> "AlertChecker":
@@ -33,6 +37,8 @@ class AlertChecker:
             latency_p95_threshold_ms=config.latency_p95_threshold_ms,
             recall_at_5_min=config.recall_at_5_min,
             faithfulness_min=config.faithfulness_min,
+            rerank_score_min=config.rerank_score_min,
+            context_relevancy_min=config.context_relevancy_min,
         )
 
     def check_thresholds(self, collector: MetricsCollector) -> list[AlertEvent]:
@@ -76,6 +82,19 @@ class AlertChecker:
                     category="threshold",
                     message=(
                         f"Faithfulness {faith:.3f} below minimum {self.faithfulness_min}"
+                    ),
+                    config_label=label,
+                ))
+
+            # Context Relevance 阈值
+            ctxrel = quality.get("avg_context_relevancy", 1.0)
+            if ctxrel > 0 and ctxrel < self.context_relevancy_min:
+                alerts.append(AlertEvent(
+                    level="warning",
+                    category="threshold",
+                    message=(
+                        f"Context Relevance {ctxrel:.3f} below minimum "
+                        f"{self.context_relevancy_min}"
                     ),
                     config_label=label,
                 ))
