@@ -1,8 +1,8 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: feat/observability | 远程: origin
-> 最后 commit: (Observability 模块实现 — tracer, collector, alerting, dashboard, reporter)
-> 更新: 2026-07-05（新增内建可观测性模块 — 38 测试全过，lint 干净）
+> 分支: feat/observability-gaps | 远程: origin
+> 最后 commit: (Observability 完整性修复 — 9 个 gap 全部补上，44 测试全过)
+> 更新: 2026-07-06
 
 ---
 

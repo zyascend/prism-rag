@@ -127,6 +127,36 @@ class TestTracer:
         tracer = Tracer(enabled=False)
         assert tracer.current_trace() is None
 
+    def test_parent_trace_detection(self):
+        """验证 current_trace() 可用于检测父 Trace 是否存在"""
+        tracer = Tracer(enabled=True)
+        # 初始无活跃 Trace
+        assert tracer.current_trace() is None
+
+        # 创建 Trace 后可以检测到
+        trace = tracer.start_trace("test query", "test_config")
+        assert tracer.current_trace() is not None
+        assert tracer.current_trace().trace_id == trace.trace_id
+
+        # 结束 Trace 后恢复为 None
+        tracer.finish_trace()
+        assert tracer.current_trace() is None
+
+    def test_child_spans_attach_to_parent_trace(self):
+        """子 span 自动挂载到当前活跃的父 Trace"""
+        tracer = Tracer(enabled=True)
+        trace = tracer.start_trace("query", "config")
+
+        # 创建子 span — 应挂载到 trace
+        with tracer.start_span("child_span") as span:
+            span.set_metadata({"key": "value"})
+
+        assert len(trace.spans) == 1
+        assert trace.spans[0].name == "child_span"
+        assert trace.spans[0].metadata == {"key": "value"}
+
+        tracer.finish_trace()
+
 
 class TestNoopSpan:
     def test_noop_span_context_manager_does_nothing(self):

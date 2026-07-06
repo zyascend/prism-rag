@@ -52,3 +52,5 @@ observability:
     latency_p95_threshold_ms: 5000
     recall_at_5_min: 0.5
     faithfulness_min: 0.6
+    rerank_score_min: 0.0        # 最低 rerank_score 告警阈值（0 = 暂不启用）
+    context_relevancy_min: 0.05  # Context Relevance 最低阈值

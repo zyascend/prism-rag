@@ -102,6 +102,36 @@ class TestMetricsCollector:
         assert metrics.avg_faithfulness == pytest.approx(0.80, abs=0.01)
         assert metrics.avg_answer_relevancy == pytest.approx(0.70, abs=0.01)
 
+    def test_record_ragas_with_details(self):
+        """验证 record_ragas_score 存储 per-sentence 和 faithfulness 细节"""
+        mc = MetricsCollector()
+        mc.record_ragas_score(
+            "cfg_a", "q1",
+            faithfulness=0.80, answer_relevancy=0.70, context_relevancy=0.10,
+            context_relevancy_details={
+                "num_sentences": 10,
+                "num_relevant": 1,
+                "per_sentence": [{"id": 0, "text": "hello world test", "relevant": True}],
+            },
+            faithfulness_details={
+                "num_claims": 4,
+                "num_supported": 3,
+                "claims": ["c1", "c2", "c3", "c4"],
+                "supported": [True, True, True, False],
+            },
+        )
+
+        snap = mc.snapshot()
+        assert "ragas_details" in snap
+        assert "cfg_a" in snap["ragas_details"]
+        details = snap["ragas_details"]["cfg_a"][0]
+        assert details["faithfulness"] == 0.80
+        assert details["context_relevancy"] == 0.10
+        assert "context_relevancy_per_sentence" in details
+        assert details["context_relevancy_per_sentence"]["num_sentences"] == 10
+        assert "faithfulness_details" in details
+        assert details["faithfulness_details"]["num_claims"] == 4
+
     def test_record_alert(self):
         mc = MetricsCollector()
         ae = AlertEvent(level="warning", category="threshold", message="test", config_label="c")

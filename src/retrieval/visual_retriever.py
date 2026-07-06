@@ -37,7 +37,7 @@ class VisualRetriever:
         # 2. FAISS MaxSim 搜索 → Top-k 页
         with tracer.start_span("visual_search") as span:
             page_results = self.faiss.maxsim_search(q_emb, k=k)
-            span.set_metadata({"num_pages": len(page_results), "k": k})
+            span.set_metadata({"num_pages": len(page_results), "k": k, "num_results": len(page_results)})
 
         if not page_results:
             return []
@@ -73,7 +73,7 @@ class VisualRetriever:
         # 1. FAISS MaxSim 搜索 (pre-encoded, skip encode span)
         with tracer.start_span("visual_search") as span:
             page_results = self.faiss.maxsim_search(q_emb, k=k)
-            span.set_metadata({"num_pages": len(page_results), "k": k, "pre_encoded": True})
+            span.set_metadata({"num_pages": len(page_results), "k": k, "pre_encoded": True, "num_results": len(page_results)})
 
         if not page_results:
             return []

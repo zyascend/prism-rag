@@ -104,6 +104,7 @@ class PrismRAGRetriever:
         visual_query_embedding: Optional[torch.Tensor] = None,
         use_hyde: bool = False,
         reranker_type: str = "bge",
+        config_label: str = "",
     ) -> dict:
         """带 retrieval_trace 的统一检索接口
 
@@ -113,6 +114,8 @@ class PrismRAGRetriever:
             use_hyde: 是否启用 HyDE 查询改写。启用时会额外用 LLM 生成假设文档
                       并作为额外查询送入 dense/visual 路线。
             reranker_type: 重排器选择 ("bge" | "zerank")
+            config_label: 检索配置标签，用于 observability 聚合。若已有父 Trace
+                         则继承其 label。
 
         Returns:
             {"results": [...], "retrieval_trace": {"bm25_top5": [...], "dense_top5": [...],
@@ -120,7 +123,15 @@ class PrismRAGRetriever:
         """
         tracer = get_tracer()
         collector = get_collector()
-        tracer.start_trace(query=query, config_label="")
+
+        # 检测是否已有父 Trace（由 evaluate_generation 等上层创建）
+        existing = tracer.current_trace()
+        if existing is not None:
+            # 挂载到已有 Trace，继承其 config_label
+            owns_trace = False
+        else:
+            tracer.start_trace(query=query, config_label=config_label)
+            owns_trace = True
 
         routes = []
         trace = {"bm25_top5": [], "dense_top5": [], "visual_top5": [], "hyde": ""}
@@ -189,9 +200,10 @@ class PrismRAGRetriever:
                 logger.warning(f"Visual 检索跳过: {e}")
 
         if not routes:
-            obs_trace = tracer.finish_trace()
-            if obs_trace:
-                collector.ingest_trace(obs_trace)
+            if owns_trace:
+                obs_trace = tracer.finish_trace()
+                if obs_trace:
+                    collector.ingest_trace(obs_trace)
             return {"results": [], "retrieval_trace": trace}
 
         fused = self.fusion.fuse(routes, k=min(k * 2, 40))
@@ -202,16 +214,24 @@ class PrismRAGRetriever:
             # Wrap fusion+rerank in a span
             with tracer.start_span("fusion_rerank") as fusion_span:
                 reranked = reranker.rerank(query, fused, top_k=k)
+                # Extract rerank score stats from results
+                rerank_scores = [r.get("rerank_score", 0.0) for r in reranked]
                 fusion_span.set_metadata({
                     "num_fused_input": len(fused),
                     "num_reranked_output": len(reranked),
+                    "num_results": len(reranked),  # collector 据此追踪 fused hits
+                    "max_rerank_score": round(max(rerank_scores), 4) if rerank_scores else 0.0,
+                    "min_rerank_score": round(min(rerank_scores), 4) if rerank_scores else 0.0,
+                    "mean_rerank_score": round(sum(rerank_scores) / len(rerank_scores), 4) if rerank_scores else 0.0,
                 })
+            if owns_trace:
+                obs_trace = tracer.finish_trace()
+                if obs_trace:
+                    collector.ingest_trace(obs_trace)
+            return {"results": reranked, "retrieval_trace": trace}
+
+        if owns_trace:
             obs_trace = tracer.finish_trace()
             if obs_trace:
                 collector.ingest_trace(obs_trace)
-            return {"results": reranked, "retrieval_trace": trace}
-
-        obs_trace = tracer.finish_trace()
-        if obs_trace:
-            collector.ingest_trace(obs_trace)
         return {"results": fused[:k], "retrieval_trace": trace}

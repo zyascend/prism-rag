@@ -17,6 +17,8 @@ class ObservabilityConfig:
     latency_p95_threshold_ms: int = 5000
     recall_at_5_min: float = 0.5
     faithfulness_min: float = 0.6
+    rerank_score_min: float = 0.0
+    context_relevancy_min: float = 0.05
 
 
 class Config:
@@ -122,6 +124,8 @@ class Config:
             latency_p95_threshold_ms=alerting_raw.get("latency_p95_threshold_ms", 5000),
             recall_at_5_min=alerting_raw.get("recall_at_5_min", 0.5),
             faithfulness_min=alerting_raw.get("faithfulness_min", 0.6),
+            rerank_score_min=alerting_raw.get("rerank_score_min", 0.0),
+            context_relevancy_min=alerting_raw.get("context_relevancy_min", 0.05),
         )
 
     @property

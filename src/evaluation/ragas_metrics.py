@@ -204,21 +204,28 @@ def decompose_claims(answer: str) -> List[str]:
     if not answer or len(answer.strip()) < 5:
         return []
 
-    prompt = CLAIM_DECOMPOSITION_PROMPT.format(answer=answer)
-    response = call_llm(prompt)
+    tracer = get_tracer()
+    with tracer.start_span("decompose_claims") as span:
+        prompt = CLAIM_DECOMPOSITION_PROMPT.format(answer=answer)
+        response = call_llm(prompt)
 
-    if not response:
-        return []
+        if not response:
+            return []
 
-    claims = []
-    for line in response.strip().split("\n"):
-        line = line.strip()
-        # 去掉编号前缀 "1.", "2.", "- ", "* "
-        line = re.sub(r"^\s*(?:\d+[\.\)]|[-*])\s*", "", line)
-        if line and len(line) > 5:
-            claims.append(line)
+        claims = []
+        for line in response.strip().split("\n"):
+            line = line.strip()
+            # 去掉编号前缀 "1.", "2.", "- ", "* "
+            line = re.sub(r"^\s*(?:\d+[\.\)]|[-*])\s*", "", line)
+            if line and len(line) > 5:
+                claims.append(line)
 
-    return claims if claims else [answer.strip()]
+        result = claims if claims else [answer.strip()]
+        span.set_metadata({
+            "num_claims": len(result),
+            "answer_length": len(answer),
+        })
+        return result
 
 
 def verify_claim(claim: str, context: str) -> float:
@@ -226,25 +233,34 @@ def verify_claim(claim: str, context: str) -> float:
     if not context or len(context.strip()) < 10:
         return 0.0
 
-    prompt = CLAIM_VERIFICATION_PROMPT.format(
-        context=context[:8000],  # 限制上下文长度
-        claim=claim,
-    )
-    response = call_llm(prompt)
+    tracer = get_tracer()
+    with tracer.start_span("verify_claim") as span:
+        prompt = CLAIM_VERIFICATION_PROMPT.format(
+            context=context[:8000],  # 限制上下文长度
+            claim=claim,
+        )
+        response = call_llm(prompt)
 
-    if not response:
-        return 0.0
+        if not response:
+            return 0.0
 
-    response_clean = response.strip().upper()
-    if response_clean.startswith("YES"):
-        return 1.0
-    elif response_clean.startswith("NO"):
-        return 0.0
-    else:
-        # 如果没有明确 YES/NO，尝试从文本推断
-        if "yes" in response_clean:
-            return 0.5
-        return 0.0
+        response_clean = response.strip().upper()
+        if response_clean.startswith("YES"):
+            verdict = 1.0
+        elif response_clean.startswith("NO"):
+            verdict = 0.0
+        else:
+            # 如果没有明确 YES/NO，尝试从文本推断
+            if "yes" in response_clean:
+                verdict = 0.5
+            else:
+                verdict = 0.0
+
+        span.set_metadata({
+            "claim_length": len(claim),
+            "verdict": verdict,
+        })
+        return verdict
 
 
 def compute_faithfulness(answer: str, context: str) -> FaithfulnessResult:
@@ -292,20 +308,27 @@ def generate_reverse_questions(answer: str, n: int = DEFAULT_N_REVERSE_QUESTIONS
     if not answer or len(answer.strip()) < 5:
         return []
 
-    prompt = REVERSE_QUESTION_PROMPT.format(answer=answer, n=n)
-    response = call_llm(prompt)
+    tracer = get_tracer()
+    with tracer.start_span("generate_reverse_questions") as span:
+        prompt = REVERSE_QUESTION_PROMPT.format(answer=answer, n=n)
+        response = call_llm(prompt)
 
-    if not response:
-        return []
+        if not response:
+            return []
 
-    questions = []
-    for line in response.strip().split("\n"):
-        line = line.strip()
-        line = re.sub(r"^\s*(?:\d+[\.\)]|[-*])\s*", "", line)
-        if line and line.endswith("?") and len(line) > 5:
-            questions.append(line)
+        questions = []
+        for line in response.strip().split("\n"):
+            line = line.strip()
+            line = re.sub(r"^\s*(?:\d+[\.\)]|[-*])\s*", "", line)
+            if line and line.endswith("?") and len(line) > 5:
+                questions.append(line)
 
-    return questions[:n]
+        result = questions[:n]
+        span.set_metadata({
+            "n_requested": n,
+            "n_generated": len(result),
+        })
+        return result
 
 
 def compute_answer_relevancy(
@@ -335,7 +358,10 @@ def compute_answer_relevancy(
 
     # Step 2: 嵌入
     texts_to_embed = [question] + gen_questions
-    embeddings = call_ollama_embed(texts_to_embed)
+    tracer = get_tracer()
+    with tracer.start_span("ollama_embed") as span:
+        embeddings = call_ollama_embed(texts_to_embed)
+        span.set_metadata({"num_texts": len(texts_to_embed)})
 
     if embeddings is None or len(embeddings) < len(texts_to_embed):
         logger.warning("嵌入失败，使用 LLM 直接评分 fallback")
@@ -508,7 +534,13 @@ def compute_context_relevancy(query: str, context_chunks: List[str]) -> ContextR
             f"[{batch_start + i}] {s}" for i, s in enumerate(batch)
         )
         prompt = CONTEXT_RELEVANCE_PROMPT.format(query=query, sentences=sentences_block)
-        response = call_llm(prompt)
+        tracer = get_tracer()
+        with tracer.start_span("context_relevance_llm") as span:
+            response = call_llm(prompt)
+            span.set_metadata({
+                "batch_start": batch_start,
+                "batch_size": len(batch),
+            })
 
         # 解析响应（传入总数以避免 LLM 漏句）
         batch_relevant = parse_relevance_response(response, len(batch))
@@ -632,10 +664,20 @@ def evaluate_generation(
         q = queries_ds[q_idx]
         query_text = str(q["query"])
         
+        # ── 创建端到端 Trace ───────────────────────────────
+        tracer = get_tracer()
+        config_label = label or "default"
+        tracer.start_trace(query=query_text, config_label=config_label)
+        
         start = time.time()
         
-        # Step 1: 检索
-        retrieved = retriever.search(query_text, k=k, use_rerank=use_rerank)
+        # Step 1: 检索（span 由 search_with_trace 内部创建，自动挂载到父 Trace）
+        with tracer.start_span("retrieval") as retrieval_span:
+            retrieved = retriever.search(query_text, k=k, use_rerank=use_rerank)
+            retrieval_span.set_metadata({
+                "num_retrieved": len(retrieved),
+                "k": k,
+            })
         
         if not retrieved:
             context = ""
@@ -644,7 +686,7 @@ def evaluate_generation(
                 [r.get("text", "") for r in retrieved]
             )
         
-        # Step 2: 生成
+        # Step 2: 生成（llm_generate span 由 generate_answer 内部创建，自动挂载）
         answer = generate_answer(query_text, context)
         latency_total += time.time() - start
         
@@ -661,40 +703,73 @@ def evaluate_generation(
             generated_count += 1
         
         # Step 3: Faithfulness（只在非拒答时算，否则无意义）
-        if not is_rejected and answer:
-            f_result = compute_faithfulness(answer, context)
-            f_result.query = query_text
-            faithfulness_results.append(f_result)
-        else:
-            f_result = FaithfulnessResult(
-                query=query_text,
-                answer=answer,
-                context_length=len(context),
-                faithfulness_score=0.0,
-            )
-            faithfulness_results.append(f_result)
+        with tracer.start_span("ragas_faithfulness") as faith_span:
+            if not is_rejected and answer:
+                f_result = compute_faithfulness(answer, context)
+                f_result.query = query_text
+                faithfulness_results.append(f_result)
+            else:
+                f_result = FaithfulnessResult(
+                    query=query_text,
+                    answer=answer,
+                    context_length=len(context),
+                    faithfulness_score=0.0,
+                )
+                faithfulness_results.append(f_result)
+            faith_span.set_metadata({
+                "is_rejected": is_rejected,
+                "num_claims": len(f_result.claims),
+                "score": f_result.faithfulness_score,
+            })
         
-        # Step 4: Answer Relevancy（对拒答也有意义：拒答本身是否相关）
-        r_result = compute_answer_relevancy(query_text, answer)
-        relevancy_results.append(r_result)
+        # Step 4: Answer Relevancy
+        with tracer.start_span("ragas_answer_relevancy") as ar_span:
+            r_result = compute_answer_relevancy(query_text, answer)
+            relevancy_results.append(r_result)
+            ar_span.set_metadata({
+                "score": r_result.relevancy_score,
+                "num_gen_questions": len(r_result.generated_questions),
+            })
 
-        # Step 5: Context Relevance（检索回的上下文与问题的相关性）
-        if retrieved:
-            context_chunks = [r.get("text", "") for r in retrieved]
-            c_result = compute_context_relevancy(query_text, context_chunks)
-        else:
-            c_result = ContextRelevancyResult(query=query_text, context_chunks=[])
-        context_relevancy_results.append(c_result)
+        # Step 5: Context Relevance
+        with tracer.start_span("ragas_context_relevancy") as cr_span:
+            if retrieved:
+                context_chunks = [r.get("text", "") for r in retrieved]
+                c_result = compute_context_relevancy(query_text, context_chunks)
+            else:
+                c_result = ContextRelevancyResult(query=query_text, context_chunks=[])
+            context_relevancy_results.append(c_result)
+            cr_span.set_metadata({
+                "score": c_result.relevance_score,
+                "num_sentences": c_result.num_sentences,
+                "num_relevant": c_result.num_relevant,
+            })
 
-        # Record observability metrics
+        # Record observability metrics (with per-sentence detail)
         collector = get_collector()
         collector.record_ragas_score(
-            config_label=label or "default",
+            config_label=config_label,
             query_id=query_text,
             faithfulness=f_result.faithfulness_score,
             answer_relevancy=r_result.relevancy_score,
             context_relevancy=c_result.relevance_score,
+            context_relevancy_details={
+                "num_sentences": c_result.num_sentences,
+                "num_relevant": c_result.num_relevant,
+                "per_sentence": c_result.per_sentence,
+            },
+            faithfulness_details={
+                "num_claims": len(f_result.claims),
+                "num_supported": sum(f_result.supported),
+                "claims": f_result.claims,
+                "supported": f_result.supported,
+            },
         )
+
+        # ── 完成 Trace，ingest 到 collector ─────────────────
+        trace = tracer.finish_trace()
+        if trace:
+            collector.ingest_trace(trace)
     
     # ── 汇总 ──
     faithfulness_scores = [r.faithfulness_score for r in faithfulness_results if r.claims]

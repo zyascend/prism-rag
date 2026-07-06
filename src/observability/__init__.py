@@ -29,6 +29,7 @@ def dump_collector(run_name: str) -> str | None:
     """将 Collector 中的追踪数据落盘到 runs/<run_name>/observability/
 
     供 CLI 评测脚本在 main() 末尾调用。无追踪数据时静默跳过。
+    在写入报告前自动运行 AlertChecker 检测阈值越界。
 
     Args:
         run_name: 运行标识，如 "e2e_qa_20260705"
@@ -38,9 +39,15 @@ def dump_collector(run_name: str) -> str | None:
     """
     collector = get_collector()
     snap = collector.snapshot()
-    if not snap.get("traces"):
+    if not snap.get("traces") and not snap.get("ragas_details"):
         return None
     try:
+        # ── 运行告警检测 ──────────────────────────────────
+        from src.config import cfg
+        checker = AlertChecker.from_config(cfg.observability)
+        for alert in checker.check_thresholds(collector):
+            collector.record_alert(alert)
+
         from observability.reporter import generate_report
 
         report_dir = generate_report(snap, run_name)
