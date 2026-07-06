@@ -70,7 +70,6 @@ pdf-rag/
 - `src/graphrag/` —— 图检索
 - `src/agent/` —— ReACT Agent
 - `frontend/` —— React 前端（P1 评估阶段靠 curl/json 验证，UI demo 捆绑到 API 验证后）
-- Docker Compose（P1 末或 P2 初加入容器化）
 
 ---
 
