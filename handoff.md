@@ -126,7 +126,8 @@ bash scripts/pull_from_cloud.sh <host> <port> <password>
 | Visual 路距官方 ColPali 差 3.6x | 多因素叠加（FAISS 精度、grounding 去重、评测框架差异），ColPali 自身在 Industrial 也只有 0.47 | 转向换组件策略 |
 
 ### 2026-07-01 上云实操教训（本轮沉淀）
-
+注意会发生这个问题：新上传的代码把索引路径覆盖了——ColQwen2 的索引（2GB）在 /root/autodl-tmp/indexes/，但本地旧版代码的 indexes/ 只有 ColPali
+  索引。需要重建 symlink 
 #### 环境依赖
 
 | 问题 | 根因 | 解决 |
@@ -276,7 +277,7 @@ prism-rag/
 | 层 | 核心指标 | 数值 | 最新 Run |
 |:--:|:---------|:----:|:---------|
 | **Layer 1** — 检索消融 | Full+zerank2 NDCG@10 | **0.5715** 🏆 | `20260704-colqwen2` |
-| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy | **0.8867 / 0.8147** | `20260705-ragas-eval` |
+| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy / CtxRel | **0.7721 / 0.8104 / 0.0759** | `20260706-ragas-full-283` |
 | **Layer 3** — 端到端 QA | Correctness / Rejection / Combined | **0.64 / 0.95 / 0.733** | `20260705-e2e-qa` |
 
 ### ✅ 已完成
@@ -296,8 +297,8 @@ prism-rag/
 **生成层（Layer 2）：**
 - [x] **RAGAS 生成层自实现**（Faithfulness 声明分解+LLM验证 / Answer Relevancy 反向问题+cosine）
 - [x] **RAGAS 云端评测**（50 条，全量检索，Faithfulness=0.8867, Relevancy=0.8147）
-- [x] **`run_ragas_metrics.py` `--skip-index` 修复**（正确加载 FAISS + BM25）
-- [x] **RAGAS Bad Case 分析**：合理拒答误伤 4 条、真正 Hallucination 4 条、Relevancy 标尺偏差 5 条
+- [x] **RAGAS 全量 283 条评测**（全量检索，Faithfulness=**0.7721**, Relevancy=**0.8104**, CtxRel=**0.0759**，确认 50 条样本高估了 Faithfulness 约 0.11）
+- [x] **Context Relevance 指标实现**（句级相关性判断，自实现，commit ba0d5ed）
 
 **端到端 QA 层（Layer 3）：**
 - [x] **QA 数据集生成器**：从 ViDoRe 283 条英文查询半自动生成 50 QA 对 + 预期答案
@@ -311,16 +312,16 @@ prism-rag/
 - [x] **API Middleware**：自动 HTTP Trace + X-Trace-Id 响应头
 
 ### 🔜 下一步
-1. **Layer 1 — Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等。ColQwen2+14.6% 仍远低预期，已排除模型选择因素
-2. **Layer 1 — zerank-2 加速**: 加 padding token 恢复批量推理（目前逐条，2x 慢）
-3. **Layer 1 — ColEmbed-3B 对比**: feature 分支已有，需跑消融对比
-4. **Layer 2 — RAGAS 全量 283 条**: 看结果是否稳定（约 45 分钟云上）
-5. **Layer 2 — 云 API Judge**: gpt-4o-mini 替换 Ollama qwen2:7b，从分钟级加速到秒级
-6. **Layer 2 — 标尺修复**: 拒答跳过 Faithfulness 计算、Relevancy 改用 LLM 评分替代 cosine
-7. **Layer 3 — 检索改善**: Bad Case 中 5 条因检索缺失导致答案错误，需优化召回策略
-8. **Layer 3 — 数据集精化**: 6 条合理拒答被误判的 case 需优化预期答案或检索上下文
-6. **RAGAS 标尺修复**: 拒答不计入 Faithfulness、Relevancy 改用 LLM 评分替代 cosine
-7. **运行端到端 QA 评测**: 在云端执行 `python scripts/run_e2e_qa.py --skip-index`
+1. **Layer 2 — 置信度阈值兜底（P0）**: 对 rerank_score < threshold（如 0.3）的查询直接拒答，拦截编造。对应 Bad Case 中氮气罐颜色代码编造的根因
+2. **Layer 2 — 上下文压缩（P1）**: BGE 句级 cosine 过滤，减少拼入的噪音段落。CtxRel 仅 0.076 说明提升空间大
+3. **Layer 2 — Chunk 元数据注入 LLM（P2）**: 在 prompt 中传递 doc_id / page_number，帮助 LLM 做 grounding
+4. **Layer 2 — 标尺修复**: 拒答跳过 Faithfulness 计算、Relevancy 改用 LLM 评分替代 cosine
+5. **Layer 2 — 云 API Judge**: gpt-4o-mini 替换 Ollama qwen2:7b，从分钟级加速到秒级（标尺修复后做）
+6. **Layer 1 — Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等
+7. **Layer 1 — zerank-2 加速**: 加 padding token 恢复批量推理
+8. **Layer 1 — ColEmbed-3B 对比**: feature 分支已有，需跑消融对比
+9. **Layer 3 — 检索改善**: Bad Case 中 5 条因检索缺失导致答案错误，需优化召回策略
+10. **Layer 3 — 数据集精化**: 6 条合理拒答被误判的 case 需优化预期答案或检索上下文
 
 ### 📁 运行记录
 | Run | 日期 | 说明 | 关键指标 |
@@ -330,7 +331,8 @@ prism-rag/
 | `runs/20260702-query-fix/` | 7/2 | Query 编码 fix | NDCG@10=0.5507 |
 | `runs/20260702_1902/` | 7/2 | **zerank-2 + HyDE 实验** | NDCG@10=0.5715 |
 | `runs/20260704-colqwen2/` | 7/4 | **ColQwen2 视觉编码实验** | NDCG@10=0.5715 |
-| `runs/20260705-ragas-eval/` | 7/5 | **RAGAS 生成层评测** | Faith=0.8867, Rel=0.8147 |
+| `runs/20260705-ragas-eval/` | 7/5 | **RAGAS 生成层评测（50 条）** | Faith=0.8867, Rel=0.8147 |
+| `runs/20260706-ragas-full-283/` | 7/6 | **RAGAS 全量 283 条** | Faith=**0.7721**, Rel=**0.8104**, CtxRel=**0.0759** |
 | `data/e2e_qa.json` | 7/5 | **端到端 QA 数据集** | 50 可回答 + 20 拒答 |
 
 ### 📄 复盘文档
@@ -339,21 +341,20 @@ prism-rag/
 - `docs/solutions/2026-07-04-visual-sota-gap-analysis.md` — Visual-only 距 SOTA 3.6x 差距根因分析
 - `runs/20260705-ragas-eval/badcase_ragas_analysis.md` — RAGAS 评测 Bad Case 分析
 
-### 📊 RAGAS 生成层评测（50 条，全量检索，2026-07-05）
+### 📊 RAGAS 生成层评测 — 两次对比（2026-07-05~06）
 
-| 指标 | 数值 | 说明 |
-|------|:----:|------|
-| Faithfulness | **0.8867** | 回答 88.7% 的声明被检索上下文支持 |
-| Relevancy | **0.8147** | 回答与问题高度相关 |
-| 生成回答 | 45/50 (90%) | |
-| 拒答 | 5/50 (10%) | 全部合理 |
-| 耗时 | 8 min 35 s | RTX 4090, Ollama qwen2:7b |
+| 指标 | 50 条（7/5） | 283 条全量（7/6） | Δ |
+|:-----|:---------:|:-------------:|:--:|
+| **Faithfulness** | **0.8867** | **0.7721** | ↓ 0.1146 |
+| **Answer Relevancy** | **0.8147** | **0.8104** | ↓ 0.0043（稳定） |
+| **Context Relevance** | — | **0.0759** | 新基线 |
+| 耗时 | 8 min 35 s | 1h 22min 44s | — |
 
-**Bad Case 总结：**
-- 🟡 合理拒答 4 条（Faithfulness=0 误伤）
-- 🟠 真正 Hallucination 1 条（氮气罐颜色代码编造，检索未召回相关文档）
-- 🔵 Relevancy 标尺偏差 5 条（cosine similarity 对词面不同不敏感）
-- 标尺缺陷：拒答应跳过 Faithfulness 计算、Relevancy 应改用 LLM 评分
+**关键结论：**
+- 50 条样本明显高估了 Faithfulness（↑0.11），全量 283 条更具代表性
+- 0.7721 对应约 23% 声明不被检索上下文支持，实际 Hallucination 率约 2-3%
+- **Context Relevance 仅 0.076** → 检索回的大部分句子与问题无关，上下文压缩优化空间大
+- Relevancy 稳定在 0.81，对采样不敏感
 
 ### 🗂️ 端到端 QA 评测（Layer 3）
 

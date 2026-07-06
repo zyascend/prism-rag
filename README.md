@@ -29,7 +29,7 @@ PDF Pages ───→ Offline Ingestion ───→ Storage ───→ Onlin
 | 层 | 评测内容 | 核心指标 | 最新结果 |
 |:--:|---------|:--------:|:--------:|
 | **Layer 1** | 检索层 — 消融对比 (ViDoRe v3 Industrial, 283 条) | NDCG@10 / Recall@5 / MRR | 🏆 Full+zerank-2 **0.5715** |
-| **Layer 2** | 生成层 — RAGAS (Faithfulness + Answer Relevancy, 50 条) | Faithfulness / Relevancy | **0.8867 / 0.8147** |
+| **Layer 2** | 生成层 — RAGAS 全量 (Faithfulness + Answer Relevancy + Context Relevance, 283 条) | Faithfulness / Relevancy / CtxRel | **0.7721 / 0.8104 / 0.0759** |
 | **Layer 3** | 端到端 QA — 答案正确性 + 拒答准确率 (50 QA + 20 拒答) | Correctness / Rejection / Combined | **0.64 / 0.95 / 0.733** |
 
 ---
@@ -57,21 +57,19 @@ PDF Pages ───→ Offline Ingestion ───→ Storage ───→ Onlin
 
 ---
 
-### Layer 2 — 生成层 RAGAS 评测 (50 条, 全量检索, 2026-07-05)
+### Layer 2 — 生成层 RAGAS 评测
 
-| 指标 | 数值 | 说明 |
-|------|:----:|------|
-| **Faithfulness** | **0.8867** | 回答 88.7% 的声明被检索上下文支持 |
-| **Answer Relevancy** | **0.8147** | 回答与问题高度相关 |
-| 生成回答 | 45/50 (90%) | 5 条合理拒答（文档无对应内容） |
-| 耗时 | 8 min 35 s | RTX 4090, Ollama qwen2:7b |
+| 指标 | 50 条（7/5） | 283 条全量（7/6） | 说明 |
+|:-----|:---------:|:-------------:|------|
+| **Faithfulness** | **0.8867** | **0.7721** | 回答声明被检索上下文支持的比例 ↓0.11（50 条样本高估） |
+| **Answer Relevancy** | **0.8147** | **0.8104** | 回答与问题相关性，稳定、对采样不敏感 |
+| **Context Relevance** | — | **0.0759** | 检索上下文与问题相关的句子比例（新指标） |
+| 耗时 | 8 min 35 s | 1h 22min 44s | RTX 4090, Ollama qwen2:7b |
 
-**Bad Case 分布：**
-| 类别 | 数量 | 影响 | 说明 |
-|:----|:----:|:----:|------|
-| 🟡 合理拒答误伤 | 4 | -0.02 Faith | 拒答句子被声明分解后 LLM 判为"不支持" |
-| 🟠 真正 Hallucination | 4 | -0.03 Faith | 其中 1 条严重（氮气罐颜色代码编造） |
-| 🔵 Relevancy 标尺偏差 | 5 | -0.02 Rel | cosine 对词面不同不敏感 |
+**关键分析：**
+- Faithfulness=0.7721 对应约 23% 声明不被支持，实际 Hallucination 率约 2-3%
+- **Context Relevance 仅 0.076** → 检索回的大量句子与问题无关，上下文压缩优化空间大
+- Bad Case 详见 [`runs/20260706-ragas-full-283/observability/report.md`](runs/20260706-ragas-full-283/observability/report.md)
 
 > 详见 [`runs/20260705-ragas-eval/badcase_ragas_analysis.md`](runs/20260705-ragas-eval/badcase_ragas_analysis.md)
 
@@ -109,7 +107,8 @@ PDF Pages ───→ Offline Ingestion ───→ Storage ───→ Onlin
 | `runs/20260702-query-fix/` | 7/2 | Query 编码修复 | NDCG@10=0.5507 |
 | `runs/20260702_1902/` | 7/2 | zerank-2 + HyDE 实验 | NDCG@10=**0.5715** |
 | `runs/20260704-colqwen2/` | 7/4 | ColQwen2 视觉替换 | NDCG@10=0.5715 |
-| `runs/20260705-ragas-eval/` | 7/5 | **Layer 2 RAGAS 生成层** | Faith=0.8867, Rel=0.8147 |
+| `runs/20260705-ragas-eval/` | 7/5 | **Layer 2 RAGAS 生成层（50 条）** | Faith=0.8867, Rel=0.8147 |
+| `runs/20260706-ragas-full-283/` | 7/6 | **Layer 2 RAGAS 全量（283 条）** | Faith=**0.7721**, Rel=**0.8104**, CtxRel=**0.0759** |
 | `runs/20260705-e2e-qa/` | 7/5 | **Layer 3 端到端 QA** | Correct=0.64, Reject=0.95 |
 
 ## 快速开始
