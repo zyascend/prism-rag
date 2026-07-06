@@ -18,6 +18,8 @@ retrieval:
   visual_k: 20
   rrf_k: 60
   rerank_k: 5
+  context_compression_ratio: 0.4      # BGE 句级 cosine 过滤保留比（1.0 = 不压缩）
+  rerank_score_reject_threshold: 0.0  # 置信度阈值（0 = 禁用，建议 0.3）
 
 storage:
   pgvector:

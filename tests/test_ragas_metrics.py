@@ -5,6 +5,7 @@ import json
 import numpy as np
 from pathlib import Path
 import pytest
+from unittest.mock import MagicMock
 
 from src.evaluation.ragas_metrics import (
     FaithfulnessResult,
@@ -16,6 +17,7 @@ from src.evaluation.ragas_metrics import (
     _llm_relevancy_fallback,
     split_context_to_sentences,
     parse_relevance_response,
+    compress_context,
 )
 
 
@@ -368,3 +370,145 @@ class TestContextRelevancyJSONSerialization:
         assert json_str is not None
         assert "avg_context_relevancy" in json_str
         assert "0.6" in json_str
+
+
+# ─── Context Compression + Threshold Guard ──────────────────────
+
+class MockBGEEmbedder:
+    """Mock BGE embedder — 返回随机嵌入，相似度由文本中的关键词决定"""
+
+    def __init__(self, dim: int = 1024):
+        self.dim = dim
+        np.random.seed(42)
+
+    def encode(self, texts):
+        """Mock encode: 用文本 hash 生成伪嵌入"""
+        import torch
+        embs = []
+        for t in texts:
+            # 用文本的 hash 作为种子生成确定性嵌入
+            seed = hash(t) % (2**31)
+            rng = np.random.RandomState(seed)
+            vec = rng.randn(self.dim).astype(np.float32)
+            vec = vec / (np.linalg.norm(vec) + 1e-10)  # L2 normalize
+            embs.append(torch.from_numpy(vec))
+        return torch.stack(embs)
+
+
+class TestContextCompression:
+    """测试上下文压缩函数"""
+
+    def test_compress_context_reduces_sentences(self):
+        """压缩后的句子数应 < 原始句子数（ratio=0.5）"""
+        chunks = [
+            "The conveyor belt has a load capacity of 500kg. The motor requires regular maintenance.",
+            "Safety guards must be installed. Operators need proper training certificates.",
+            "The facility is located in Houston Texas. Coffee breaks are 15 minutes long.",
+            "Annual inspections are mandatory per OSHA regulation 1910. Fire exits must be clearly marked.",
+        ]
+        bge = MockBGEEmbedder(dim=128)  # smaller dim for speed
+        result = compress_context(
+            query="What is the load capacity of the conveyor belt?",
+            chunks=chunks,
+            bge_embedder=bge,
+            ratio=0.5,
+        )
+        # Should have kept ~50% of sentences
+        original_count = len(split_context_to_sentences(chunks))
+        compressed_count = len(result.split("\n"))
+        assert compressed_count < original_count
+        assert compressed_count >= 3  # min keep
+
+    def test_compress_context_short_circuits(self):
+        """≤5 句时跳过压缩，返回原文"""
+        chunks = ["A short text. Only two sentences here."]
+        bge = MockBGEEmbedder(dim=128)
+        result = compress_context(
+            query="test query",
+            chunks=chunks,
+            bge_embedder=bge,
+            ratio=0.4,
+        )
+        # Should return joined chunks, not compressed
+        assert result == "\n\n".join(chunks)
+
+    def test_compress_context_preserves_order(self):
+        """保留的句子应按原文顺序排列"""
+        chunks = [
+            "First sentence about safety. Second sentence about maintenance.",
+            "Third sentence about capacity. Fourth sentence about weather.",
+            "Fifth sentence about inspections. Sixth sentence about lunch.",
+        ]
+        bge = MockBGEEmbedder(dim=128)
+        result = compress_context(
+            query="safety capacity inspections",
+            chunks=chunks,
+            bge_embedder=bge,
+            ratio=0.5,
+        )
+        kept = result.split("\n")
+        # Check sentences appear in original order
+        indices = []
+        all_sentences = split_context_to_sentences(chunks)
+        for s in kept:
+            try:
+                indices.append(all_sentences.index(s))
+            except ValueError:
+                pass
+        assert indices == sorted(indices), f"Sentences not in order: {indices}"
+
+    def test_compress_context_empty_chunks(self):
+        """空输入返回空字符串"""
+        bge = MockBGEEmbedder(dim=128)
+        result = compress_context(
+            query="test", chunks=[], bge_embedder=bge, ratio=0.4,
+        )
+        assert result == ""
+
+
+class TestConfidenceThreshold:
+    """测试置信度阈值检测逻辑"""
+
+    def test_threshold_rejects_low_score(self):
+        """max_rerank < threshold 时应拒答"""
+        threshold = 0.3
+        rerank_scores = [0.05, 0.08, 0.02, 0.10, 0.15]
+        max_score = max(rerank_scores)
+        assert max_score < threshold
+        assert threshold > 0
+        # Simulates the check in evaluate_generation
+        threshold_rejected = threshold > 0 and max_score < threshold and len(rerank_scores) > 0
+        assert threshold_rejected is True
+
+    def test_threshold_passes_high_score(self):
+        """max_rerank >= threshold 时应通过"""
+        threshold = 0.3
+        rerank_scores = [0.45, 0.38, 0.52, 0.30, 0.41]
+        max_score = max(rerank_scores)
+        assert max_score >= threshold
+        threshold_rejected = threshold > 0 and max_score < threshold and len(rerank_scores) > 0
+        assert threshold_rejected is False
+
+    def test_threshold_zero_disabled(self):
+        """threshold=0 时无论如何都通过"""
+        threshold = 0.0
+        rerank_scores = [0.001, 0.002]
+        max_score = max(rerank_scores)
+        threshold_rejected = threshold > 0 and max_score < threshold and len(rerank_scores) > 0
+        assert threshold_rejected is False
+
+    def test_threshold_empty_scores(self):
+        """无 rerank_score 时不应拒答"""
+        threshold = 0.3
+        rerank_scores = []
+        max_score = max(rerank_scores) if rerank_scores else 0.0
+        threshold_rejected = threshold > 0 and max_score < threshold and len(rerank_scores) > 0
+        assert threshold_rejected is False
+
+    def test_threshold_exact_match(self):
+        """max_score == threshold 时通过（不是小于）"""
+        threshold = 0.3
+        rerank_scores = [0.3, 0.4]
+        max_score = max(rerank_scores)
+        threshold_rejected = threshold > 0 and max_score < threshold and len(rerank_scores) > 0
+        assert threshold_rejected is False

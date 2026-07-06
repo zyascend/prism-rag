@@ -410,6 +410,77 @@ def _llm_relevancy_fallback(question: str, answer: str) -> float:
         return 0.5  # 无法解析时给中间值
 
 
+# ─── Context Compression ────────────────────────────────────────
+
+def compress_context(
+    query: str,
+    chunks: List[str],
+    bge_embedder,
+    ratio: float = 0.4,
+) -> str:
+    """BGE 句级 cosine 过滤：保留与 query 最相关的句子，压缩上下文。
+
+    Args:
+        query: 查询文本
+        chunks: 检索回的 chunk 文本列表
+        bge_embedder: BGEEmbedder 实例（需要有 encode() 方法，返回 L2-normalized 嵌入）
+        ratio: 保留比例，0.4 表示保留 top 40% 最相关句子
+
+    Returns:
+        压缩后的上下文字符串（句子按原文顺序拼接）
+    """
+    import time as _time
+    import torch as _torch
+
+    tracer = get_tracer()
+    with tracer.start_span("context_compression") as span:
+        t0 = _time.time()
+
+        # Step 1: 拆句
+        sentences = split_context_to_sentences(chunks)
+        num_before = len(sentences)
+
+        # 太少不值得压缩
+        if num_before <= 5:
+            span.set_metadata({
+                "num_before": num_before, "num_after": num_before,
+                "ratio": 1.0, "skipped": True, "reason": "too_few_sentences",
+            })
+            return "\n\n".join(chunks)
+
+        # Step 2: BGE 编码
+        query_emb = bge_embedder.encode([query])  # [1, dim]
+        sent_embs = bge_embedder.encode(sentences)  # [N, dim]
+
+        # Step 3: Cosine = dot product（BGE 已 L2-normalize）
+        query_vec = query_emb[0]  # [dim]
+        similarities = [
+            float(_torch.dot(query_vec, sent_embs[i]))
+            for i in range(num_before)
+        ]
+
+        # Step 4: 按相似度排序，保留 top ratio（至少 3 句）
+        num_keep = max(3, int(num_before * ratio))
+        ranked = sorted(
+            enumerate(similarities), key=lambda x: x[1], reverse=True
+        )
+        keep_indices = {idx for idx, _ in ranked[:num_keep]}
+
+        # Step 5: 按原文顺序拼接
+        kept = [sentences[i] for i in range(num_before) if i in keep_indices]
+        compressed = "\n".join(kept)
+
+        elapsed = (_time.time() - t0) * 1000
+        span.set_metadata({
+            "num_before": num_before,
+            "num_after": len(kept),
+            "ratio": ratio,
+            "compression_ms": round(elapsed, 2),
+            "skipped": False,
+        })
+        return compressed
+
+
 # ─── Context Relevance ─────────────────────────────────────────
 
 CONTEXT_RELEVANCE_PROMPT = """\
@@ -582,18 +653,30 @@ def retrieve_and_generate(
     query: str,
     k: int = 5,
     use_rerank: bool = True,
+    bge_embedder=None,
 ) -> tuple:
-    """检索 → 生成，返回 (retrieved_chunks, context, answer)"""
+    """检索 → 生成，返回 (retrieved_chunks, context, answer)
+
+    Args:
+        retriever: PrismRAGRetriever 实例
+        query: 查询文本
+        k: 检索 top-k
+        use_rerank: 是否重排
+        bge_embedder: 可选，BGEEmbedder 实例。传入时自动压缩上下文。
+    """
     retrieved = retriever.search(query, k=k, use_rerank=use_rerank)
 
     if not retrieved:
         return [], "", generate_answer(query, "")
 
-    context = "\n\n---\n\n".join(
-        [r.get("text", "") for r in retrieved]
-    )
-    answer = generate_answer(query, context)
+    chunks = [r.get("text", "") for r in retrieved]
+    compress_ratio = cfg.get("retrieval.context_compression_ratio", 1.0)
+    if bge_embedder is not None and compress_ratio < 1.0:
+        context = compress_context(query, chunks, bge_embedder, ratio=compress_ratio)
+    else:
+        context = "\n\n---\n\n".join(chunks)
 
+    answer = generate_answer(query, context)
     return retrieved, context, answer
 
 
@@ -681,22 +764,52 @@ def evaluate_generation(
         
         if not retrieved:
             context = ""
+            context_chunks = []
         else:
-            context = "\n\n---\n\n".join(
-                [r.get("text", "") for r in retrieved]
-            )
-        
-        # Step 2: 生成（llm_generate span 由 generate_answer 内部创建，自动挂载）
-        answer = generate_answer(query_text, context)
+            context_chunks = [r.get("text", "") for r in retrieved]
+
+            # ── Step 1.5a: 置信度阈值检测 ──────────────────
+            rerank_scores = [r.get("rerank_score", 0.0) for r in retrieved]
+            max_rerank = max(rerank_scores) if rerank_scores else 0.0
+            reject_threshold = cfg.get("retrieval.rerank_score_reject_threshold", 0.0)
+
+            with tracer.start_span("rerank_threshold_check") as thresh_span:
+                threshold_rejected = (
+                    reject_threshold > 0
+                    and max_rerank < reject_threshold
+                    and len(retrieved) > 0
+                )
+                thresh_span.set_metadata({
+                    "max_rerank_score": round(max_rerank, 4),
+                    "threshold": reject_threshold,
+                    "rejected": threshold_rejected,
+                })
+
+            # ── Step 1.5b: 上下文压缩（非拒答时）─────────────
+            compress_ratio = cfg.get("retrieval.context_compression_ratio", 1.0)
+            if not threshold_rejected and compress_ratio < 1.0 and context_chunks:
+                context = compress_context(
+                    query_text, context_chunks, retriever.bge, ratio=compress_ratio,
+                )
+            else:
+                context = "\n\n---\n\n".join(context_chunks)
+
+        # ── 拒答判断（短语拒答 + 阈值拒答）─────────────────
+        if threshold_rejected:
+            answer = "I cannot answer this question based on the available documents."
+        else:
+            # Step 2: 生成（llm_generate span 由 generate_answer 内部创建，自动挂载）
+            answer = generate_answer(query_text, context)
         latency_total += time.time() - start
-        
-        # 检查是否拒答
+
+        # 检查是否短语拒答
         rejection_phrases = [
             "cannot answer", "not enough information",
             "based on the available", "cannot provide",
         ]
-        is_rejected = any(phrase in answer.lower() for phrase in rejection_phrases)
-        
+        phrase_rejected = any(phrase in answer.lower() for phrase in rejection_phrases)
+        is_rejected = phrase_rejected or threshold_rejected
+
         if is_rejected:
             rejected_count += 1
         else:
