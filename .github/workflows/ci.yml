@@ -9,9 +9,6 @@ on:
   schedule:
     - cron: "0 2 * * 0"    # 每周日凌晨 2:00 全量跑
 
-env:
-  UV_SYSTEM_PYTHON: "true"
-
 jobs:
   # ── 快速反馈: lint + test ──────────────────────────
   quick:
@@ -26,7 +23,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install --system -e ".[dev]"
+        run: uv pip install -e ".[dev]"
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short
@@ -61,7 +58,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install --system -e ".[dev]"
+        run: uv pip install -e ".[dev]"
 
       - name: Cache HuggingFace datasets
         uses: actions/cache@v4
@@ -110,7 +107,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install --system -e ".[dev]"
+        run: uv pip install -e ".[dev]"
 
       - name: Cache HuggingFace datasets
         uses: actions/cache@v4
@@ -153,7 +150,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv pip install --system -e ".[dev]"
+        run: uv pip install -e ".[dev]"
 
       - name: Cache HuggingFace datasets
         uses: actions/cache@v4
