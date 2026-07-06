@@ -9,10 +9,13 @@ import pytest
 from src.evaluation.ragas_metrics import (
     FaithfulnessResult,
     AnswerRelevancyResult,
+    ContextRelevancyResult,
     RagasGenerationEvalResult,
     decompose_claims,
     generate_reverse_questions,
     _llm_relevancy_fallback,
+    split_context_to_sentences,
+    parse_relevance_response,
 )
 
 
@@ -181,4 +184,187 @@ class TestJSONSerialization:
         json_str = json.dumps(output, indent=2, ensure_ascii=False)
         assert json_str is not None
         assert "0.5" in json_str
+        assert "0.6" in json_str
+
+
+class TestContextRelevancyResult:
+    """测试 ContextRelevancyResult 数据结构"""
+
+    def test_empty_result(self):
+        r = ContextRelevancyResult(query="", context_chunks=[])
+        d = r.to_dict()
+        assert d["relevance_score"] == 0.0
+        assert d["num_sentences"] == 0
+        assert d["num_relevant"] == 0
+        assert d["per_sentence"] == []
+
+    def test_with_data(self):
+        r = ContextRelevancyResult(
+            query="What is the load capacity?",
+            context_chunks=["The conveyor belt has a load capacity of 500kg.", "This manual covers installation procedures."],
+        )
+        r.num_sentences = 3
+        r.num_relevant = 2
+        r.relevance_score = 2 / 3
+        r.per_sentence = [
+            {"id": 0, "text": "The conveyor belt has a load capacity of 500kg.", "relevant": True},
+            {"id": 1, "text": "This manual covers installation procedures.", "relevant": False},
+            {"id": 2, "text": "Maintenance should be performed monthly.", "relevant": True},
+        ]
+        d = r.to_dict()
+        assert d["relevance_score"] == pytest.approx(0.6667, abs=0.001)
+        assert d["num_sentences"] == 3
+        assert d["num_relevant"] == 2
+        assert len(d["per_sentence"]) == 3
+        assert d["per_sentence"][0]["relevant"] is True
+        assert d["per_sentence"][1]["relevant"] is False
+
+    def test_all_relevant(self):
+        r = ContextRelevancyResult(query="q", context_chunks=["a", "b"])
+        r.num_sentences = 2
+        r.num_relevant = 2
+        r.relevance_score = 1.0
+        assert r.relevance_score == 1.0
+
+    def test_none_relevant(self):
+        r = ContextRelevancyResult(query="q", context_chunks=["a"])
+        r.num_sentences = 5
+        r.num_relevant = 0
+        r.relevance_score = 0.0
+        assert r.relevance_score == 0.0
+
+    def test_json_serializable(self):
+        r = ContextRelevancyResult(query="test q", context_chunks=["chunk 1"])
+        r.num_sentences = 2
+        r.num_relevant = 1
+        r.relevance_score = 0.5
+        r.per_sentence = [
+            {"id": 0, "text": "chunk 1 sentence.", "relevant": True},
+        ]
+        d = r.to_dict()
+        json_str = json.dumps(d)
+        assert json_str is not None
+        assert "test q" in json_str
+        assert "relevance_score" in json_str
+
+
+class TestSentenceSplitting:
+    """测试上下文分句逻辑（纯函数，无 LLM 调用）"""
+
+    def test_single_sentence(self):
+        chunks = ["This is a test sentence."]
+        sentences = split_context_to_sentences(chunks)
+        assert len(sentences) >= 1
+        assert any("test" in s for s in sentences)
+
+    def test_multiple_sentences_per_chunk(self):
+        chunks = ["The conveyor belt has a load capacity. The motor requires regular maintenance. Safety guards must be installed."]
+        sentences = split_context_to_sentences(chunks)
+        assert len(sentences) == 3
+
+    def test_multiple_chunks(self):
+        chunks = [
+            "The equipment must be inspected monthly. All operators need proper training.",
+            "Emergency stops should be tested weekly. Maintenance logs are required.",
+        ]
+        sentences = split_context_to_sentences(chunks)
+        assert len(sentences) == 4
+
+    def test_empty_input(self):
+        assert split_context_to_sentences([]) == []
+        assert split_context_to_sentences([""]) == []
+        assert split_context_to_sentences(["   "]) == []
+
+    def test_filters_short_fragments(self):
+        chunks = ["A sentence with enough words.", "x", "y", "Another valid sentence here."]
+        sentences = split_context_to_sentences(chunks)
+        # "x" and "y" should be filtered out (too short)
+        assert len(sentences) >= 2
+        for s in sentences:
+            assert len(s.split()) >= 3  # sentences shorter than 3 words are filtered
+
+    def test_handles_newlines(self):
+        chunks = ["The manual specifies torque requirements.\nInstallation must follow the guidelines.\nSafety inspections are mandatory."]
+        sentences = split_context_to_sentences(chunks)
+        assert len(sentences) == 3
+
+    def test_preserves_original_index(self):
+        """验证按句号、换行、分号分割"""
+        chunks = ["A. B. C."]
+        sentences = split_context_to_sentences(chunks)
+        # Each should be at least 3 chars after stripping
+        assert all(len(s) >= 3 for s in sentences)
+
+
+class TestRelevanceResponseParsing:
+    """测试 LLM 返回的 JSON 解析（纯函数，无 LLM 调用）"""
+
+    def test_valid_json_response(self):
+        response = '[{"id": 0, "relevant": true}, {"id": 1, "relevant": false}]'
+        result = parse_relevance_response(response, 2)
+        assert result == [True, False]
+
+    def test_partial_scores(self):
+        response = '[{"id": 0, "relevant": true}]'
+        result = parse_relevance_response(response, 2)
+        # Only sentence 0 marked relevant, sentence 1 defaults to False
+        assert result == [True, False]
+
+    def test_empty_response(self):
+        result = parse_relevance_response("", 3)
+        assert result == [False, False, False]
+
+    def test_malformed_json(self):
+        result = parse_relevance_response("not valid json at all", 2)
+        assert result == [False, False]
+
+    def test_extract_json_from_markdown_block(self):
+        response = '```json\n[{"id": 0, "relevant": true}]\n```'
+        result = parse_relevance_response(response, 1)
+        assert result == [True]
+
+    def test_yes_no_format_fallback(self):
+        """LLM 可能不按 JSON 返回，而是用 [0] YES [1] NO 格式"""
+        response = "[0] YES\n[1] NO\n[2] YES"
+        result = parse_relevance_response(response, 3)
+        assert result == [True, False, True]
+
+    def test_mixed_case_yes_no(self):
+        response = "0: yes\n1: no\n2: YES"
+        result = parse_relevance_response(response, 3)
+        assert result == [True, False, True]
+
+    def test_too_few_results_defaults_false(self):
+        response = "0: yes"
+        result = parse_relevance_response(response, 4)
+        assert result == [True, False, False, False]
+
+
+class TestContextRelevancyJSONSerialization:
+    """测试 ContextRelevancyResult 的 JSON 序列化路径"""
+
+    def test_full_json_output(self):
+        """模拟完整的 Context Relevance 评测输出"""
+        results = []
+        for i in range(3):
+            r = ContextRelevancyResult(
+                query=f"query {i}",
+                context_chunks=[f"chunk {i}"],
+            )
+            r.num_sentences = 5
+            r.num_relevant = 3
+            r.relevance_score = 0.6
+            r.per_sentence = [
+                {"id": j, "text": f"sentence {j}", "relevant": j < 3}
+                for j in range(5)
+            ]
+            results.append(r)
+
+        output = {
+            "avg_context_relevancy": np.mean([r.relevance_score for r in results]),
+            "results": [r.to_dict() for r in results],
+        }
+        json_str = json.dumps(output, indent=2, ensure_ascii=False)
+        assert json_str is not None
+        assert "avg_context_relevancy" in json_str
         assert "0.6" in json_str

@@ -8,6 +8,8 @@
     分解答案为原子声明 → 逐个问 LLM "上下文是否支持该声明" → 支持率。
   - Answer Relevancy（答案相关性）：答案与问题的相关程度。
     从答案反向生成 N 个推测性问题 → BGE 嵌入对比原问题 → 余弦相似度均值。
+  - Context Relevance（上下文相关性）：检索回的上下文中有多少内容真正与问题相关。
+    拆分上下文为句子 → 逐句问 LLM "这句话跟问题有关吗？" → 相关句占比。
 """
 
 from __future__ import annotations
@@ -75,6 +77,27 @@ class AnswerRelevancyResult:
             "generated_questions": self.generated_questions,
             "similarities": [round(s, 4) for s in self.similarities],
             "relevancy_score": round(self.relevancy_score, 4),
+        }
+
+
+@dataclass
+class ContextRelevancyResult:
+    """单条查询的 Context Relevance 结果"""
+    query: str
+    context_chunks: List[str] = field(default_factory=list)
+    num_sentences: int = 0
+    num_relevant: int = 0
+    relevance_score: float = 0.0
+    per_sentence: List[dict] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "query": self.query,
+            "context_chunks": self.context_chunks,
+            "num_sentences": self.num_sentences,
+            "num_relevant": self.num_relevant,
+            "relevance_score": round(self.relevance_score, 4),
+            "per_sentence": self.per_sentence,
         }
 
 
@@ -361,6 +384,149 @@ def _llm_relevancy_fallback(question: str, answer: str) -> float:
         return 0.5  # 无法解析时给中间值
 
 
+# ─── Context Relevance ─────────────────────────────────────────
+
+CONTEXT_RELEVANCE_PROMPT = """\
+Please evaluate whether each sentence below is relevant to answering the given question.
+A sentence is relevant if it contains information that could help answer the question,
+even indirectly. Reply with a JSON array: [{{"id": <number>, "relevant": true/false}}, ...]
+
+Question: {query}
+
+Sentences:
+{sentences}"""
+
+
+def split_context_to_sentences(context_chunks: List[str]) -> List[str]:
+    """将检索上下文拆分为句子列表（纯函数，无 LLM 调用）
+
+    按句号、换行分割，过滤过短的碎片（<3 词），保证每句至少可评估。
+    """
+    sentences = []
+    for chunk in context_chunks:
+        if not chunk or not chunk.strip():
+            continue
+        # 按句号和换行分割
+        parts = re.split(r'\.|\n', chunk)
+        for part in parts:
+            cleaned = part.strip()
+            # 过滤：至少 3 个词，长度 >= 10 字符
+            if len(cleaned.split()) >= 3 and len(cleaned) >= 10:
+                # 去掉列表编号前缀
+                cleaned = re.sub(r"^\s*(?:\d+[\.\)]|[-*])\s*", "", cleaned)
+                if len(cleaned.split()) >= 3:
+                    sentences.append(cleaned)
+    return sentences
+
+
+def parse_relevance_response(response_text: str, num_sentences: int) -> List[bool]:
+    """解析 LLM 返回的相关性判断结果（纯函数，无 LLM 调用）
+
+    支持三种格式：
+      1. JSON: [{"id": 0, "relevant": true}, ...]
+      2. Markdown JSON block: ```json [...] ```
+      3. Text: [0] YES / 0: yes
+
+    返回: 长度为 num_sentences 的 bool 列表，未覆盖的默认 False
+    """
+    result = [False] * num_sentences
+    if not response_text or not response_text.strip():
+        return result
+
+    text = response_text.strip()
+
+    # Attempt 1: JSON format (possibly wrapped in markdown)
+    json_str = None
+    # Try extracting from markdown code block
+    md_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', text, re.DOTALL)
+    if md_match:
+        json_str = md_match.group(1)
+    elif text.startswith('['):
+        json_str = text
+
+    if json_str:
+        try:
+            parsed = json.loads(json_str)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    idx = item.get("id", -1)
+                    if 0 <= idx < num_sentences:
+                        result[idx] = bool(item.get("relevant", False))
+            return result
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Attempt 2: Text format — [0] YES / 0: yes
+    for i in range(num_sentences):
+        patterns = [
+            rf'\[{i}\]\s*(YES|yes)',
+            rf'{i}\s*[:\)]\s*(YES|yes)',
+            rf'\[{i}\]\s*:\s*(True|true)',
+            rf'{i}\s*[:\)]\s*(True|true)',
+        ]
+        for pat in patterns:
+            if re.search(pat, text):
+                result[i] = True
+                break
+
+    return result
+
+
+_CONTEXT_RELEVANCE_BATCH_SIZE = 20  # 每批最多 20 句
+
+
+def compute_context_relevancy(query: str, context_chunks: List[str]) -> ContextRelevancyResult:
+    """计算单条 query 的 Context Relevance 分数
+
+    Context Relevance = relevant_sentences / total_sentences
+
+    算法：
+      1. 将 context_chunks 拆为句子列表
+      2. 分批（每批 ≤20 句），逐批问 LLM "这句话跟问题有关吗？"
+      3. 汇总：相关句数 / 总句数
+    """
+    result = ContextRelevancyResult(
+        query=query,
+        context_chunks=list(context_chunks),
+    )
+
+    # Step 1: 分句
+    sentences = split_context_to_sentences(context_chunks)
+    result.num_sentences = len(sentences)
+
+    if not sentences:
+        result.relevance_score = 0.0
+        return result
+
+    # Step 2: 分批问 LLM
+    all_relevant = []
+    for batch_start in range(0, len(sentences), _CONTEXT_RELEVANCE_BATCH_SIZE):
+        batch = sentences[batch_start:batch_start + _CONTEXT_RELEVANCE_BATCH_SIZE]
+
+        # 构建带编号的句子列表
+        sentences_block = "\n".join(
+            f"[{batch_start + i}] {s}" for i, s in enumerate(batch)
+        )
+        prompt = CONTEXT_RELEVANCE_PROMPT.format(query=query, sentences=sentences_block)
+        response = call_llm(prompt)
+
+        # 解析响应（传入总数以避免 LLM 漏句）
+        batch_relevant = parse_relevance_response(response, len(batch))
+        all_relevant.extend(batch_relevant)
+
+    # Step 3: 汇总
+    result.num_relevant = sum(all_relevant)
+    result.relevance_score = result.num_relevant / len(sentences) if sentences else 0.0
+
+    # 构建逐句明细
+    result.per_sentence = [
+        {"id": i, "text": sentences[i], "relevant": all_relevant[i] if i < len(all_relevant) else False}
+        for i in range(len(sentences))
+    ]
+
+    return result
+
+
 # ─── 问答生成 ──────────────────────────────────────────────────
 
 def generate_answer(query: str, context: str) -> str:
@@ -406,12 +572,14 @@ class RagasGenerationEvalResult:
     """生成层评测完整结果"""
     faithfulness_results: List[FaithfulnessResult] = field(default_factory=list)
     relevancy_results: List[AnswerRelevancyResult] = field(default_factory=list)
+    context_relevancy_results: List[ContextRelevancyResult] = field(default_factory=list)
     avg_faithfulness: float = 0.0
     avg_relevancy: float = 0.0
+    avg_context_relevancy: float = 0.0
     num_queries: int = 0
     generated_count: int = 0
     rejected_count: int = 0
-    
+
     def summary_dict(self) -> dict:
         return {
             "num_queries": self.num_queries,
@@ -419,6 +587,7 @@ class RagasGenerationEvalResult:
             "rejected_count": self.rejected_count,
             "avg_faithfulness": round(self.avg_faithfulness, 4),
             "avg_relevancy": round(self.avg_relevancy, 4),
+            "avg_context_relevancy": round(self.avg_context_relevancy, 4),
         }
 
 
@@ -452,6 +621,7 @@ def evaluate_generation(
     
     faithfulness_results = []
     relevancy_results = []
+    context_relevancy_results = []
     rejected_count = 0
     generated_count = 0
     latency_total = 0.0
@@ -508,6 +678,14 @@ def evaluate_generation(
         r_result = compute_answer_relevancy(query_text, answer)
         relevancy_results.append(r_result)
 
+        # Step 5: Context Relevance（检索回的上下文与问题的相关性）
+        if retrieved:
+            context_chunks = [r.get("text", "") for r in retrieved]
+            c_result = compute_context_relevancy(query_text, context_chunks)
+        else:
+            c_result = ContextRelevancyResult(query=query_text, context_chunks=[])
+        context_relevancy_results.append(c_result)
+
         # Record observability metrics
         collector = get_collector()
         collector.record_ragas_score(
@@ -515,6 +693,7 @@ def evaluate_generation(
             query_id=query_text,
             faithfulness=f_result.faithfulness_score,
             answer_relevancy=r_result.relevancy_score,
+            context_relevancy=c_result.relevance_score,
         )
     
     # ── 汇总 ──
@@ -522,43 +701,49 @@ def evaluate_generation(
     avg_faithfulness = float(np.mean(faithfulness_scores)) if faithfulness_scores else 0.0
     relevancy_scores = [r.relevancy_score for r in relevancy_results]
     avg_relevancy = float(np.mean(relevancy_scores)) if relevancy_scores else 0.0
-    
+    context_relevancy_scores = [r.relevance_score for r in context_relevancy_results if r.num_sentences > 0]
+    avg_context_relevancy = float(np.mean(context_relevancy_scores)) if context_relevancy_scores else 0.0
+
     result = RagasGenerationEvalResult(
         faithfulness_results=faithfulness_results,
         relevancy_results=relevancy_results,
+        context_relevancy_results=context_relevancy_results,
         avg_faithfulness=avg_faithfulness,
         avg_relevancy=avg_relevancy,
+        avg_context_relevancy=avg_context_relevancy,
         num_queries=num_queries,
         generated_count=generated_count,
         rejected_count=rejected_count,
     )
-    
+
     # ── 日志输出 ──
     rejection_rate = rejected_count / num_queries if num_queries > 0 else 0.0
     avg_latency = latency_total / num_queries if num_queries > 0 else 0.0
-    
+
     logger.info(f"\n{'='*60}")
     logger.info(f"生成层评测结果 [{label or 'default'}]")
     logger.info(f"{'='*60}")
-    logger.info(f"  查询总数:     {num_queries}")
-    logger.info(f"  生成回答:     {generated_count}")
-    logger.info(f"  拒绝回答:     {rejected_count} ({rejection_rate:.1%})")
-    logger.info(f"  平均延迟:     {avg_latency:.1f}s")
-    logger.info(f"  Faithfulness: {avg_faithfulness:.4f}  ({len(faithfulness_scores)} 条有声明)")
-    logger.info(f"  Relevancy:    {avg_relevancy:.4f}")
+    logger.info(f"  查询总数:         {num_queries}")
+    logger.info(f"  生成回答:         {generated_count}")
+    logger.info(f"  拒绝回答:         {rejected_count} ({rejection_rate:.1%})")
+    logger.info(f"  平均延迟:         {avg_latency:.1f}s")
+    logger.info(f"  Faithfulness:     {avg_faithfulness:.4f}  ({len(faithfulness_scores)} 条有声明)")
+    logger.info(f"  Answer Relevancy: {avg_relevancy:.4f}")
+    logger.info(f"  Context Relevance:{avg_context_relevancy:.4f}")
     
     # ── 保存 ──
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    
+
     label_suffix = f"_{label}" if label else ""
     with open(output_path / f"ragas_metrics{label_suffix}.json", "w") as f:
         json.dump({
             "summary": result.summary_dict(),
             "faithfulness": [r.to_dict() for r in faithfulness_results],
             "relevancy": [r.to_dict() for r in relevancy_results],
+            "context_relevancy": [r.to_dict() for r in context_relevancy_results],
         }, f, indent=2, ensure_ascii=False)
-    
+
     logger.info(f"  结果已保存: {output_path / f'ragas_metrics{label_suffix}.json'}")
     
     return result
