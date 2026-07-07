@@ -112,7 +112,7 @@ class ViDoReIngestor:
             for j in range(i, min(i + 100, len(all_chunk_rows))):
                 vec = bge_embs[j].cpu().numpy().tolist()
                 entry = all_chunk_rows[j]
-                batch.append((entry[0], entry[1], entry[2], entry[3], entry[4], entry[5], vec))
+                batch.append((entry[0], entry[1], entry[2], entry[3], entry[4], entry[5], vec, entry[7]))
             self.pg.insert_chunks(batch)
 
         logger.info(f"✅ pgvector 入库完成, 共 {self.pg.count()} 条 chunk")
