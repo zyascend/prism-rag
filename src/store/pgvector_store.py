@@ -90,7 +90,7 @@ class PgVectorStore:
                 ON CONFLICT (chunk_id) DO NOTHING
                 """,
                 chunks,
-                template="(%s, %s, %s, %s, %s, %s, %s::vector)",
+                template="(%s, %s, %s, %s, %s, %s, %s::vector, %s)",
             )
         self.conn.commit()
 
