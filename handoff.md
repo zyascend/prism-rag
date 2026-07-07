@@ -1,8 +1,8 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: main | 远程: origin
-> 最后 commit: (TO 文档编号提取为 chunk metadata)
-> 更新: 2026-07-07（上下文压缩 + TO 手册清洗 + doc_ref metadata，CtxRel +52%, Faithfulness +15%）
+> 分支: chore/analyze-bottlehole | 远程: origin
+> 最后 commit: (NDCG 公式修复 + page_id 去重 + Visual gap 分析终局)
+> 更新: 2026-07-07（NDCG 公式标准化 + page_id 去重 + Visual bottleneck 根因终局定性 + 云端全量实验）
 
 ---
 
@@ -271,8 +271,11 @@ prism-rag/
 
 | 层 | 核心指标 | 数值 | 最新 Run |
 |:--:|:---------|:----:|:---------|
-| **Layer 1** — 检索消融 | Full+zerank2 NDCG@10 | **0.5715** | `20260704-colqwen2` |
+| **Layer 1** — 检索消融 | Full+zerank2 NDCG@10 (标准公式) | **0.402** (50q) | `20260707-bottleneck-analysis` |
 | **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy / CtxRel | **0.889 / 0.801 / 0.116** | `20260707-ragas-100-docref` |
+
+> ⚠️ **NDCG 公式已修复**: 从自实现 `1/(i+1)` 改为国际标准 `1/log2(i+1)`（对齐 pytrec_eval）。
+> 旧公式下 Full+zerank2 为 0.5715，新公式同等分数约 0.65+（50q 采样）。历史 run 数据不可直接对比。
 
 ### 📈 CtxRel 改善历程（100-query）
 
@@ -294,8 +297,17 @@ prism-rag/
 - [x] **HyDE 查询改写实验** (结论：本场景无效)
 - [x] 消融框架扩展 (reranker_type + use_hyde 双维度)
 - [x] **ColQwen2 集成** (+14.6% Visual_only NDCG@10)
-- [x] **Visual-only 差距根因分析**（排除索引大小、评分公式、管道 API；锁定环境版本不一致/图像处理器/query 截断）
 - [x] 12 路消融全量运行（含 zerank-2、ColQwen2、HyDE 对比）
+- [x] **NDCG 公式修复** (`1/(i+1)` → `1/log2(i+1)`，对齐 pytrec_eval 国际标准)
+- [x] **NDCG/Recall page_id 去重**（修复 VisualRetriever chunk 级重复导致 NDCG 被低估 ~40%）
+- [x] **Visual gap 终局定性** — 详见 §7 突破
+
+**§7 Visual-only SOTA gap 终局定性（2026-07-07 cloud 实验）：**
+- [x] Root Cause A/B/C **全部证伪**（同进程重建分不变、Qwen2VL 默认 fast、max_length 已修）
+- [x] MaxSim 与官方 `score_multi_vector` **完全一致**（NDCG 0.344 vs 0.340, 99% match）
+- [x] 官方 SOTA 确认：ColPali-v1.3 Industrial = **0.470**, ColQwen2 Industrial = **0.498**
+- [x] "3x 缺口" = NDCG 公式差（~2x）+ page_id 去重缺失（~0.4x），修复后 Visual_only ≈ **0.34** vs 官方 0.50
+- [x] 剩余 1.45x 差距来自编码/图像质量，非管线 bug
 
 **生成层（Layer 2）：**
 - [x] **RAGAS 生成层自实现**（Faithfulness 声明分解+LLM验证 / Answer Relevancy 反向问题+cosine）
@@ -316,18 +328,18 @@ prism-rag/
 
 ### 🔜 下一步
 
-**P0 — 已验证有效、待全量确认：**
-1. 全量 283 条 RAGAS eval（100-query 可能高估 Faithfulness ~0.11）
-2. 基于 rerank_score 分布设定 `rerank_score_reject_threshold`（建议 0.15）
+**P0 — NDCG 修复后重跑全量评测（云实例恢复后）：**
+1. 全量 283 条消融重跑（标准 NDCG + 去重），建立新基线
+2. RAGAS 全量 283 条重跑（确认 Faithfulness 是否受检索质量影响）
 
 **P1 — 质量改进：**
-3. Chunk metadata 注入 LLM prompt（doc_ref 效果有限，可尝试 page_number/section_title）
-4. CtxRel 句级 LLM 预过滤替代 BGE cosine（提升检索精度但慢）
+3. Chunk metadata 注入 LLM prompt（page_number/section_title）
+4. CtxRel 句级 LLM 预过滤替代 BGE cosine
 5. 换 Unstructured.io 重解析 PDF（根治 TO 手册噪音）
 
 **P2 — 效率/工程：**
-6. Visual 路条件跳过（visual hits=0 时省 33% 延迟）
-7. dense+visual 编码并行（省 ~4% 延迟）
+6. Visual 路按需路由（含表格/图表 query 启用，纯文本跳过）
+7. `run_eval.py` 加 `--no-hyde` flag（省 ~3.5 min/run）
 8. gpt-4o-mini 替换 Ollama qwen2:7b（分钟级→秒级）
 
 ### 📁 运行记录
@@ -341,11 +353,15 @@ prism-rag/
 | `runs/20260705-ragas-eval/` | 7/5 | **RAGAS 生成层评测（50 条）** | Faith=0.8867, Rel=0.8147 |
 | `runs/20260706-ragas-full-283/` | 7/6 | **RAGAS 全量 283 条** | Faith=**0.7721**, Rel=**0.8104**, CtxRel=**0.0759** |
 | `data/e2e_qa.json` | 7/5 | **端到端 QA 数据集** | 50 可回答 + 20 拒答 |
+| ☁️ Option A | 7/7 | 复用 7/4 cache, Visual_only 50q | NDCG@10=0.1676（旧公式） |
+| ☁️ Option B | 7/7 | 同进程重建, Visual_only 50q | NDCG@10=0.1676 → Root Cause A **证伪** |
+| ☁️ MaxSim 对比 | 7/7 | 官方 `score_multi_vector` vs `_maxsim_torch` 同嵌入 | NDCG 0.344 vs 0.340, **99% 一致** |
+| ☁️ NDCG 修复后 | 7/7 | 标准 `1/log2` 公式, 50q 全配置消融 | Visual=0.202, Full+zerank2=**0.402** (旧公式 0.167→0.202) |
 
 ### 📄 复盘文档
 - `docs/solutions/2026-07-02-visual-oom-fix-retrospective.md` — Visual OOM 修复
 - `docs/solutions/2026-07-02-zerank2-hyde-experiment.md` — zerank-2 + HyDE 实验
-- `docs/solutions/2026-07-04-visual-sota-gap-analysis.md` — Visual-only 距 SOTA 3.6x 差距根因分析
+- `docs/solutions/2026-07-04-visual-sota-gap-analysis.md` — Visual-only 距 SOTA 差距根因分析 + **终局定性**（§7）
 - `runs/20260705-ragas-eval/badcase_ragas_analysis.md` — RAGAS 评测 Bad Case 分析
 
 ### 📊 RAGAS 生成层评测 — 两次对比（2026-07-05~06）

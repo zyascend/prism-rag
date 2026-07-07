@@ -115,3 +115,4 @@ dist/
 .runs
 runs/**/*.sql
 .superpowers
+.workbuddy
