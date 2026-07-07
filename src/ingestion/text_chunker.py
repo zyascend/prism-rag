@@ -23,6 +23,7 @@ class Chunk:
     page_number: int
     text: str
     chunk_type: str = "text"  # text | table
+    doc_ref: str = ""         # TO 文档编号，用于 LLM grounding（不进 CtxRel 评估）
 
     def __repr__(self) -> str:
         return f"Chunk(id={self.chunk_id}, page={self.page_id}, type={self.chunk_type})"
@@ -60,15 +61,24 @@ class TextChunker:
         self.max_chars = max_tokens * self.TOKEN_EST_RATIO
 
     @classmethod
-    def clean_to_markdown(cls, text: str | None) -> str:
-        """清洗 TO 军事手册特有的噪音。
+    def clean_to_markdown(cls, text: str | None) -> tuple[str, str]:
+        """清洗 TO 军事手册噪音，同时提取文档编号用于 grounding。
 
-        处理顺序很重要：先修复断词，再去噪音行，最后压缩空行。
+        Returns:
+            (cleaned_text, doc_ref) — doc_ref 为第一个匹配到的 TO 编号，无则为 ""
         """
         if not text or not text.strip():
-            return ""
+            return "", ""
 
-        # 1. 修复 PDF 断词（"Protec-\ntive" → "Protective"）
+        # 提取第一个 TO 引用作为 doc_ref（用于 LLM grounding）
+        doc_ref = ""
+        ref_match = cls._RE_TO_REF.search(text)
+        if ref_match:
+            doc_ref = ref_match.group(0).strip()
+            # 规范化：去掉多余空格和逗号
+            doc_ref = re.sub(r"\s+", " ", doc_ref)
+
+        # 1. 修复 PDF 断词
         text = cls._RE_HYPHEN_BREAK.sub(r"\1\2", text)
 
         # 2. 去含空单元格的表格碎片行（"|  | TO WP 011 |"），保留正常表格
@@ -87,7 +97,7 @@ class TextChunker:
         # 6. 压缩多余空行（≥3个换行 → 2个）
         text = cls._RE_MULTI_BLANK.sub("\n\n", text)
 
-        return text.strip()
+        return text.strip(), doc_ref
 
     def chunk_page(
         self,
@@ -100,8 +110,8 @@ class TextChunker:
         if not markdown_text or not markdown_text.strip():
             return []
 
-        # ── 预处理：清洗 TO 手册噪音 ──────────────────────
-        markdown_text = self.clean_to_markdown(markdown_text)
+        # ── 预处理：清洗 TO 手册噪音 + 提取 doc_ref ─────
+        markdown_text, doc_ref = self.clean_to_markdown(markdown_text)
         if not markdown_text:
             return []
 
@@ -124,6 +134,7 @@ class TextChunker:
                     page_number=page_number,
                     text=para,
                     chunk_type="table" if self._looks_like_table(para) else "text",
+                    doc_ref=doc_ref,
                 ))
             else:
                 # 长段落：按句子边界切
@@ -141,6 +152,7 @@ class TextChunker:
                                 page_number=page_number,
                                 text=buffer,
                                 chunk_type="text",
+                            doc_ref=doc_ref,
                             ))
                             buffer = ""
                         words = sent.split()
@@ -158,6 +170,7 @@ class TextChunker:
                                         page_number=page_number,
                                         text=word_buffer,
                                         chunk_type="text",
+                            doc_ref=doc_ref,
                                     ))
                                 word_buffer = word
                         if word_buffer:
@@ -169,6 +182,7 @@ class TextChunker:
                                 page_number=page_number,
                                 text=word_buffer,
                                 chunk_type="text",
+                            doc_ref=doc_ref,
                             ))
                     elif len(buffer) + len(sent) + 1 <= self.max_chars:
                         buffer = (buffer + " " + sent).strip()
@@ -182,6 +196,7 @@ class TextChunker:
                                 page_number=page_number,
                                 text=buffer,
                                 chunk_type="text",
+                            doc_ref=doc_ref,
                             ))
                         buffer = sent
                 if buffer:
@@ -193,6 +208,7 @@ class TextChunker:
                         page_number=page_number,
                         text=buffer,
                         chunk_type="text",
+                            doc_ref=doc_ref,
                     ))
 
         return chunks

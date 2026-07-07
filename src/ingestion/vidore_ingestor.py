@@ -101,7 +101,7 @@ class ViDoReIngestor:
                 markdown_text=row.get("markdown", None),
             )
             for c in chunks:
-                all_chunk_rows.append((c.chunk_id, c.page_id, c.doc_id, c.page_number, c.chunk_type, c.text, None))
+                all_chunk_rows.append((c.chunk_id, c.page_id, c.doc_id, c.page_number, c.chunk_type, c.text, None, c.doc_ref))
                 all_texts.append(c.text)
 
         logger.info(f"共 {len(all_chunk_rows)} 个 chunk，开始 BGE 编码...")

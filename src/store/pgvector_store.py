@@ -61,7 +61,8 @@ class PgVectorStore:
                     page_number INTEGER NOT NULL,
                     chunk_type TEXT NOT NULL DEFAULT 'text',
                     text TEXT NOT NULL,
-                    bge_vector vector(1024) NOT NULL
+                    bge_vector vector(1024) NOT NULL,
+                    doc_ref TEXT NOT NULL DEFAULT ''
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_page_id ON chunks(page_id)")
@@ -78,13 +79,13 @@ class PgVectorStore:
         """批量插入 chunk
 
         Args:
-            chunks: [(chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector), ...]
+            chunks: [(chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector, doc_ref), ...]
         """
         with self.conn.cursor() as cur:
             psycopg2.extras.execute_values(
                 cur,
                 """
-                INSERT INTO chunks (chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector)
+                INSERT INTO chunks (chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector, doc_ref)
                 VALUES %s
                 ON CONFLICT (chunk_id) DO NOTHING
                 """,
@@ -98,7 +99,7 @@ class PgVectorStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text,
+                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref,
                        1 - (bge_vector <=> %s::vector) AS score
                 FROM chunks
                 ORDER BY bge_vector <=> %s::vector
@@ -115,7 +116,8 @@ class PgVectorStore:
                     "page_number": r[3],
                     "chunk_type": r[4],
                     "text": r[5],
-                    "score": float(r[6]),
+                    "doc_ref": r[6],
+                    "score": float(r[7]),
                 }
                 for r in rows
             ]
@@ -127,7 +129,7 @@ class PgVectorStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text
+                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref
                 FROM chunks
                 WHERE page_id = ANY(%s)
                 """,
@@ -142,6 +144,7 @@ class PgVectorStore:
                     "page_number": r[3],
                     "chunk_type": r[4],
                     "text": r[5],
+                    "doc_ref": r[6],
                 }
                 for r in rows
             ]

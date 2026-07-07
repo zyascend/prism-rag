@@ -794,6 +794,14 @@ def evaluate_generation(
             else:
                 context = "\n\n---\n\n".join(context_chunks)
 
+            # ── 注入 doc_ref 作为 grounding 元数据 ────────────
+            doc_refs = list(dict.fromkeys(
+                r.get("doc_ref", "") for r in retrieved if r.get("doc_ref")
+            ))  # 去重，保序
+            if doc_refs and context:
+                ref_prefix = "Source documents: " + "; ".join(doc_refs)
+                context = ref_prefix + "\n\n" + context
+
         # ── 拒答判断（短语拒答 + 阈值拒答）─────────────────
         if threshold_rejected:
             answer = "I cannot answer this question based on the available documents."
