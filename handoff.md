@@ -1,8 +1,8 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: feat/observability-gaps | 远程: origin
-> 最后 commit: (Observability 完整性修复 — 9 个 gap 全部补上，44 测试全过)
-> 更新: 2026-07-06
+> 分支: main | 远程: origin
+> 最后 commit: (TO 文档编号提取为 chunk metadata)
+> 更新: 2026-07-07（上下文压缩 + TO 手册清洗 + doc_ref metadata，CtxRel +52%, Faithfulness +15%）
 
 ---
 
@@ -271,9 +271,17 @@ prism-rag/
 
 | 层 | 核心指标 | 数值 | 最新 Run |
 |:--:|:---------|:----:|:---------|
-| **Layer 1** — 检索消融 | Full+zerank2 NDCG@10 | **0.5715** 🏆 | `20260704-colqwen2` |
-| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy / CtxRel | **0.7721 / 0.8104 / 0.0759** | `20260706-ragas-full-283` |
-| **Layer 3** — 端到端 QA | Correctness / Rejection / Combined | **0.64 / 0.95 / 0.733** | `20260705-e2e-qa` |
+| **Layer 1** — 检索消融 | Full+zerank2 NDCG@10 | **0.5715** | `20260704-colqwen2` |
+| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy / CtxRel | **0.889 / 0.801 / 0.116** | `20260707-ragas-100-docref` |
+
+### 📈 CtxRel 改善历程（100-query）
+
+| 阶段 | PR | CtxRel | Faithfulness | 改动 |
+|:--|:--:|:--:|:--:|------|
+| 基线 | — | 0.076 | 0.772 | 283-query 全量（旧） |
+| +上下文压缩 | #19 | 0.087 | 0.894 | BGE 句级 cosine 过滤 0.4 |
+| +TO 清洗 | #20 | 0.117 | 0.886 | 6 步正则去噪音行 |
+| +doc_ref | #21 | 0.116 | 0.889 | TO 编号存 metadata |
 
 ### ✅ 已完成
 
@@ -307,16 +315,20 @@ prism-rag/
 - [x] **API Middleware**：自动 HTTP Trace + X-Trace-Id 响应头
 
 ### 🔜 下一步
-1. **Layer 2 — 置信度阈值兜底（P0）**: 对 rerank_score < threshold（如 0.3）的查询直接拒答，拦截编造。对应 Bad Case 中氮气罐颜色代码编造的根因
-2. **Layer 2 — 上下文压缩（P1）**: BGE 句级 cosine 过滤，减少拼入的噪音段落。CtxRel 仅 0.076 说明提升空间大
-3. **Layer 2 — Chunk 元数据注入 LLM（P2）**: 在 prompt 中传递 doc_id / page_number，帮助 LLM 做 grounding
-4. **Layer 2 — 标尺修复**: 拒答跳过 Faithfulness 计算、Relevancy 改用 LLM 评分替代 cosine
-5. **Layer 2 — 云 API Judge**: gpt-4o-mini 替换 Ollama qwen2:7b，从分钟级加速到秒级（标尺修复后做）
-6. **Layer 1 — Visual_only 深层根因**: attention_mask、query token 零化、评分公式与官方差异（`sum` vs `mean`）等
-7. **Layer 1 — zerank-2 加速**: 加 padding token 恢复批量推理
-8. **Layer 1 — ColEmbed-3B 对比**: feature 分支已有，需跑消融对比
-9. **Layer 3 — 检索改善**: Bad Case 中 5 条因检索缺失导致答案错误，需优化召回策略
-10. **Layer 3 — 数据集精化**: 6 条合理拒答被误判的 case 需优化预期答案或检索上下文
+
+**P0 — 已验证有效、待全量确认：**
+1. 全量 283 条 RAGAS eval（100-query 可能高估 Faithfulness ~0.11）
+2. 基于 rerank_score 分布设定 `rerank_score_reject_threshold`（建议 0.15）
+
+**P1 — 质量改进：**
+3. Chunk metadata 注入 LLM prompt（doc_ref 效果有限，可尝试 page_number/section_title）
+4. CtxRel 句级 LLM 预过滤替代 BGE cosine（提升检索精度但慢）
+5. 换 Unstructured.io 重解析 PDF（根治 TO 手册噪音）
+
+**P2 — 效率/工程：**
+6. Visual 路条件跳过（visual hits=0 时省 33% 延迟）
+7. dense+visual 编码并行（省 ~4% 延迟）
+8. gpt-4o-mini 替换 Ollama qwen2:7b（分钟级→秒级）
 
 ### 📁 运行记录
 | Run | 日期 | 说明 | 关键指标 |
