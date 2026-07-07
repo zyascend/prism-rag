@@ -1,0 +1,29 @@
+{
+  "default": {
+    "config_label": "default",
+    "num_queries": 200,
+    "latency": {
+      "p50_ms": 16836.17,
+      "p95_ms": 24812.34,
+      "p99_ms": 26628.78,
+      "avg_ms": 17307.98,
+      "min_ms": 3918.49,
+      "max_ms": 29305.76
+    },
+    "hits": {
+      "avg_bm25": 20.0,
+      "avg_dense": 20.0,
+      "avg_visual": 20.0,
+      "avg_fused": 5.0,
+      "avg_reranked": 0.0
+    },
+    "cache": {
+      "hyde_hit_rate": 0.0
+    },
+    "quality": {
+      "avg_faithfulness": 0.7464,
+      "avg_answer_relevancy": 0.8007,
+      "avg_context_relevancy": 0.1157
+    }
+  }
+}
