@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,19 +52,37 @@ ABLATION_CONFIGS = [
 
 
 def compute_ndcg(relevant: set, ranked: List[str], k: int) -> float:
+    """计算 NDCG@k，使用标准 log2(i+1) 折扣（与 pytrec_eval 一致）。
+    对重复页面去重，仅保留首次出现（后续重复不计增益）"""
     dcg, idcg = 0.0, 0.0
-    for i in range(min(k, len(ranked))):
-        if ranked[i] in relevant:
-            dcg += 1.0 / (i + 1)
+    seen = set()
+    pos = 0
+    for rid in ranked:
+        if pos >= k:
+            break
+        if rid in seen:
+            continue
+        seen.add(rid)
+        if rid in relevant:
+            dcg += 1.0 / math.log2(pos + 2)
+        pos += 1
     for i in range(min(k, len(relevant))):
-        idcg += 1.0 / (i + 1)
+        idcg += 1.0 / math.log2(i + 2)
     return dcg / idcg if idcg > 0 else 0.0
 
 
 def compute_recall(relevant: set, ranked: List[str], k: int) -> float:
     if not relevant:
         return 0.0
-    return sum(1 for r in ranked[:k] if r in relevant) / len(relevant)
+    seen = set()
+    hits = 0
+    for r in ranked[:k]:
+        if r in seen:
+            continue
+        seen.add(r)
+        if r in relevant:
+            hits += 1
+    return hits / len(relevant)
 
 
 def compute_mrr(relevant: set, ranked: List[str]) -> float:
