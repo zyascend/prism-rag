@@ -1,4 +1,4 @@
-.PHONY: help install ingest-vidore eval-vidore eval-full eval-ragas clean lint test
+.PHONY: help install ingest-vidore eval-vidore eval-full eval-ragas clean lint test db up e2e-local ingest-pdf
 
 help: ## 显示帮助
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -47,6 +47,18 @@ lint: ## 代码检查
 
 test: ## 运行测试
 	python -m pytest tests/ -v --tb=short
+
+db: ## 起 pgvector 容器（本地 dev 用）
+	docker compose up -d db
+
+up: ## 全栈起服务
+	docker compose up -d --build
+
+e2e-local: ## 本地端到端（需 pgvector 容器 + 模型）
+	pytest tests/e2e_local.py -v
+
+ingest-pdf: ## 入库本地 PDF: make ingest-pdf PDF=path/to.pdf
+	python scripts/ingest_pdf.py --pdf $(PDF)
 
 clean: ## 清理索引和评测结果
 	rm -rf indexes/ results/
