@@ -765,6 +765,7 @@ def evaluate_generation(
         if not retrieved:
             context = ""
             context_chunks = []
+            ctx_for_eval = ""
         else:
             context_chunks = [r.get("text", "") for r in retrieved]
 
@@ -793,6 +794,11 @@ def evaluate_generation(
                 )
             else:
                 context = "\n\n---\n\n".join(context_chunks)
+
+            # CtxRel 评估的是 LLM 实际看到的检索上下文（压缩后），
+            # 与 generate_answer / compute_faithfulness 使用同一份 context；
+            # doc_ref 前缀是 grounding 元数据，不计入相关性评估
+            ctx_for_eval = context
 
             # ── 注入 doc_ref 作为 grounding 元数据 ────────────
             doc_refs = list(dict.fromkeys(
@@ -852,11 +858,11 @@ def evaluate_generation(
                 "num_gen_questions": len(r_result.generated_questions),
             })
 
-        # Step 5: Context Relevance
+        # Step 5: Context Relevance — 评估 LLM 实际看到的上下文（压缩后），
+        # 而非原始检索 chunk，确保与 Faithfulness/生成口径一致
         with tracer.start_span("ragas_context_relevancy") as cr_span:
-            if retrieved:
-                context_chunks = [r.get("text", "") for r in retrieved]
-                c_result = compute_context_relevancy(query_text, context_chunks)
+            if retrieved and ctx_for_eval:
+                c_result = compute_context_relevancy(query_text, [ctx_for_eval])
             else:
                 c_result = ContextRelevancyResult(query=query_text, context_chunks=[])
             context_relevancy_results.append(c_result)
