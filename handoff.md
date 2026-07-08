@@ -348,6 +348,7 @@ prism-rag/
 **P1 — 质量改进：**
 3. Chunk metadata 注入 LLM prompt（page_number/section_title）
 4. CtxRel 句级 LLM 预过滤替代 BGE cosine
+   - ⚠️ **ratio 调参实验已做（2026-07-08, `runs/20260708-compress-ratio-025`）**：0.4→0.25 时 CtxRel 0.294→0.410(+39%) **但** Faithfulness 0.882→0.855(-3%)、拒答 16→19、num_relevant 8.2→7.4（BGE 开始砍相关句）。结论：**0.25 过激，0.4 保留为安全默认；甜区估计在 0.3（待测）**。调参是零风险但边际有限，LLM 预过滤才是质变路径（注意避免与 CtxRel 评分 LLM 自循环）。
 5. 换 Unstructured.io 重解析 PDF（根治 TO 手册噪音）
 
 **P2 — 效率/工程：**
