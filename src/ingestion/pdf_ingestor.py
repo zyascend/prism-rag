@@ -5,7 +5,6 @@ import random
 from pathlib import Path
 from typing import Dict, Optional
 
-import torch
 from src.config import cfg
 from src.ingestion.parser import build_parser
 

@@ -8,12 +8,15 @@ import math
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from datasets import load_dataset as hf_load_dataset
 from tqdm import tqdm
 
 from src.evaluation.vidore_adapter import PrismRAGRetriever
+
+if TYPE_CHECKING:
+    import torch
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +166,6 @@ def run_ablation(
         quick: 仅跑新增配置（跳过基线消融）
         config_filter: 可选，按名称子串过滤消融配置（如 "Visual" 匹配 Visual_only、BM25_Dense_Visual）
     """
-    import torch  # 仅在用到类型时延迟导入
 
     configs = ABLATION_CONFIGS
     if quick:

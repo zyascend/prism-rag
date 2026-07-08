@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 import torch
@@ -25,7 +24,7 @@ from src.ingestion.progress import (
     save_page_embeddings,
     save_state,
 )
-from src.ingestion.text_chunker import Chunk, TextChunker
+from src.ingestion.text_chunker import TextChunker
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
 

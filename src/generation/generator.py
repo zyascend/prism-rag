@@ -2,7 +2,7 @@
 from __future__ import annotations
 import logging
 import os
-from typing import List, Optional
+from typing import List
 
 from src.config import cfg
 from src.evaluation.ragas_metrics import compress_context

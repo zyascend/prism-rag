@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import torch
 
-from src.evaluation.ablation import load_eval_data, run_ablation, AblationConfig, ABLATION_CONFIGS
+from src.evaluation.ablation import load_eval_data, run_ablation
 
 
 def _make_mock_dataset(num_queries: int = 5):

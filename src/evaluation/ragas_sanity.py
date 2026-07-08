@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict
 
 import requests
 
-from src.config import cfg
 from src.evaluation.vidore_adapter import PrismRAGRetriever
 
 logger = logging.getLogger(__name__)
@@ -110,7 +108,7 @@ def run_ragas_sanity(
         "passed": rejection_rate >= 0.8,
     }
 
-    logger.info(f"\nRAGAS Sanity 结果:")
+    logger.info("\nRAGAS Sanity 结果:")
     logger.info(f"  总拒答数: {total}")
     logger.info(f"  正确拒绝: {rejected_count}")
     logger.info(f"  拒绝率: {rejection_rate:.1%}")

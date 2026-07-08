@@ -103,28 +103,39 @@ class Config:
                 return default
         return data
 
+    def _ensure_loaded(self) -> None:
+        """Lazily (re)load config if it has not been loaded or is uninitialized."""
+        if not self._loaded or self._data is None:
+            self.load()
+
     @property
     def colpali_model_id(self) -> str:
+        self._ensure_loaded()
         return self._data["models"]["colpali"]
 
     @property
     def colqwen2_model_id(self) -> str:
+        self._ensure_loaded()
         return self._data["models"]["colqwen2"]
 
     @property
     def bge_model_id(self) -> str:
+        self._ensure_loaded()
         return self._data["models"]["bge_embedding"]
 
     @property
     def reranker_model_id(self) -> str:
+        self._ensure_loaded()
         return self._data["models"]["bge_reranker"]
 
     @property
     def zerank_reranker_model_id(self) -> str:
+        self._ensure_loaded()
         return self._data["models"]["zerank_reranker"]
 
     @property
     def llm_model_id(self) -> str:
+        self._ensure_loaded()
         return self._data["models"]["llm"]
 
     @property
@@ -146,6 +157,7 @@ class Config:
 
     @property
     def bge_dim(self) -> int:
+        self._ensure_loaded()
         return self._data["embedding"]["bge_dim"]
 
 

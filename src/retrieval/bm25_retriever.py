@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import math
 from typing import List, Optional
 
 from rank_bm25 import BM25Okapi
 
-from src.ingestion.text_chunker import Chunk
 from src.store.pgvector_store import PgVectorStore
 from src.observability import get_tracer
 

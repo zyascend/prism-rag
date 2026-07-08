@@ -1,4 +1,4 @@
-from src.generation.generator import Generator, GenerationError
+from src.generation.generator import Generator
 
 
 class _FakeCompletions:

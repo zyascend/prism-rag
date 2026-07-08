@@ -6,15 +6,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import torch
-from datasets import load_dataset
-from tqdm import tqdm
 
-from src.config import cfg
 from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
-from src.ingestion.text_chunker import Chunk, TextChunker
+from src.ingestion.text_chunker import TextChunker
 from src.retrieval.bm25_retriever import BM25Retriever
 from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.fusion import RRFFusion

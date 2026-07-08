@@ -1,5 +1,4 @@
 # tests/test_faiss_add_pages.py
-import numpy as np
 import torch
 from src.store.faiss_store import FaissColPaliStore
 

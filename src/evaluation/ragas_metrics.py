@@ -729,7 +729,6 @@ def evaluate_generation(
     Returns:
         RagasGenerationEvalResult 汇总
     """
-    import torch
     from tqdm import tqdm
     
     logger.info(f"开始生成层评测 ({len(queries_ds)} 条查询, top-k={k}, rerank={use_rerank})...")

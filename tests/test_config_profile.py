@@ -1,4 +1,4 @@
-import importlib, os
+import os
 from src import config as config_mod
 
 

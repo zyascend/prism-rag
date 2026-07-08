@@ -10,7 +10,11 @@ from src.retrieval.reranker import Reranker
 @patch("src.retrieval.reranker.CrossEncoder")
 def test_reranker_basic(MockCrossEncoder):
     mock_model = MagicMock()
-    mock_model.predict.return_value = np.array([0.95, 0.80, 0.70])
+    mock_model.predict.side_effect = [
+        np.array([0.95]),
+        np.array([0.80]),
+        np.array([0.70]),
+    ]
     MockCrossEncoder.return_value = mock_model
 
     reranker = Reranker(device="cpu")

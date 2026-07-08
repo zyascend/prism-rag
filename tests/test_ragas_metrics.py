@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import numpy as np
-from pathlib import Path
 import pytest
 from unittest.mock import MagicMock
 
@@ -13,7 +12,6 @@ from src.evaluation.ragas_metrics import (
     ContextRelevancyResult,
     RagasGenerationEvalResult,
     decompose_claims,
-    generate_reverse_questions,
     _llm_relevancy_fallback,
     split_context_to_sentences,
     parse_relevance_response,
