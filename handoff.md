@@ -412,6 +412,34 @@ prism-rag/
 
 ---
 
+## 8. 生产服务骨架（2026-07-08, `feat/production-spine`）
+
+> 方向：从"刷 benchmark"转向"贴近生产"。薄垂直切片 = 真实 PDF 入库 + `/ask` 问答闭环 + 本地可跑 + 容器化。
+> 设计：`docs/superpowers/specs/2026-07-08-production-service-spine-design.md`
+> 计划：`docs/superpowers/plans/2026-07-08-production-service-spine.md`（9 task，全过 + 终审 Ready to merge）
+
+### 交付内容
+- `src/ingestion/parser.py`：`Parser` 抽象 — `SimplePDFParser`(PyMuPDF, 本地零依赖兜底) + `MinerUParser`(MinerU CLI, 生产)
+- `src/ingestion/pdf_ingestor.py`：`PDFIngestor.ingest(pdf)` → 解析→分块→BGE→pgvector + ColPali→FAISS 增量(`add_pages`)
+- `src/store/faiss_store.py`：新增 `add_pages` 增量写入（flat + hnsw 同步）；`src/store/pgvector_store.py`：新增 `delete_by_doc_id`
+- `src/generation/generator.py`：`Generator`(OpenAI SDK) + `GenerationError`，引用以检索 chunk 为准，空检索诚实拒答
+- `src/api/routes.py`：新增 `POST /ingest`（上传 PDF 入库）、`POST /ask`（检索→生成→答案+引用回链）；失败清理 + 502/500 错误处理
+- `src/config.py`：`CONFIG_PROFILE` 合并机制；`config/models.local-dev.yaml`（parser=simple, use_visual=false, 免 MinerU/ColPali）
+- `Dockerfile` + `docker-compose.yml`（pgvector + api，OPENAI_API_KEY 映射）+ `Makefile`(`db`/`up`/`e2e-local`/`ingest-pdf`) + `scripts/ingest_pdf.py`
+- `tests/e2e_local.py`：真·端到端，无 PG/OPENAI 时自动 skip
+
+### 本地可跑验证
+- `docker compose up db` 起 pgvector → `python scripts/ingest_pdf.py --pdf x.pdf` 入库 → `POST /ask` 拿答案+引用
+- `use_visual:false` 本地 smoke 只需 BGE(~1.3GB, 一次性下载进 HF cache) + OpenAI API，免 ColPali
+- 单测：`make test`（9 个 spine 单测全过，纯单元无 PG/模型）；全量 174 单测 + ruff 全绿（Task 9 确认）
+
+### 已知 follow-up（非阻塞）
+- `add_pages` 在 `index_type=hnsw` 现已同步 HNSW；默认 flat 不受影响
+- 上传文件失败时已清理 `data/uploads/<doc_id>.pdf`（mineru 中间产物清理为 best-effort）
+- 本切片**不含** `make eval-vidore`/Repro Spine/GraphRAG/MinIO/CI（已与用户确认拿掉，留待下一轮）
+
+---
+
 ## 7. 会话恢复检查清单
 
 新会话开始时，如果需要继续云端部署：

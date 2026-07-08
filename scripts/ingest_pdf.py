@@ -26,9 +26,10 @@ def main():
     colpali = ColPaliEmbedder() if use_visual else None
     chunker = TextChunker()
     bm25 = BM25Retriever()
+    # 先入库（会 create_schema + 写入 chunks），再拟合 BM25 内存索引
     faiss.load()
-    bm25.fit_from_pgvector(pg)
     res = PDFIngestor(pg, faiss, bge, colpali, chunker).ingest(Path(args.pdf))
+    bm25.fit_from_pgvector(pg)
     print(f"入库完成: {res}")
 
 
