@@ -272,7 +272,7 @@ prism-rag/
 | 层 | 核心指标 | 数值 | 最新 Run |
 |:--:|:---------|:----:|:---------|
 | **Layer 1** — 检索消融 | Full+zerank2 NDCG@10 (标准公式) | **0.402** (50q) | `20260707-bottleneck-analysis` |
-| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy / CtxRel | **0.889 / 0.801 / 0.116** | `20260707-ragas-100-docref` |
+| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy / CtxRel | **0.882 / 0.791 / 0.294** | `20260708-ctxrel-fix` |
 
 > ⚠️ **NDCG 公式已修复**: 从自实现 `1/(i+1)` 改为国际标准 `1/log2(i+1)`（对齐 pytrec_eval）。
 > 旧公式下 Full+zerank2 为 0.5715，新公式同等分数约 0.65+（50q 采样）。历史 run 数据不可直接对比。
@@ -285,6 +285,18 @@ prism-rag/
 | +上下文压缩 | #19 | 0.087 | 0.894 | BGE 句级 cosine 过滤 0.4 |
 | +TO 清洗 | #20 | 0.117 | 0.886 | 6 步正则去噪音行 |
 | +doc_ref | #21 | 0.116 | 0.889 | TO 编号存 metadata |
+| +metric 修复 | 本分支 | **0.294** | 0.882 | CtxRel 改评压缩后 context（见下） |
+
+> ⚠️ **CtxRel 根因修复（2026-07-08，分支 `fix/ctxrel-compressed-context`）**：
+> `compute_context_relevancy` 原本传入**原始检索 chunk**（`evaluate_generation` 中重新构造 `context_chunks`），
+> **绕过了 `compress_context` 的 0.4 句级过滤**。但 RAGAS Context Relevance 定义为
+> "喂给 LLM 的上下文"中相关句占比——应与 `generate_answer` / `compute_faithfulness` 使用同一份 `context`。
+> 这导致 CtxRel 系统性低估：实测 100q 平均 75 句/查询、仅 ~8 句相关 = 0.116；
+> 压缩后 ~30 句中保留大部分相关句，预计 CtxRel 升至 ~0.25–0.30（待云端重跑确认）。
+> 修复：在 doc_ref 前缀注入前捕获 `ctx_for_eval = context`，传 `[ctx_for_eval]` 给 CtxRel。
+> 回归测试 `TestCtxRelUsesCompressedContext` 已加（47 ragas 测试全过）。
+> **云端复测确认（2026-07-08, `runs/20260708-ctxrel-fix`）**：CtxRel 0.116 → **0.294 (+154%)**，
+> num_sentences 75.3→29.8（压缩到 40%）、num_relevant 7.8→8.2（相关句保留），Faithfulness/Relevancy 无回归。
 
 ### ✅ 已完成
 
@@ -314,6 +326,7 @@ prism-rag/
 - [x] **RAGAS 云端评测**（50 条，全量检索，Faithfulness=0.8867, Relevancy=0.8147）
 - [x] **RAGAS 全量 283 条评测**（全量检索，Faithfulness=**0.7721**, Relevancy=**0.8104**, CtxRel=**0.0759**，确认 50 条样本高估了 Faithfulness 约 0.11）
 - [x] **Context Relevance 指标实现**（句级相关性判断，自实现，commit ba0d5ed）
+- [x] **CtxRel 口径修复**（`compute_context_relevancy` 改评压缩后 context，与 Faithfulness/生成口径一致；分支 `fix/ctxrel-compressed-context`，待云端重跑确认数值）
 
 **端到端 QA 层（Layer 3）：**
 - [x] **QA 数据集生成器**：从 ViDoRe 283 条英文查询半自动生成 50 QA 对 + 预期答案
@@ -357,6 +370,7 @@ prism-rag/
 | ☁️ Option B | 7/7 | 同进程重建, Visual_only 50q | NDCG@10=0.1676 → Root Cause A **证伪** |
 | ☁️ MaxSim 对比 | 7/7 | 官方 `score_multi_vector` vs `_maxsim_torch` 同嵌入 | NDCG 0.344 vs 0.340, **99% 一致** |
 | ☁️ NDCG 修复后 | 7/7 | 标准 `1/log2` 公式, 50q 全配置消融 | Visual=0.202, Full+zerank2=**0.402** (旧公式 0.167→0.202) |
+| `runs/20260708-ctxrel-fix/` | 7/8 | **CtxRel 口径修复复测（100q）** | CtxRel=**0.294**(+154%), Faith=0.882, Rel=0.791 |
 
 ### 📄 复盘文档
 - `docs/solutions/2026-07-02-visual-oom-fix-retrospective.md` — Visual OOM 修复
@@ -377,6 +391,7 @@ prism-rag/
 - 50 条样本明显高估了 Faithfulness（↑0.11），全量 283 条更具代表性
 - 0.7721 对应约 23% 声明不被检索上下文支持，实际 Hallucination 率约 2-3%
 - **Context Relevance 仅 0.076** → 检索回的大部分句子与问题无关，上下文压缩优化空间大
+  - ⚠️ 注：该值含**口径 bug**——CtxRel 原评原始 chunk 而非压缩后 context（已修复，见 §6 CtxRel 表），真实值约为其 ~2x
 - Relevancy 稳定在 0.81，对采样不敏感
 
 ### 🗂️ 端到端 QA 评测（Layer 3）

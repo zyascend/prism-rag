@@ -18,6 +18,7 @@ from src.evaluation.ragas_metrics import (
     split_context_to_sentences,
     parse_relevance_response,
     compress_context,
+    evaluate_generation,
 )
 
 
@@ -512,3 +513,107 @@ class TestConfidenceThreshold:
         max_score = max(rerank_scores)
         threshold_rejected = threshold > 0 and max_score < threshold and len(rerank_scores) > 0
         assert threshold_rejected is False
+
+
+class TestCtxRelUsesCompressedContext:
+    """回归测试：CtxRel 应评估压缩后的上下文（LLM 实际看到的），而非原始 chunk
+
+    根因：compute_context_relevancy 曾被传入原始检索 chunk，绕过了
+    compress_context 的句级过滤，导致 CtxRel 系统性低估（实测 0.116）。
+    RAGAS Context Relevance 定义为"喂给 LLM 的上下文"中相关句占比，
+    应与 generate_answer / compute_faithfulness 使用同一份 context。
+    """
+
+    def test_ctxrel_receives_compressed_context(self, monkeypatch, tmp_path):
+        from src.evaluation import ragas_metrics
+
+        # ── 伪造 retriever：search 返回 5 个 raw chunk ──
+        raw_chunks = [
+            {
+                "text": f"Raw chunk number {i} with filler about pumps and valves.",
+                "rerank_score": 0.5,
+                "doc_ref": f"TO-{i}",
+            }
+            for i in range(5)
+        ]
+        retriever = MagicMock()
+        retriever.search.return_value = raw_chunks
+        retriever.bge = MagicMock()
+
+        # ── 伪造 dataset（1 条 query）──
+        class _FakeDS:
+            def __len__(self):
+                return 1
+
+            def __getitem__(self, i):
+                return {"query": "What is the pump pressure?"}
+
+        ds = _FakeDS()
+
+        # ── 强制压缩开启（ratio=0.4）、拒答阈值关闭 ──
+        def fake_cfg_get(key, default=None):
+            if "compression" in key:
+                return 0.4
+            if "reject_threshold" in key:
+                return 0.0
+            return default
+
+        monkeypatch.setattr(ragas_metrics.cfg, "get", fake_cfg_get)
+
+        # ── mock compress_context 返回可辨识的压缩串 ──
+        COMPRESSED = "COMPRESSED RELEVANT SENTENCE ABOUT PUMP PRESSURE"
+        monkeypatch.setattr(ragas_metrics, "compress_context", lambda *a, **k: COMPRESSED)
+
+        # ── mock 生成与评测的 LLM 依赖，避免触网 ──
+        monkeypatch.setattr(
+            ragas_metrics,
+            "generate_answer",
+            lambda q, c: "The pump pressure is 55 PSI.",
+        )
+        monkeypatch.setattr(
+            ragas_metrics,
+            "compute_faithfulness",
+            lambda ans, ctx: FaithfulnessResult(
+                query="",
+                answer=ans,
+                context_length=len(ctx),
+                claims=["c"],
+                supported=[True],
+                faithfulness_score=1.0,
+            ),
+        )
+        monkeypatch.setattr(
+            ragas_metrics,
+            "compute_answer_relevancy",
+            lambda q, a, embed_fn=None: AnswerRelevancyResult(
+                query=q, answer=a, relevancy_score=0.8
+            ),
+        )
+
+        # ── spy compute_context_relevancy：记录收到的 context_chunks ──
+        captured = {}
+
+        def spy_ctxrel(query, context_chunks):
+            captured["context_chunks"] = context_chunks
+            return ContextRelevancyResult(
+                query=query,
+                context_chunks=context_chunks,
+                num_sentences=1,
+                num_relevant=1,
+                relevance_score=1.0,
+            )
+
+        monkeypatch.setattr(ragas_metrics, "compute_context_relevancy", spy_ctxrel)
+
+        # ── 跑 ──
+        evaluate_generation(
+            retriever, ds, k=5, use_rerank=True, max_queries=1,
+            output_dir=str(tmp_path), label="t",
+        )
+
+        # ── 断言：CtxRel 收到的是压缩串（单元素列表），而非 raw chunk 列表 ──
+        assert "context_chunks" in captured, "compute_context_relevancy 未被调用"
+        assert captured["context_chunks"] == [COMPRESSED], (
+            "CtxRel 应评估压缩后的上下文（与 generate_answer/faithfulness 一致），"
+            f"实际收到: {captured['context_chunks']!r}"
+        )
