@@ -78,14 +78,16 @@ def get_retriever() -> PrismRAGRetriever:
     global _retriever
     if _retriever is None:
         cfg.load()
+        use_visual = cfg.get("retrieval.use_visual", True)
         pg_store = PgVectorStore()
         faiss_store = FaissColPaliStore()
         bge = BGEEmbedder()
-        colpali = ColPaliEmbedder()
+        # 本地 dev (use_visual=false) 免 ColPali 3.5B 下载：仅当启用 visual 路才构造
+        colpali = ColPaliEmbedder() if use_visual else None
         chunker = TextChunker()
         bm25 = BM25Retriever()
         dense = DenseRetriever(pg_store, bge)
-        visual = VisualRetriever(faiss_store, pg_store, colpali)
+        visual = VisualRetriever(faiss_store, pg_store, colpali) if use_visual else None
         fusion = RRFFusion(rrf_k=60)
         reranker = Reranker()
 
