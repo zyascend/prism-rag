@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import uuid
 from pathlib import Path
 from typing import List, Optional
@@ -205,8 +206,14 @@ async def ingest(file: UploadFile = File(...)):
         ).ingest(pdf_path, doc_id=doc_id)
     except Exception as e:
         retriever.pg.delete_by_doc_id(doc_id)
+        pdf_path.unlink(missing_ok=True)
+        if cfg.get("ingestion.parser") == "mineru":
+            try:
+                shutil.rmtree(Path("data/mineru_output") / doc_id, ignore_errors=True)
+            except Exception:
+                pass
         logger.error(f"ingest failed: {e}")
-        raise HTTPException(status_code=500, detail=f"入库失败: {e}")
+        raise HTTPException(status_code=500, detail="Ingestion failed")
     retriever.bm25.fit_from_pgvector(retriever.pg)
     if cfg.get("retrieval.use_visual", True):
         retriever.faiss.save()
@@ -224,7 +231,7 @@ async def ask(request: AskRequest):
         )
     except Exception as e:
         logger.error(f"search error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal search error")
     if request.doc_id:
         results = [r for r in results if r.get("doc_id") == request.doc_id]
     if not results:

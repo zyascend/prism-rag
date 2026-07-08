@@ -350,6 +350,12 @@ class FaissColPaliStore:
         self._page_ids = np.concatenate([self._page_ids, np.array(new_ids, dtype=np.int64)])
         self._page_boundaries.extend(new_bounds)
         self._index.add(nv)
+        if self._index_type == "hnsw":
+            if self._hnsw is None:
+                hnsw_m = cfg.get("storage.faiss.hnsw_m", 32)
+                self._hnsw = faiss.IndexHNSWFlat(self._vectors.shape[1], hnsw_m, faiss.METRIC_INNER_PRODUCT)
+                self._hnsw.hnsw.efConstruction = 200
+            self._hnsw.add(nv)
         self._num_pages = len(self._page_boundaries)
         self._num_patches = self._vectors.shape[0]
         if self._device.type == "cuda":

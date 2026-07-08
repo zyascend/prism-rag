@@ -4,6 +4,8 @@ import logging
 import os
 from typing import List
 
+import openai
+
 from src.config import cfg
 from src.evaluation.ragas_metrics import compress_context
 
@@ -50,7 +52,7 @@ class Generator:
             resp = self.client.chat.completions.create(
                 model=self.model, messages=prompt, temperature=0.0,
             )
-        except Exception as e:
+        except (openai.APIError, openai.APIConnectionError, openai.APITimeoutError) as e:
             raise GenerationError(f"LLM call failed: {e}") from e
 
         answer_text = resp.choices[0].message.content
