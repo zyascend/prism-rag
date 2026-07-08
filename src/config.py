@@ -7,6 +7,15 @@ import yaml
 from dataclasses import dataclass
 
 
+def deep_merge(base: dict, override: dict) -> None:
+    """Recursively merge override into base in place."""
+    for k, v in override.items():
+        if isinstance(v, dict) and isinstance(base.get(k), dict):
+            deep_merge(base[k], v)
+        else:
+            base[k] = v
+
+
 @dataclass
 class ObservabilityConfig:
     """Observability 配置，从 YAML observability 段加载，缺失时使用默认值"""
@@ -56,6 +65,13 @@ class Config:
                     self._data["embedding"][device_key] = "mps"
                 else:
                     self._data["embedding"][device_key] = "cpu"
+        # 合并 profile（如 local-dev）：CONFIG_PROFILE=local-dev -> config/models.local-dev.yaml
+        profile = os.environ.get("CONFIG_PROFILE")
+        if profile:
+            profile_path = Path(__file__).parent.parent / "config" / f"models.{profile}.yaml"
+            if profile_path.exists():
+                with open(profile_path) as pf:
+                    deep_merge(self._data, yaml.safe_load(pf) or {})
         self._loaded = True
         return self
 
