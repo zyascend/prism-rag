@@ -320,6 +320,41 @@ class FaissColPaliStore:
             for page_id, score in sorted_pages[:k]
         ]
 
+    # ── incremental add ────────────────────────────────────
+
+    def add_pages(self, page_embeddings: Dict[int, torch.Tensor]):
+        """增量写入多向量页面。首次调用（无索引）时等价于 build_index。"""
+        dim = 128
+        if self._vectors is None:
+            self._vectors = np.empty((0, dim), dtype=np.float32)
+            self._page_ids = np.empty((0,), dtype=np.int64)
+            self._page_boundaries = []
+            self._index_type = cfg.get("storage.faiss.index_type", "flat")
+            self._index = faiss.IndexFlatIP(dim)
+            self._device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+            self._vectors_torch = None
+
+        start = self._vectors.shape[0]
+        new_vecs, new_ids, new_bounds = [], [], []
+        for pid in sorted(page_embeddings.keys()):
+            emb = page_embeddings[pid].float().numpy().astype(np.float32)
+            n = emb.shape[0]
+            new_vecs.append(emb)
+            new_ids.extend([int(pid)] * n)
+            new_bounds.append((start, start + n))
+            start += n
+        if not new_vecs:
+            return
+        nv = np.vstack(new_vecs)
+        self._vectors = np.vstack([self._vectors, nv])
+        self._page_ids = np.concatenate([self._page_ids, np.array(new_ids, dtype=np.int64)])
+        self._page_boundaries.extend(new_bounds)
+        self._index.add(nv)
+        self._num_pages = len(self._page_boundaries)
+        self._num_patches = self._vectors.shape[0]
+        if self._device.type == "cuda":
+            self._vectors_torch = torch.from_numpy(self._vectors).to(self._device)
+
     # ── properties ─────────────────────────────────────────
 
     @property

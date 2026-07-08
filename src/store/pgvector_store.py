@@ -154,6 +154,14 @@ class PgVectorStore:
             cur.execute("SELECT COUNT(*) FROM chunks")
             return cur.fetchone()[0]
 
+    def delete_by_doc_id(self, doc_id: str) -> int:
+        """删除某 doc_id 的全部 chunk，返回删除行数（失败清理用）"""
+        with self.conn.cursor() as cur:
+            cur.execute("DELETE FROM chunks WHERE doc_id = %s", (doc_id,))
+            deleted = cur.rowcount
+        self.conn.commit()
+        return deleted
+
     def close(self):
         if self._conn and not self._conn.closed:
             self._conn.close()
