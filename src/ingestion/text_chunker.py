@@ -56,6 +56,8 @@ class TextChunker:
     )
     _RE_HYPHEN_BREAK = re.compile(r"(\w)-\n(\w)")
     _RE_MULTI_BLANK = re.compile(r"\n{3,}")
+    # 表格分隔行（形如 |---|---| 或 :--: | :--:）
+    _SEP_RE = re.compile(r"^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$")
 
     def __init__(self, max_tokens: int = MAX_TOKENS):
         self.max_tokens = max_tokens
@@ -129,7 +131,8 @@ class TextChunker:
                 continue
 
             if self._looks_like_table(para):
-                # 表格：按"行"切分（保留表头），绝不按词切碎
+                # 表格：先归一化分隔行（无 |---|---| 时注入），再按"行"切分
+                para = self._normalize_separator_row(para)
                 for t in self._split_table(para, page_id, doc_id, page_number, doc_ref):
                     chunk_idx += 1
                     t.chunk_id = f"pg{page_id:05d}_ch{chunk_idx:03d}"
@@ -249,7 +252,7 @@ class TextChunker:
         # 定位分隔行（形如 |---|---| 或 :--: | :--:）
         sep_idx = next(
             (i for i, ln in enumerate(lines)
-             if re.match(r"^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$", ln) and "|" in ln),
+             if TextChunker._SEP_RE.match(ln) and "|" in ln),
             None,
         )
         if sep_idx is not None:
@@ -296,3 +299,52 @@ class TextChunker:
         lines = text.split("\n")
         pipe_count = sum(line.count("|") for line in lines[:5])
         return pipe_count >= 3
+
+    @staticmethod
+    def _normalize_separator_row(table_md: str) -> str:
+        """表格分隔行归一化：把"表头后是数据行但缺 |---|---| 分隔行"的 markdown
+        表格修复为合法 GFM（在表头行后注入分隔行）。
+
+        能正确处理两种形态：
+        - 纯表格（首行即表头）：在首行后注入分隔行；
+        - 表头前有 caption 行（如 "Table 7. Pressure limits" 直接贴在表格上，
+          中间无空行）：定位到第一个真正的管道表头行，在它之后注入分隔行，
+          caption 作为前缀保留，且 _split_table 不会把 caption 误当表头。
+
+        收益：
+        - 让 _split_table 能复用完整表头（列名行 + 分隔行），而非把首行当伪表头；
+        - 长表切分后的每个子块都是合法 GFM，保留列结构；
+        - 单块小表也更利于 Dense embedding 与 LLM 按表格渲染。
+
+        以下情况原样返回（不误改）：
+        - 非表格 / 不足两行 / 没有管道表头行；
+        - 表头行后已是分隔行；
+        - 表头行后非表格数据行（caption 续行 / 正文 / 空行）。
+        """
+        lines = table_md.split("\n")
+        if len(lines) < 2:
+            return table_md
+        # 定位第一个真正的管道表头行（跳过前置 caption 等非表格行）
+        h = next((i for i, ln in enumerate(lines) if ln.count("|") >= 2), None)
+        if h is None:
+            return table_md  # 没有任何表格行，原样返回
+        if h + 1 >= len(lines):
+            return table_md  # 只有表头没有后续行
+        first = lines[h].strip()
+        second = lines[h + 1].strip()
+        # 表头行后已是分隔行 → 无需处理
+        if TextChunker._SEP_RE.match(second) and "|" in second:
+            return table_md
+        # 表头行后不是数据行（caption 续行 / 正文 / 空）→ 不注入，避免破坏结构
+        if second.count("|") < 2:
+            return table_md
+        # 依据表头列数构造分隔行
+        core = first.strip()
+        if core.startswith("|"):
+            core = core[1:]
+        if core.endswith("|"):
+            core = core[:-1]
+        n_cols = len(core.split("|"))
+        sep = "|" + "|".join("---" for _ in range(n_cols)) + "|"
+        # 在表头行(h)之后注入分隔行，前置 caption 行保持原样
+        return "\n".join(lines[: h + 1] + [sep] + lines[h + 1:])
