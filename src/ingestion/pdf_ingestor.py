@@ -7,6 +7,7 @@ from typing import Dict, Optional
 
 from src.config import cfg
 from src.ingestion.parser import build_parser
+from src.ingestion.table_summarizer import TableSummarizer
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,10 @@ class PDFIngestor:
         self.colpali = colpali
         self.chunker = chunker
         self.parser = parser or build_parser()
+        # 表格摘要生成器：为 chunk_type=table 的块生成 NL 摘要，供 Dense 检索
+        self.summarizer = TableSummarizer(
+            enabled=cfg.get("ingestion.table_summary_enabled", True)
+        )
 
     def ingest(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict:
         doc_id = doc_id or _rand_doc_id()
@@ -38,9 +43,16 @@ class PDFIngestor:
                 page_number=p.page_number, markdown_text=p.markdown,
             )
             for c in chunks:
+                # 表格块：生成摘要（Dense 向量编码摘要，检索更准；text 仍存全文供生成）
+                summary = ""
+                embed_text = c.text
+                if c.chunk_type == "table":
+                    summary = self.summarizer.summarize(c.text)
+                    if summary:
+                        embed_text = summary
                 all_rows.append((c.chunk_id, c.page_id, c.doc_id, c.page_number,
-                                 c.chunk_type, c.text, None, c.doc_ref))
-                all_texts.append(c.text)
+                                 c.chunk_type, c.text, None, c.doc_ref, summary))
+                all_texts.append(embed_text)
             if use_visual:
                 page_images.append(p.image)
                 page_id_for_image.append(page_id)
@@ -51,7 +63,8 @@ class PDFIngestor:
                 batch = all_rows[i:i + 100]
                 vecs = embs[i:i + 100].cpu().numpy().tolist()
                 self.pg.insert_chunks([
-                    (r[0], r[1], r[2], r[3], r[4], r[5], v, r[7]) for r, v in zip(batch, vecs)
+                    (r[0], r[1], r[2], r[3], r[4], r[5], v, r[7], r[8])
+                    for r, v in zip(batch, vecs)
                 ])
 
         if use_visual and page_images:

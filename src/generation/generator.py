@@ -33,14 +33,34 @@ class Generator:
         if not top:
             return {"answer": "I don't have enough information to answer that question.",
                     "citations": [], "context": ""}
-        contexts = [r["text"] for r in top]
-        if self.bge is not None:
-            context = compress_context(
-                query, contexts, self.bge,
-                ratio=cfg.get("retrieval.context_compression_ratio", 0.4),
-            )
-        else:
-            context = "\n\n".join(contexts)
+
+        # 表格 chunk 检索时按摘要定位，但生成时必须展开完整 Markdown 表格喂给 LLM，
+        # 因此整表跳过 compress_context（句级压缩会把表格行删掉，破坏结构）。
+        # 非表格 chunk 仍走 BGE 句级压缩，按原排序拼接上下文。
+        table_parts: dict = {}        # orig_index -> 完整表格 markdown
+        text_idx: list = []           # 非表格 chunk 的原排序下标
+        text_texts: list = []         # 非表格 chunk 的文本
+        for i, r in enumerate(top):
+            if r.get("chunk_type") == "table":
+                table_parts[i] = r["text"]
+            else:
+                text_idx.append(i)
+                text_texts.append(r["text"])
+
+        if text_texts:
+            if self.bge is not None:
+                compressed_text = compress_context(
+                    query, text_texts, self.bge,
+                    ratio=cfg.get("retrieval.context_compression_ratio", 0.4),
+                )
+            else:
+                compressed_text = "\n\n".join(text_texts)
+            # 压缩结果是一个整体块，挂在非表格 chunk 的最小下标处，保持原有相对顺序
+            table_parts[min(text_idx)] = (
+                table_parts.get(min(text_idx), "") + "\n\n" + compressed_text
+            ).strip()
+
+        context = "\n\n".join(table_parts[i] for i in sorted(table_parts))
 
         prompt = [
             {"role": "system", "content":
