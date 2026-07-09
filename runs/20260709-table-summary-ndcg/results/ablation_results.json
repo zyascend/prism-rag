@@ -1,0 +1,112 @@
+[
+  {
+    "config": "BM25_only",
+    "ndcg@5": 0.412,
+    "ndcg@10": 0.4248,
+    "recall@5": 0.3897,
+    "recall@10": 0.4639,
+    "mrr": 0.5302,
+    "avg_latency_ms": 27.2,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Dense_only",
+    "ndcg@5": 0.3474,
+    "ndcg@10": 0.3638,
+    "recall@5": 0.3231,
+    "recall@10": 0.3979,
+    "mrr": 0.4718,
+    "avg_latency_ms": 115.7,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Visual_only",
+    "ndcg@5": 0.1392,
+    "ndcg@10": 0.159,
+    "recall@5": 0.102,
+    "recall@10": 0.2143,
+    "mrr": 0.1727,
+    "avg_latency_ms": 176.3,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "BM25_Dense",
+    "ndcg@5": 0.4197,
+    "ndcg@10": 0.4296,
+    "recall@5": 0.3941,
+    "recall@10": 0.4675,
+    "mrr": 0.5376,
+    "avg_latency_ms": 140.5,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "BM25_Dense_Visual",
+    "ndcg@5": 0.4176,
+    "ndcg@10": 0.4334,
+    "recall@5": 0.4201,
+    "recall@10": 0.4952,
+    "mrr": 0.5071,
+    "avg_latency_ms": 348.7,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Full_no_rerank",
+    "ndcg@5": 0.4176,
+    "ndcg@10": 0.4334,
+    "recall@5": 0.4201,
+    "recall@10": 0.4952,
+    "mrr": 0.5071,
+    "avg_latency_ms": 364.1,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Full_with_rerank",
+    "ndcg@5": 0.5094,
+    "ndcg@10": 0.5162,
+    "recall@5": 0.4655,
+    "recall@10": 0.5353,
+    "mrr": 0.6356,
+    "avg_latency_ms": 644.9,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Full_BGE_HyDE",
+    "ndcg@5": 0.4978,
+    "ndcg@10": 0.5054,
+    "recall@5": 0.457,
+    "recall@10": 0.5292,
+    "mrr": 0.615,
+    "avg_latency_ms": 824.6,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Full_zerank2",
+    "ndcg@5": 0.5342,
+    "ndcg@10": 0.5357,
+    "recall@5": 0.4732,
+    "recall@10": 0.5459,
+    "mrr": 0.6658,
+    "avg_latency_ms": 1140.9,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Full_zerank2_HyDE",
+    "ndcg@5": 0.5238,
+    "ndcg@10": 0.5273,
+    "recall@5": 0.4632,
+    "recall@10": 0.5399,
+    "mrr": 0.6518,
+    "avg_latency_ms": 1391.7,
+    "num_queries": 283,
+    "language": "en"
+  }
+]

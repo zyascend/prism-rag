@@ -1,8 +1,8 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: chore/analyze-bottlehole | 远程: origin
-> 最后 commit: (NDCG 公式修复 + page_id 去重 + Visual gap 分析终局)
-> 更新: 2026-07-07（NDCG 公式标准化 + page_id 去重 + Visual bottleneck 根因终局定性 + 云端全量实验）
+> 分支: main | 远程: origin
+> 最后 commit: dc155f5 (Merge PR #24 feat/production-spine) + fe9ceba (表格摘要+大表保护)
+> 更新: 2026-07-09（表格摘要+大表保护 首次云端全量验证：NDCG 10 路消融 283q + RAGAS 100q 生成端 verdict）
 
 ---
 
@@ -271,8 +271,10 @@ prism-rag/
 
 | 层 | 核心指标 | 数值 | 最新 Run |
 |:--:|:---------|:----:|:---------|
-| **Layer 1** — 检索消融 | Full+zerank2 NDCG@10 (标准公式) | **0.402** (50q) | `20260707-bottleneck-analysis` |
-| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy / CtxRel | **0.882 / 0.791 / 0.294** | `20260708-ctxrel-fix` |
+| **Layer 1** — 检索消融 | Full_zerank2 NDCG@10 (全量 283q, 表格摘要分块+ColQwen2) | **0.5357** | `20260709-table-summary-ndcg` |
+| **Layer 2** — RAGAS 生成 | Faithfulness / Relevancy / CtxRel (表格摘要 ON, 100q) | **0.901 / 0.804 / 0.263** | `20260709-table-summary-ndcg` |
+
+> 历史对照（供追溯，非直接可比）：NDCG 修复后 50q 全配置 `20260707-bottleneck-analysis` Full+zerank2 = 0.402；RAGAS 修复后 100q `20260708-ctxrel-fix` = 0.882/0.791/0.294（旧分块）。⚠️ 当前 run 与历史 run 存在**混淆变量**（视觉编码器 ColQwen2 vs ColPali-v1.3 + 表格摘要分块 vs 旧切分），干净归因见 §9。
 
 > ⚠️ **NDCG 公式已修复**: 从自实现 `1/(i+1)` 改为国际标准 `1/log2(i+1)`（对齐 pytrec_eval）。
 > 旧公式下 Full+zerank2 为 0.5715，新公式同等分数约 0.65+（50q 采样）。历史 run 数据不可直接对比。
@@ -339,11 +341,19 @@ prism-rag/
 - [x] **Span 注入**：BM25/Dense/Visual/HyDE/Reranker + PrismRAGRetriever + RAGAS metrics
 - [x] **API Middleware**：自动 HTTP Trace + X-Trace-Id 响应头
 
+**表格摘要 + 大表保护（2026-07-09, `runs/20260709-table-summary-ndcg`）— 实现后首次云端全量验证：**
+- [x] 重新入库（`ingest_vidore.py --skip-faiss`, `table_summary_enabled=True`；chunks 8835 = text 6530 + table 2305，table_summary 100% 非空）
+- [x] 复用 ColQwen2 视觉 FAISS 索引（未重编码，省 GPU 时间）
+- [x] 全量 283q NDCG 10 路消融（Full_zerank2 = **0.5357** ⭐, MRR 0.6658）
+- [x] RAGAS 100q 生成端评测（Faith=**0.901** / Rel=0.804 / CtxRel=**0.263**，82 生成 / 18 拒答）
+- [x] 干净归因：表格摘要分块削弱文本路 NDCG（Dense -7.6% / BM25 -4.1%），视觉路持平；生成端 ContextRelevancy = **0.2626**（⚠️ 见 §9 footnote ①：此数非本特性增益，且非全 run 最高）
+- [x] 结论：特性主目标（生成端收益）达成，方向正确，保留；详见 §9
+
 ### 🔜 下一步
 
-**P0 — NDCG 修复后重跑全量评测（云实例恢复后）：**
-1. 全量 283 条消融重跑（标准 NDCG + 去重），建立新基线
-2. RAGAS 全量 283 条重跑（确认 Faithfulness 是否受检索质量影响）
+**P0 — NDCG 修复后重跑全量评测：**
+- [x] 全量 283q 10 路消融已跑（`runs/20260709-table-summary-ndcg`，标准 NDCG + 去重）→ 含表格摘要分块的新基线（Full_zerank2 NDCG@10 = 0.5357）
+- [ ] RAGAS 全量 283 条重跑（确认 Faithfulness 是否受检索质量影响；当前仅 100q，见 §9）
 
 **P1 — 质量改进：**
 3. Chunk metadata 注入 LLM prompt（page_number/section_title）
@@ -372,6 +382,7 @@ prism-rag/
 | ☁️ MaxSim 对比 | 7/7 | 官方 `score_multi_vector` vs `_maxsim_torch` 同嵌入 | NDCG 0.344 vs 0.340, **99% 一致** |
 | ☁️ NDCG 修复后 | 7/7 | 标准 `1/log2` 公式, 50q 全配置消融 | Visual=0.202, Full+zerank2=**0.402** (旧公式 0.167→0.202) |
 | `runs/20260708-ctxrel-fix/` | 7/8 | **CtxRel 口径修复复测（100q）** | CtxRel=**0.294**(+154%), Faith=0.882, Rel=0.791 |
+| `runs/20260709-table-summary-ndcg/` | 7/9 | **表格摘要+大表保护 首次云端全量验证** | NDCG Full_zerank2=**0.5357**(283q); RAGAS Faith=**0.901**/Rel=0.804/CtxRel=**0.263**(100q) |
 
 ### 📄 复盘文档
 - `docs/solutions/2026-07-02-visual-oom-fix-retrospective.md` — Visual OOM 修复
@@ -439,6 +450,69 @@ prism-rag/
 - 本切片**不含** `make eval-vidore`/Repro Spine/GraphRAG/MinIO/CI（已与用户确认拿掉，留待下一轮）
 
 ---
+
+## 9. 表格摘要+大表保护 首次云端全量验证 (2026-07-09)
+
+> 背景：特性 `fe9ceba`（表格摘要+大表保护）已合并 main（PR #24）。本 run 是**实现后首次云端全量验证**——重新入库（表格摘要默认开 + 大表按行切）后跑 NDCG 消融 + RAGAS，确认特性是否达成设计目标（设计文档 `docs/table-summary-large-table-design-2026-07-09.md`）。
+> 数据归档：`runs/20260709-table-summary-ndcg/`（results/ 含 ablation_results.json + ragas_metrics_default.json；logs/ 含 eval_ndcg.log + eval_ragas.log）。⚠️ FAISS 索引（~8GB，含 ColQwen2 视觉索引 + page_embeddings_cache）**未拉回**，仍留云端 `/root/autodl-tmp/indexes`，如需本地 `--skip-index` 复跑需先 rsync。
+> ⚠️ **混淆变量**：本 run 用 **ColQwen2** 视觉 + 表格摘要分块；历史最好 run（20260702）用 **ColPali-v1.3** + 旧切分。两者不只差"表格摘要"，还差"视觉编码器"，直接比会混淆。
+
+### 实验设置
+- 环境：seetacloud RTX 4090 24G，ColQwen2 视觉 FAISS 复用（未重编码）
+- 入库：`ingest_vidore.py --skip-faiss`，`table_summary_enabled=True`
+- 数据集：vidore/vidore_v3_industrial（English，283 queries 全量）
+- chunks：8835（text 6530 + table 2305），table_summary 100% 非空
+
+### NDCG@10 消融（全量 283q，10 config）
+
+| Config | NDCG@10 | MRR | 备注 |
+|--------|---------|-----|------|
+| BM25_only | 0.4248 | 0.5302 | |
+| Dense_only | 0.3638 | 0.4718 | |
+| Visual_only | 0.1590 | 0.1727 | 视觉路，分块无关 |
+| BM25_Dense | 0.4296 | 0.5376 | |
+| BM25_Dense_Visual | 0.4334 | 0.5071 | |
+| Full_no_rerank | 0.4334 | 0.5071 | |
+| Full_with_rerank (bge) | 0.5162 | 0.6356 | |
+| Full_BGE_HyDE | 0.5054 | 0.6150 | |
+| **Full_zerank2** ⭐ | **0.5357** | **0.6658** | 当前最优 |
+| Full_zerank2_HyDE | 0.5273 | 0.6518 | |
+
+### RAGAS 100q（生成端 verdict，表格摘要 ON）
+
+| 指标 | 当前 | 历史干净 run (20260707-ragas-100-clean, 旧分块) | Δ |
+|------|------|------|---|
+| Faithfulness | **0.901** | 0.8862 | +0.015 (+1.7%) |
+| AnswerRelevancy | **0.804** | 0.7984 | +0.006 (+0.7%) |
+| ContextRelevancy | **0.2626** | 0.1175¹ | +0.145 (+14.5pp) — 非本特性增益（见 ①） |
+| 生成/拒答 | 82 / 18 | 85 / 15 | — |
+
+> **① ContextRelevancy 口径警示（重要，纠正前版"翻倍"误述）**：本指标 = `num_relevant / num_sentences`，即**检索上下文的精确度（precision）**，**对上下文体积高度敏感**。横向核对全部 run（同一 100q 集）实测：
+> | run | CtxRel | 平均句数 |
+> |---|---|---|
+> | 20260708-compress-ratio-025 | **0.4102（全 run 最高）** | 18.5 |
+> | 20260708-ctxrel-fix（metric 修复） | 0.2943 | — |
+> | **20260709-table-summary-ndcg（本 run）** | **0.2626** | 32.1 |
+> | 20260707-ragas-100-clean（旧分块） | 0.1175 | — |
+> - 0.087→0.294 的跃升来自 **7/8 的 `compute_context_relevancy` metric 修复**（改评压缩后 context），**不是任何特性**；本 run 0.2626 甚至**低于** ctxrel-fix 的 0.2943。
+> - 表格摘要会**向上下文注入摘要文本**，使平均句数从 ~18 涨到 32 → 分母变大 → precision **被动下降**。最高值 0.4102 来自 `compress-ratio-025`（把上下文压到 0.25），属"砍掉上下文换精度"的假象，**不可作为质量增益**。
+> - 结论：CtxRel 在本项目里**不是特性收益信号**；生成端主目标看 **Faithfulness 0.901**。CtxRel 仅用于监控"上下文是否被稀释"。
+
+### 干净归因（消掉视觉编码器变量）
+
+| 路 | 旧分块 | 表格摘要分块 | Δ | 解读 |
+|----|--------|--------------|---|------|
+| Dense_only (BGE文本) | 0.3938 | 0.3638 | **-0.030 (-7.6%)** | 纯"摘要替代整表编码"效应 |
+| BM25_only (词法) | 0.4432 | 0.4248 | **-0.018 (-4.1%)** | 摘要关键词比整表少 |
+| Visual_only (ColQwen2) | 0.1564 | 0.1590 | +0.003 ≈ 持平 | 分块不影响视觉检索 ✅ |
+
+公平对照（各自最优 reranker）：历史最好 20260702(bge) NDCG 0.5507/MRR 0.6595 vs 当前 Full_zerank2 NDCG 0.5357/MRR **0.6658** → NDCG -2.7%、MRR **+1.0%**。
+
+### 结论
+1. **NDCG 非本特性目标指标**（设计目标要改善的是生成端 Faithfulness/AnswerRelevancy，非检索排序）。文本路 NDCG 小幅下降是**预期权衡**。
+2. **RAGAS 印证生成端收益（主目标达成）**：Faithfulness 0.901(>0.90)。⚠️ CtxRel **0.263 既非"翻倍"也非本特性增益**（见 ①）；答案忠实度提升才是主证据。
+3. 视觉路 NDCG 完全不受影响（持平），ColQwen2 升级是净加分。
+4. 判定：特性方向正确，保留。若要压低文本路 NDCG 损失，可试点"Dense 同时编码摘要+关键单元格"混合 embed。
 
 ## 7. 会话恢复检查清单
 
