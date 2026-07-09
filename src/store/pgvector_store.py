@@ -47,6 +47,13 @@ class PgVectorStore:
     def conn(self):
         if self._conn is None or self._conn.closed:
             self._conn = psycopg2.connect(self.conn_string)
+            # 关键：先开 autocommit，再 register_vector（其内部会发查询，
+            # 若 autocommit 仍为 False 会开启事务导致后续无法切换）。
+            # 不设 autocommit 的危害：本 store 是 API 单例常驻连接，
+            # 每次 search 的 SELECT 都会让连接进入 idle-in-transaction 且永不提交，
+            # 长期持有 chunks 共享锁，挡住 DDL（ALTER TABLE 需排他锁），
+            # 表现为 API 运行数小时后拖住所有 ingest/迁移（已验证的 23h 泄漏）。
+            self._conn.autocommit = True
             register_vector(self._conn)
         return self._conn
 
@@ -137,7 +144,7 @@ class PgVectorStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref
+                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref, table_summary
                 FROM chunks
                 WHERE page_id = ANY(%s)
                 """,
