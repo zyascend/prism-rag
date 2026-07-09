@@ -19,12 +19,11 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
 import requests
 
-from src.config import cfg
 from src.observability import get_tracer
 
 logger = logging.getLogger(__name__)
@@ -494,7 +493,6 @@ def evaluate_e2e_qa(
 
     # ── 日志输出 ──
     avg_latency = latency_total / (num_answerable + num_rejection) if (num_answerable + num_rejection) > 0 else 0.0
-    rejection_rate_expected = num_rejection / (num_answerable + num_rejection) if (num_answerable + num_rejection) > 0 else 0.0
 
     logger.info(f"\n{'='*60}")
     logger.info("端到端 QA 评测结果")
@@ -502,7 +500,7 @@ def evaluate_e2e_qa(
     logger.info(f"  可回答问题:     {num_answerable}")
     logger.info(f"  拒答问题:       {num_rejection}")
     logger.info(f"  平均延迟:       {avg_latency:.1f}s")
-    logger.info(f"  ───────────────")
+    logger.info("  ───────────────")
     logger.info(f"  答案正确率:     {avg_correctness:.2%} ({num_answerable} 条)")
     logger.info(f"  不合理拒答:     {rejected_answerable} ({rejected_answerable/num_answerable:.1%})" if num_answerable > 0 else "")
     logger.info(f"  拒答准确率:     {rejection_accuracy:.2%} ({num_rejection} 条)")

@@ -8,7 +8,9 @@ Schema:
     page_number INTEGER NOT NULL,
     chunk_type TEXT NOT NULL DEFAULT 'text',
     text TEXT NOT NULL,
-    bge_vector vector(1024) NOT NULL
+    bge_vector vector(1024) NOT NULL,
+    doc_ref TEXT NOT NULL DEFAULT '',
+    table_summary TEXT NOT NULL DEFAULT ''   -- 表格 NL 摘要（检索用，生成仍用 text 全文）
   );
   CREATE INDEX idx_chunks_page_id ON chunks(page_id);
   CREATE INDEX idx_chunks_doc_id ON chunks(doc_id);
@@ -16,7 +18,6 @@ Schema:
 
 from __future__ import annotations
 
-import os
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -46,6 +47,13 @@ class PgVectorStore:
     def conn(self):
         if self._conn is None or self._conn.closed:
             self._conn = psycopg2.connect(self.conn_string)
+            # 关键：先开 autocommit，再 register_vector（其内部会发查询，
+            # 若 autocommit 仍为 False 会开启事务导致后续无法切换）。
+            # 不设 autocommit 的危害：本 store 是 API 单例常驻连接，
+            # 每次 search 的 SELECT 都会让连接进入 idle-in-transaction 且永不提交，
+            # 长期持有 chunks 共享锁，挡住 DDL（ALTER TABLE 需排他锁），
+            # 表现为 API 运行数小时后拖住所有 ingest/迁移（已验证的 23h 泄漏）。
+            self._conn.autocommit = True
             register_vector(self._conn)
         return self._conn
 
@@ -62,9 +70,14 @@ class PgVectorStore:
                     chunk_type TEXT NOT NULL DEFAULT 'text',
                     text TEXT NOT NULL,
                     bge_vector vector(1024) NOT NULL,
-                    doc_ref TEXT NOT NULL DEFAULT ''
+                    doc_ref TEXT NOT NULL DEFAULT '',
+                    table_summary TEXT NOT NULL DEFAULT ''
                 )
             """)
+            # 兼容旧库：新增列（已在 CREATE 中的新库此句为 no-op）
+            cur.execute(
+                "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS table_summary TEXT NOT NULL DEFAULT ''"
+            )
             cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_page_id ON chunks(page_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON chunks(doc_id)")
             # HNSW 索引
@@ -79,18 +92,19 @@ class PgVectorStore:
         """批量插入 chunk
 
         Args:
-            chunks: [(chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector, doc_ref), ...]
+            chunks: [(chunk_id, page_id, doc_id, page_number, chunk_type, text,
+                      bge_vector, doc_ref, table_summary), ...]
         """
         with self.conn.cursor() as cur:
             psycopg2.extras.execute_values(
                 cur,
                 """
-                INSERT INTO chunks (chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector, doc_ref)
+                INSERT INTO chunks (chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector, doc_ref, table_summary)
                 VALUES %s
                 ON CONFLICT (chunk_id) DO NOTHING
                 """,
                 chunks,
-                template="(%s, %s, %s, %s, %s, %s, %s::vector, %s)",
+                template="(%s, %s, %s, %s, %s, %s, %s::vector, %s, %s)",
             )
         self.conn.commit()
 
@@ -99,7 +113,7 @@ class PgVectorStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref,
+                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref, table_summary,
                        1 - (bge_vector <=> %s::vector) AS score
                 FROM chunks
                 ORDER BY bge_vector <=> %s::vector
@@ -117,7 +131,8 @@ class PgVectorStore:
                     "chunk_type": r[4],
                     "text": r[5],
                     "doc_ref": r[6],
-                    "score": float(r[7]),
+                    "table_summary": r[7],
+                    "score": float(r[8]),
                 }
                 for r in rows
             ]
@@ -129,7 +144,7 @@ class PgVectorStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref
+                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref, table_summary
                 FROM chunks
                 WHERE page_id = ANY(%s)
                 """,
@@ -145,6 +160,7 @@ class PgVectorStore:
                     "chunk_type": r[4],
                     "text": r[5],
                     "doc_ref": r[6],
+                    "table_summary": r[7],
                 }
                 for r in rows
             ]
@@ -153,6 +169,14 @@ class PgVectorStore:
         with self.conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM chunks")
             return cur.fetchone()[0]
+
+    def delete_by_doc_id(self, doc_id: str) -> int:
+        """删除某 doc_id 的全部 chunk，返回删除行数（失败清理用）"""
+        with self.conn.cursor() as cur:
+            cur.execute("DELETE FROM chunks WHERE doc_id = %s", (doc_id,))
+            deleted = cur.rowcount
+        self.conn.commit()
+        return deleted
 
     def close(self):
         if self._conn and not self._conn.closed:

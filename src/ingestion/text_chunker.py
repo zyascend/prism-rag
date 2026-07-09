@@ -24,6 +24,7 @@ class Chunk:
     text: str
     chunk_type: str = "text"  # text | table
     doc_ref: str = ""         # TO 文档编号，用于 LLM grounding（不进 CtxRel 评估）
+    table_summary: str = ""   # 表格自然语言摘要（仅 chunk_type=table 时由 TableSummarizer 填充）
 
     def __repr__(self) -> str:
         return f"Chunk(id={self.chunk_id}, page={self.page_id}, type={self.chunk_type})"
@@ -55,6 +56,8 @@ class TextChunker:
     )
     _RE_HYPHEN_BREAK = re.compile(r"(\w)-\n(\w)")
     _RE_MULTI_BLANK = re.compile(r"\n{3,}")
+    # 表格分隔行（形如 |---|---| 或 :--: | :--:）
+    _SEP_RE = re.compile(r"^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$")
 
     def __init__(self, max_tokens: int = MAX_TOKENS):
         self.max_tokens = max_tokens
@@ -116,12 +119,24 @@ class TextChunker:
             return []
 
         paragraphs = re.split(r"\n\s*\n", markdown_text.strip())
+        # 合并被空行打断的表格：相邻两段都是表格形态则拼回一体，
+        # 否则按行切分时表头/分隔行会掉队，破坏 markdown 表格结构。
+        paragraphs = self._merge_table_blocks(paragraphs)
         chunks: List[Chunk] = []
         chunk_idx = 0
 
         for para in paragraphs:
             para = para.strip()
             if not para:
+                continue
+
+            if self._looks_like_table(para):
+                # 表格：先归一化分隔行（无 |---|---| 时注入），再按"行"切分
+                para = self._normalize_separator_row(para)
+                for t in self._split_table(para, page_id, doc_id, page_number, doc_ref):
+                    chunk_idx += 1
+                    t.chunk_id = f"pg{page_id:05d}_ch{chunk_idx:03d}"
+                    chunks.append(t)
                 continue
 
             if len(para) <= self.max_chars:
@@ -133,7 +148,7 @@ class TextChunker:
                     doc_id=doc_id,
                     page_number=page_number,
                     text=para,
-                    chunk_type="table" if self._looks_like_table(para) else "text",
+                    chunk_type="text",
                     doc_ref=doc_ref,
                 ))
             else:
@@ -214,8 +229,122 @@ class TextChunker:
         return chunks
 
     @staticmethod
+    def _merge_table_blocks(paragraphs: List[str]) -> List[str]:
+        """把被空行拆开的相邻表格段落重新拼回一体。"""
+        merged: List[str] = []
+        for para in paragraphs:
+            if (merged and TextChunker._looks_like_table(merged[-1])
+                    and TextChunker._looks_like_table(para)):
+                merged[-1] = merged[-1] + "\n" + para
+            else:
+                merged.append(para)
+        return merged
+
+    def _split_table(
+        self, table_md: str, page_id: int, doc_id: str,
+        page_number: int, doc_ref: str,
+    ) -> List[Chunk]:
+        """按行切分超长 markdown 表格，每段保留表头（列名 + 分隔行）。
+
+        避免原逻辑按词切碎导致 `|---|---|` 与行对齐丢失。
+        """
+        lines = table_md.split("\n")
+        # 定位分隔行（形如 |---|---| 或 :--: | :--:）
+        sep_idx = next(
+            (i for i, ln in enumerate(lines)
+             if TextChunker._SEP_RE.match(ln) and "|" in ln),
+            None,
+        )
+        if sep_idx is not None:
+            header = lines[: sep_idx + 1]          # 列名行 + 分隔行
+            body = lines[sep_idx + 1:]
+        else:
+            header = lines[:1]
+            body = lines[1:]
+
+        chunks: List[Chunk] = []
+        buf: List[str] = []
+        buf_len = 0
+        for row in body:
+            row_len = len(row)
+            if buf and buf_len + row_len + 1 > self.max_chars:
+                chunks.append(self._make_table_chunk(
+                    "\n".join(header + buf), page_id, doc_id, page_number, doc_ref))
+                buf, buf_len = [], 0
+            buf.append(row)
+            buf_len += row_len + 1
+        if buf:
+            chunks.append(self._make_table_chunk(
+                "\n".join(header + buf), page_id, doc_id, page_number, doc_ref))
+        # 兜底：极端情况（无 body）至少保留原表
+        if not chunks:
+            chunks.append(self._make_table_chunk(
+                table_md, page_id, doc_id, page_number, doc_ref))
+        return chunks
+
+    @staticmethod
+    def _make_table_chunk(
+        text: str, page_id: int, doc_id: str,
+        page_number: int, doc_ref: str,
+    ) -> Chunk:
+        return Chunk(
+            chunk_id="",  # 由调用方按序填充
+            page_id=page_id, doc_id=doc_id, page_number=page_number,
+            text=text, chunk_type="table", doc_ref=doc_ref,
+        )
+
+    @staticmethod
     def _looks_like_table(text: str) -> bool:
         """启发式判断是否为表格文本（含管道符或明显的列对齐）"""
         lines = text.split("\n")
         pipe_count = sum(line.count("|") for line in lines[:5])
         return pipe_count >= 3
+
+    @staticmethod
+    def _normalize_separator_row(table_md: str) -> str:
+        """表格分隔行归一化：把"表头后是数据行但缺 |---|---| 分隔行"的 markdown
+        表格修复为合法 GFM（在表头行后注入分隔行）。
+
+        能正确处理两种形态：
+        - 纯表格（首行即表头）：在首行后注入分隔行；
+        - 表头前有 caption 行（如 "Table 7. Pressure limits" 直接贴在表格上，
+          中间无空行）：定位到第一个真正的管道表头行，在它之后注入分隔行，
+          caption 作为前缀保留，且 _split_table 不会把 caption 误当表头。
+
+        收益：
+        - 让 _split_table 能复用完整表头（列名行 + 分隔行），而非把首行当伪表头；
+        - 长表切分后的每个子块都是合法 GFM，保留列结构；
+        - 单块小表也更利于 Dense embedding 与 LLM 按表格渲染。
+
+        以下情况原样返回（不误改）：
+        - 非表格 / 不足两行 / 没有管道表头行；
+        - 表头行后已是分隔行；
+        - 表头行后非表格数据行（caption 续行 / 正文 / 空行）。
+        """
+        lines = table_md.split("\n")
+        if len(lines) < 2:
+            return table_md
+        # 定位第一个真正的管道表头行（跳过前置 caption 等非表格行）
+        h = next((i for i, ln in enumerate(lines) if ln.count("|") >= 2), None)
+        if h is None:
+            return table_md  # 没有任何表格行，原样返回
+        if h + 1 >= len(lines):
+            return table_md  # 只有表头没有后续行
+        first = lines[h].strip()
+        second = lines[h + 1].strip()
+        # 表头行后已是分隔行 → 无需处理
+        if TextChunker._SEP_RE.match(second) and "|" in second:
+            return table_md
+        # 表头行后不是数据行（caption 续行 / 正文 / 空）→ 不注入，避免破坏结构
+        if second.count("|") < 2:
+            return table_md
+        # 依据表头列数构造分隔行
+        core = first.strip()
+        if core.startswith("|"):
+            core = core[1:]
+        if core.endswith("|"):
+            core = core[:-1]
+        n_cols = len(core.split("|"))
+        sep = "|" + "|".join("---" for _ in range(n_cols)) + "|"
+        # 在表头行(h)之后注入分隔行，前置 caption 行保持原样
+        return "\n".join(lines[: h + 1] + [sep] + lines[h + 1:])

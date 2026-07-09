@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 import torch
@@ -25,7 +24,8 @@ from src.ingestion.progress import (
     save_page_embeddings,
     save_state,
 )
-from src.ingestion.text_chunker import Chunk, TextChunker
+from src.ingestion.table_summarizer import TableSummarizer
+from src.ingestion.text_chunker import TextChunker
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
 
@@ -48,6 +48,9 @@ class ViDoReIngestor:
         self.bge = bge_embedder
         self.colpali = colpali_embedder
         self.chunker = chunker
+        self.summarizer = TableSummarizer(
+            enabled=cfg.get("ingestion.table_summary_enabled", True)
+        )
 
     def ingest(
         self,
@@ -101,8 +104,16 @@ class ViDoReIngestor:
                 markdown_text=row.get("markdown", None),
             )
             for c in chunks:
-                all_chunk_rows.append((c.chunk_id, c.page_id, c.doc_id, c.page_number, c.chunk_type, c.text, None, c.doc_ref))
-                all_texts.append(c.text)
+                summary = ""
+                embed_text = c.text
+                if c.chunk_type == "table":
+                    summary = self.summarizer.summarize(c.text)
+                    if summary:
+                        embed_text = summary
+                all_chunk_rows.append(
+                    (c.chunk_id, c.page_id, c.doc_id, c.page_number, c.chunk_type, c.text, None, c.doc_ref, summary)
+                )
+                all_texts.append(embed_text)
 
         logger.info(f"共 {len(all_chunk_rows)} 个 chunk，开始 BGE 编码...")
         bge_embs = self.bge.encode(all_texts, batch_size=32, show_progress=True)
@@ -112,7 +123,7 @@ class ViDoReIngestor:
             for j in range(i, min(i + 100, len(all_chunk_rows))):
                 vec = bge_embs[j].cpu().numpy().tolist()
                 entry = all_chunk_rows[j]
-                batch.append((entry[0], entry[1], entry[2], entry[3], entry[4], entry[5], vec, entry[7]))
+                batch.append((entry[0], entry[1], entry[2], entry[3], entry[4], entry[5], vec, entry[7], entry[8]))
             self.pg.insert_chunks(batch)
 
         logger.info(f"✅ pgvector 入库完成, 共 {self.pg.count()} 条 chunk")

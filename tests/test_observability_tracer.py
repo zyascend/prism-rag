@@ -11,7 +11,10 @@ class TestSpan:
         assert span.started_at is not None
 
     def test_span_finish_sets_duration(self):
+        import time
+
         span = Span(name="test_op")
+        time.sleep(0.001)
         span.finish()
         assert span.finished_at is not None
         assert span.duration_ms > 0
@@ -64,7 +67,10 @@ class TestTrace:
         assert trace.spans[0].name == "op"
 
     def test_trace_finish(self):
+        import time
+
         trace = Trace(query="q", config_label="c")
+        time.sleep(0.001)
         trace.finish()
         assert trace.finished_at is not None
         assert trace.duration_ms > 0

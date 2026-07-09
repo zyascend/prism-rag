@@ -1,0 +1,10 @@
+# config/models.local-dev.yaml
+ingestion:
+  parser: simple
+retrieval:
+  use_visual: false
+  use_rerank: true
+llm:
+  base_url: https://token.sensenova.cn/v1
+  api_key: sk-9KsXrrsbMc3AVC8fH76syyHu6S1Mt3f2
+  model: deepseek-v4-flash

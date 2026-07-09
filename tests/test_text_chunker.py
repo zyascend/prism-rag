@@ -166,3 +166,97 @@ class TestCleanMarkdown:
         for c in chunks:
             assert "TO 35E1-2-13-1" in c.doc_ref
             assert "TO 35E1-2-13-1" not in c.text  # stripped from text
+
+
+# ─── 表格分隔行归一化 + 大表保护 ─────────────────────────────────
+
+class TestTableSeparatorNormalization:
+    """验证 _normalize_separator_row 与 chunk_page 表格分支"""
+
+    def test_injects_separator_when_missing(self):
+        """缺 |---|---| 的表格应在首行后注入分隔行，成为合法 GFM"""
+        chunker = TextChunker()
+        # ViDoRe 形态：首行表头 + 第二行直接数据，无分隔行
+        text = (
+            "| Design Number | Description | Interval |\n"
+            "| D-001 | inspect pump | 50h |\n"
+            "| D-002 | replace seal | 200h |"
+        )
+        chunks = chunker.chunk_page(page_id=1, doc_id="d1", page_number=1, markdown_text=text)
+        assert len(chunks) == 1
+        assert chunks[0].chunk_type == "table"
+        lines = chunks[0].text.split("\n")
+        # 第 0 行表头，第 1 行应为注入的分隔行
+        assert lines[0] == "| Design Number | Description | Interval |"
+        assert lines[1] == "|---|---|---|"
+
+    def test_keeps_existing_separator(self):
+        """已有分隔行的表格不应被改动"""
+        chunker = TextChunker()
+        text = (
+            "| A | B |\n|---|---|\n| 1 | 2 |"
+        )
+        chunks = chunker.chunk_page(page_id=1, doc_id="d1", page_number=1, markdown_text=text)
+        assert len(chunks) == 1
+        assert "|---|---|" in chunks[0].text
+        assert chunks[0].text.count("|---|---|") == 1
+
+    def test_skips_caption_then_table(self):
+        """表格上方有 caption 行（无空行直接粘连）→ caption 作为表格前缀保留，
+        真实表头之后注入分隔行，而非误把 caption 当表头"""
+        chunker = TextChunker()
+        text = (
+            "Maintenance 3. Table\n"
+            "| Design Number | Interval |\n"
+            "| D-001 | 50h |"
+        )
+        chunks = chunker.chunk_page(page_id=1, doc_id="d1", page_number=1, markdown_text=text)
+        table_chunks = [c for c in chunks if c.chunk_type == "table"]
+        assert len(table_chunks) == 1
+        tlines = table_chunks[0].text.split("\n")
+        # caption 作为前缀保留在表格块内
+        assert tlines[0] == "Maintenance 3. Table"
+        # 真实表头紧随其后，且其后注入了分隔行
+        assert tlines[1] == "| Design Number | Interval |"
+        assert tlines[2] == "|---|---|"
+        assert "Maintenance 3. Table" in table_chunks[0].text
+
+    def test_large_table_split_reuses_header_and_separator(self):
+        """超长表格（无分隔行）被切分后，每个子块都带表头+分隔行，且未被按词切碎"""
+        chunker = TextChunker(max_tokens=20)  # max_chars=80，强制切分
+        header = "| ID | Name |\n"
+        rows = "".join(f"| {i:05d} | item-{i} |\n" for i in range(12))
+        text = header + rows  # 无分隔行
+        chunks = chunker.chunk_page(page_id=1, doc_id="d1", page_number=1, markdown_text=text)
+        table_chunks = [c for c in chunks if c.chunk_type == "table"]
+        assert len(table_chunks) >= 2  # 确实被切分了
+        for c in table_chunks:
+            cl = c.text.split("\n")
+            # 每个子块都以表头 + 注入分隔行开头
+            assert cl[0] == "| ID | Name |"
+            assert cl[1] == "|---|---|"
+            # 未被按词切碎：每行仍含 ≥2 个管道符
+            pipe_rows = [ln for ln in cl if ln.count("|") >= 2]
+            assert len(pipe_rows) >= 2
+            # 不应出现把 |---|---| 切断的半截行
+            assert not any("---" in ln and ln.count("|") < 2 for ln in cl)
+
+    def test_vidore_style_table_becomes_valid_gfm(self):
+        """真实 ViDoRe 工业手册表格（caption 直接粘连 + 无分隔行）规范化后
+        成为合法 GFM：caption 前缀 + 表头 + 注入分隔行 + 数据"""
+        chunker = TextChunker()
+        text = (
+            "Table 7. Pressure limits\n"
+            "| Parameter | Min | Max | Unit |\n"
+            "| Inlet | 1.0 | 2.5 | bar |\n"
+            "| Outlet | 0.5 | 1.8 | bar |"
+        )
+        chunks = chunker.chunk_page(page_id=1, doc_id="d1", page_number=1, markdown_text=text)
+        table_chunks = [c for c in chunks if c.chunk_type == "table"]
+        assert len(table_chunks) == 1
+        tl = table_chunks[0].text.split("\n")
+        assert tl[0] == "Table 7. Pressure limits"   # caption 前缀
+        assert tl[1] == "| Parameter | Min | Max | Unit |"
+        assert tl[2] == "|---|---|---|---|"
+        # caption 仍存在于表格块中
+        assert any("Pressure limits" in c.text for c in chunks)

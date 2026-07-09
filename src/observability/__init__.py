@@ -4,7 +4,6 @@
 消费侧 (observability/): dashboard, reporter
 """
 import logging
-from datetime import datetime, timezone
 
 from src.observability.alerting import AlertChecker
 from src.observability.collectors import (
