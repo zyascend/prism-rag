@@ -349,6 +349,13 @@ prism-rag/
 - [x] 干净归因：表格摘要分块削弱文本路 NDCG（Dense -7.6% / BM25 -4.1%），视觉路持平；生成端 ContextRelevancy = **0.2626**（⚠️ 见 §9 footnote ①：此数非本特性增益，且非全 run 最高）
 - [x] 结论：特性主目标（生成端收益）达成，方向正确，保留；详见 §9
 
+**增量更新/删除优化（分支 `feat/incremental-update-delete`，Spec `docs/incremental-update-optimization-spec-2026-07-16.md`）：**
+- [x] **P0（D2 正确性）**：删文档后已删内容仍被 BM25 召回的 bug 修复（`delete_document` 三路统一编排：pg→bm25→faiss；pg 删除前先取受影响 id）。
+- [x] **P1（D1 FAISS orphan + U2 副本幂等）**：FAISS 墓碑 + 异步 compact；`documents` 表内容哈希幂等（同 PDF 重入库复用 doc_id，不产副本）；ingest 哈希覆盖。
+- [x] **P2（效率 + 规模）**：① BM25 弃用 `rank_bm25.BM25Okapi` 全量重建，改为自维护统计 + `fit_incremental`/`remove_chunks`（O(vocab) 重算 idf，消 U1）；打分公式与本项目所装 rank_bm25 逐位一致（NDCG 不漂移）。② page 级 `page_hash` diff：同 doc_id 修改版仅重编码变化页，未变页跳过 ColQwen2（省 GPU）；`routes.py` 跳过每次 ingest 后的全量 `fit_from_pgvector`。③ 原子快照切换：FAISS `os.replace` + BM25 临时文件 `os.replace` + pg `chunks_staging` 事务内 RENAME swap（零停机大批量刷新）。
+- [x] **验证（本地）**：`test_p2_incremental` + `test_lifecycle` + `test_faiss_lifecycle` + `test_pdf_ingestor` 共 21 项全过；ruff 全绿。评测公式对照 `test_bm25_scores_match_rank_bm25` 通过。
+- [ ] **待办（收尾）**：commit 分支 → 上云用已部署 ColQwen2 跑全量评测（确认 NDCG 不漂移、page diff 省 GPU 生效）→ 提 PR。⚠️ 本地禁全量评测（依赖远程 PG / ColQwen2）。
+
 ### 🔜 下一步
 
 **P0 — NDCG 修复后重跑全量评测：**

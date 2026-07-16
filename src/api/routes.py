@@ -204,7 +204,7 @@ async def ingest(file: UploadFile = File(...)):
     try:
         result = PDFIngestor(
             retriever.pg, retriever.faiss, retriever.bge,
-            retriever.colpali, retriever.chunker,
+            retriever.colpali, retriever.chunker, bm25=retriever.bm25,
         ).ingest(pdf_path, doc_id=doc_id)
     except Exception as e:
         retriever.pg.delete_by_doc_id(doc_id)
@@ -216,7 +216,9 @@ async def ingest(file: UploadFile = File(...)):
                 pass
         logger.error(f"ingest failed: {e}")
         raise HTTPException(status_code=500, detail="Ingestion failed")
-    retriever.bm25.fit_from_pgvector(retriever.pg)
+    # P2-A：BM25 已通过 ingestor 增量维护；仅当为空（首篇/重启未加载）才全量 refit
+    if not retriever.bm25.ready:
+        retriever.bm25.fit_from_pgvector(retriever.pg)
     if cfg.get("retrieval.use_visual", True):
         retriever.faiss.save()
     return IngestResponse(**result)
