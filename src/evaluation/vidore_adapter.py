@@ -56,6 +56,34 @@ class PrismRAGRetriever:
         self.hyde = hyde
         self.zerank_reranker = zerank_reranker
 
+    def delete_document(self, doc_id: str) -> dict:
+        """删除一份文档，保证三路不再返回其内容（修复 D2 正确性缺陷）。
+
+        严格顺序（修复 D4 删除顺序脆弱）：
+          1. 先取该 doc 的 chunk_id / page_id（pg 行删前取，避免丢引用）
+          2. pg.delete_by_doc_id（真相源，已 commit）
+          3. bm25.remove_chunks（修复 D2：已删内容不再进入 RRF/答案）
+          4. faiss.delete_by_doc_id（墓碑，修复 D1：视觉向量不再参与 MaxSim）
+          5. faiss.maybe_compact（墓碑占比高时物理回收）
+        """
+        chunk_ids = set(self.pg.get_chunk_ids_by_doc_id(doc_id))
+        page_ids = self.pg.get_page_ids_by_doc_id(doc_id)
+
+        deleted_rows = self.pg.delete_by_doc_id(doc_id)
+        removed_bm25 = self.bm25.remove_chunks(chunk_ids)
+
+        faiss_removed = self.faiss.delete_by_doc_id(doc_id)
+        faiss_compacted = self.faiss.maybe_compact()
+
+        return {
+            "doc_id": doc_id,
+            "pg_deleted_rows": deleted_rows,
+            "bm25_removed": removed_bm25,
+            "faiss_removed": faiss_removed,
+            "faiss_compacted": faiss_compacted,
+            "page_ids": page_ids,
+        }
+
     def search(
         self,
         query: str,
