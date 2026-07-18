@@ -127,6 +127,18 @@ def set_generator(g):
     _generator = g
 
 
+@app.post("/cache/invalidate")
+async def invalidate_cache():
+    """失效检索缓存（重索引 / 语料变更后调用）。
+
+    检索缓存以 index_version 为盐，本端点递增版本并清空内存缓存，
+    确保后续请求重新检索而非命中旧结果。返回当前 index_version。
+    """
+    retriever = get_retriever()
+    retriever.invalidate_cache()
+    return {"status": "ok", "index_version": retriever.index_version}
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health():
     retriever = get_retriever()

@@ -346,6 +346,15 @@ prism-rag/
   - ③ `MetricsCollector` 增 `_trace_by_id` 内存索引（FIFO cap=2000）+ 磁盘 JSONL 持久化（`logs/api_traces.jsonl`，由 `config observability.trace_persist_path` 控制，空串关闭）；`get_trace(id)` 内存优先、未命中回退扫描磁盘（覆盖进程重启）
   - **效果**：拿响应 `X-Trace-Id` → `GET /trace/{id}` 即可看 retrieval_trace + generation.context，二分定位"检索层 vs 生成层"错误，端到端可落地（聚焦单测已验证）
 
+**检索缓存（2026-07-18, `feat/cache-layers`）— L3 结果缓存 + 全局开关 + 可观测命中率：**
+- [x] **CacheStore 抽象 + InMemoryLRUCache**（`src/cache/store.py`）：进程内 LRU 淘汰 + 可选 TTL 兜底；RedisCache 预留接口（多 worker 场景）
+- [x] **L3 检索结果缓存**（`PrismRAGRetriever.search_with_trace` 包裹）：key = 归一化 query + k + 各路开关 + reranker_type + index_version 盐；命中跳过三路检索+融合+重排
+- [x] **index_version 版本盐失效**：`delete_document` 调 `invalidate_cache()`（版本+1，旧 key 天然失效，零脏读）；新增 `POST /cache/invalidate` 端点供重索引后失效服务侧缓存
+- [x] **全局开关**（`cache.enabled`，`src/config.py` CacheConfig + `models.yaml` cache 段）：门控所有缓存层，运行时每请求读取，关闭即穿透
+- [x] **可观测 cache 命中率**（`MetricsCollector.record_cache_event` + `ConfigMetrics.retrieval_cache_hit_rate`）：命中写 `retrieval` span（cache_hit=True，供 `GET /trace/{id}` 可见）+ 聚合命中率进 report
+- [x] 正确性约束：key 含全部检索开关；`visual_query_embedding` 非 None 按 tensor hash 编 key；TTL 仅兜底不依赖正确性
+- 聚焦单测 `tests/test_retrieval_cache.py` 全过（LRU/TTL、命中率聚合、cache_key 归一化+版本盐、命中/未命中、全局开关关闭）
+
 **表格摘要 + 大表保护（2026-07-09, `runs/20260709-table-summary-ndcg`）— 实现后首次云端全量验证：**
 - [x] 重新入库（`ingest_vidore.py --skip-faiss`, `table_summary_enabled=True`；chunks 8835 = text 6530 + table 2305，table_summary 100% 非空）
 - [x] 复用 ColQwen2 视觉 FAISS 索引（未重编码，省 GPU 时间）

@@ -45,6 +45,7 @@ class ConfigMetrics:
     avg_reranked_count: float = 0.0
     # 缓存
     hyde_hit_rate: float = 0.0
+    retrieval_cache_hit_rate: float = 0.0
     # 质量
     avg_faithfulness: float = 0.0
     avg_answer_relevancy: float = 0.0
@@ -69,7 +70,10 @@ class ConfigMetrics:
                 "avg_fused": round(self.avg_fused_count, 2),
                 "avg_reranked": round(self.avg_reranked_count, 2),
             },
-            "cache": {"hyde_hit_rate": round(self.hyde_hit_rate, 2)},
+            "cache": {
+                "hyde_hit_rate": round(self.hyde_hit_rate, 2),
+                "retrieval_cache_hit_rate": round(self.retrieval_cache_hit_rate, 2),
+            },
             "quality": {
                 "avg_faithfulness": round(self.avg_faithfulness, 4),
                 "avg_answer_relevancy": round(self.avg_answer_relevancy, 4),
@@ -117,6 +121,8 @@ class MetricsCollector:
         self._ragas_scores: dict[str, list[dict[str, float]]] = {}  # config_label -> [{f, ar}]
         self._ragas_details: dict[str, list[dict[str, Any]]] = {}  # config_label -> [per-query detail]
         self._alerts: list[AlertEvent] = []
+        # 缓存命中统计：config_label -> layer -> {hits, misses}
+        self._cache_data: dict[str, dict[str, dict[str, int]]] = {}
         # 单条 Trace 反查索引（trace_id -> trace dict）与磁盘持久化状态
         self._trace_by_id: dict[str, dict[str, Any]] = {}
         self._trace_id_order: list[str] = []  # FIFO 顺序，配合 _TRACE_MEM_CAP 淘汰
@@ -138,6 +144,7 @@ class MetricsCollector:
             self._ragas_scores.clear()
             self._ragas_details.clear()
             self._alerts.clear()
+            self._cache_data.clear()
             self._trace_by_id.clear()
             self._trace_id_order.clear()
 
@@ -185,6 +192,25 @@ class MetricsCollector:
                         self._hyde_data[label]["hits"] += 1
                     else:
                         self._hyde_data[label]["misses"] += 1
+
+    def record_cache_event(self, layer: str, hit: bool, config_label: str = "api") -> None:
+        """记录一次缓存命中/未命中事件，用于聚合各层 cache 命中率。
+
+        Args:
+            layer: 缓存层标识，如 "retrieval"（L3 检索结果缓存）、"hyde"（已有）。
+            hit: True=命中，False=未命中。
+            config_label: 检索配置标签；在线请求默认 "api"，评测时继承 config_label。
+        """
+        with self._lock:
+            if config_label not in self._cache_data:
+                self._cache_data[config_label] = {}
+            layer_data = self._cache_data[config_label]
+            if layer not in layer_data:
+                layer_data[layer] = {"hits": 0, "misses": 0}
+            if hit:
+                layer_data[layer]["hits"] += 1
+            else:
+                layer_data[layer]["misses"] += 1
 
     def _resolve_trace_log_path(self) -> Path | None:
         """按 config 解析磁盘持久化路径；空字符串表示关闭持久化。"""
@@ -314,6 +340,14 @@ class MetricsCollector:
                 total = hd["hits"] + hd["misses"]
                 if total > 0:
                     metrics.hyde_hit_rate = hd["hits"] / total
+
+            # Retrieval cache hit rate
+            if config_label in self._cache_data:
+                cd = self._cache_data[config_label]
+                if "retrieval" in cd:
+                    total = cd["retrieval"]["hits"] + cd["retrieval"]["misses"]
+                    if total > 0:
+                        metrics.retrieval_cache_hit_rate = cd["retrieval"]["hits"] / total
 
             # RAGAS
             if config_label in self._ragas_scores:

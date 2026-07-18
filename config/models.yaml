@@ -57,3 +57,8 @@ observability:
     faithfulness_min: 0.6
     rerank_score_min: 0.0        # 最低 rerank_score 告警阈值（0 = 暂不启用）
     context_relevancy_min: 0.05  # Context Relevance 最低阈值
+
+cache:
+  enabled: true                # 全局开关：是否启用检索缓存（L3 结果缓存等）
+  max_size: 2048               # 内存 LRU 容量（条目数）
+  ttl_seconds: 0               # 0 = 仅依赖 index_version 盐失效；>0 仅作跨进程异常兜底
