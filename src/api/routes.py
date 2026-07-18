@@ -23,6 +23,7 @@ from src.retrieval.fusion import RRFFusion
 from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
 from src.observability.middleware import ObservabilityMiddleware
+from src.observability import get_collector
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
 
@@ -136,6 +137,19 @@ async def health():
     )
 
 
+@app.get("/trace/{trace_id}")
+async def get_trace(trace_id: str):
+    """按 X-Trace-Id 反查单条请求的完整 Trace（检索各路 + 生成层 context/citations）。
+
+    用于生产态排查单条错误答案：拿到响应的 X-Trace-Id 后直接 GET 此端点，
+    即可看 context 是否含正确答案、定位在检索层还是生成层。
+    """
+    trace = get_collector().get_trace(trace_id)
+    if trace is None:
+        raise HTTPException(status_code=404, detail="Trace not found (may have been evicted or never persisted)")
+    return trace
+
+
 @app.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest):
     retriever = get_retriever()
@@ -229,19 +243,28 @@ async def ask(request: AskRequest):
     retriever = get_retriever()
     use_visual = cfg.get("retrieval.use_visual", True)
     try:
-        results = retriever.search(
+        search_result = retriever.search_with_trace(
             request.query, k=request.k,
             use_visual=use_visual, use_rerank=request.use_rerank,
         )
     except Exception as e:
         logger.error(f"search error: {e}")
         raise HTTPException(status_code=500, detail="Internal search error")
+    results = search_result["results"]
+    retrieval_trace = search_result["retrieval_trace"]
     if request.doc_id:
         results = [r for r in results if r.get("doc_id") == request.doc_id]
+    trace = RetrievalTrace(
+        bm25_top5=[RouteTraceItem(**t) for t in retrieval_trace["bm25_top5"]],
+        dense_top5=[RouteTraceItem(**t) for t in retrieval_trace["dense_top5"]],
+        visual_top5=[RouteTraceItem(**t) for t in retrieval_trace["visual_top5"]],
+    )
     if not results:
-        return AskResponse(query=request.query,
-                           answer="I don't have enough information to answer that question.",
-                           citations=[])
+        return AskResponse(
+            query=request.query,
+            answer="I don't have enough information to answer that question.",
+            citations=[], retrieval_trace=trace,
+        )
     try:
         gen = get_generator(retriever.bge).answer(request.query, results, k_context=request.k)
     except GenerationError as e:
@@ -249,4 +272,5 @@ async def ask(request: AskRequest):
     return AskResponse(
         query=request.query, answer=gen["answer"],
         citations=[Citation(**c) for c in gen["citations"]],
+        retrieval_trace=trace,
     )

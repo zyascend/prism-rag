@@ -16,7 +16,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
         # 从 request body 中提取 query 文本（不改变 body 流）
         query_text = "(API request)"
-        if request.method == "POST" and request.url.path == "/search":
+        if request.method == "POST" and request.url.path in ("/search", "/ask"):
             try:
                 body = await request.body()
                 import json

@@ -8,6 +8,7 @@ import openai
 
 from src.config import cfg
 from src.evaluation.ragas_metrics import compress_context
+from src.observability import get_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,18 @@ class Generator:
         self.bge = bge_embedder
 
     def answer(self, query: str, retrieved: List[dict], k_context: int = 5) -> dict:
-        top = retrieved[:k_context]
-        if not top:
-            return {"answer": "I don't have enough information to answer that question.",
-                    "citations": [], "context": ""}
+        tracer = get_tracer()
+        with tracer.start_span(
+            "generation", metadata={"model": self.model, "k_context": k_context}
+        ) as gen_span:
+            top = retrieved[:k_context]
+            if not top:
+                gen_span.set_metadata({
+                    "num_retrieved": 0, "num_citations": 0,
+                    "citations": [], "context": "",
+                })
+                return {"answer": "I don't have enough information to answer that question.",
+                        "citations": [], "context": ""}
 
         # 表格 chunk 检索时按摘要定位，但生成时必须展开完整 Markdown 表格喂给 LLM，
         # 因此整表跳过 compress_context（句级压缩会把表格行删掉，破坏结构）。
@@ -82,4 +91,11 @@ class Generator:
              "snippet": (r.get("text") or "")[:200]}
             for r in top
         ]
+        # 完整 context 写入 span metadata —— 排查"context 里有没有答案"的关键
+        gen_span.set_metadata({
+            "num_retrieved": len(top),
+            "num_citations": len(citations),
+            "citations": citations,
+            "context": context,
+        })
         return {"answer": answer_text, "citations": citations, "context": context}

@@ -1,13 +1,21 @@
 """指标收集器 — 按 config 聚合延迟、命中、质量指标"""
 from __future__ import annotations
 
+import json
 import statistics
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from src.observability.tracer import Trace
+
+# 项目根目录（collectors.py 位于 src/observability/）
+_ROOT = Path(__file__).resolve().parent.parent.parent
+# 内存中保留的可反查 Trace 上限（FIFO），防止长时间运行撑爆内存；
+# 超过后最旧的从内存淘汰，但仍可在磁盘 JSONL 中查到。
+_TRACE_MEM_CAP = 2000
 
 
 def _utcnow() -> datetime:
@@ -109,6 +117,10 @@ class MetricsCollector:
         self._ragas_scores: dict[str, list[dict[str, float]]] = {}  # config_label -> [{f, ar}]
         self._ragas_details: dict[str, list[dict[str, Any]]] = {}  # config_label -> [per-query detail]
         self._alerts: list[AlertEvent] = []
+        # 单条 Trace 反查索引（trace_id -> trace dict）与磁盘持久化状态
+        self._trace_by_id: dict[str, dict[str, Any]] = {}
+        self._trace_id_order: list[str] = []  # FIFO 顺序，配合 _TRACE_MEM_CAP 淘汰
+        self._trace_log_path: Path | None = None  # 懒加载：首次 ingest 时按 config 解析
         self._span_hit_names = {
             "bm25_search": "bm25",
             "dense_search": "dense",
@@ -126,12 +138,29 @@ class MetricsCollector:
             self._ragas_scores.clear()
             self._ragas_details.clear()
             self._alerts.clear()
+            self._trace_by_id.clear()
+            self._trace_id_order.clear()
 
     def ingest_trace(self, trace: Trace) -> None:
         """接收一个已完成的 Trace，提取指标并聚合"""
         with self._lock:
             label = trace.config_label
-            self._traces.append(trace.to_dict())
+            trace_dict = trace.to_dict()
+            self._traces.append(trace_dict)
+
+            # ── 单条反查索引（内存）───
+            tid = trace_dict["trace_id"]
+            if tid in self._trace_by_id:
+                self._trace_id_order.remove(tid)
+            self._trace_by_id[tid] = trace_dict
+            self._trace_id_order.append(tid)
+            # FIFO 淘汰最旧的（磁盘仍保留）
+            while len(self._trace_id_order) > _TRACE_MEM_CAP:
+                old = self._trace_id_order.pop(0)
+                self._trace_by_id.pop(old, None)
+
+            # ── 磁盘持久化（进程重启后仍可反查）───
+            self._persist_trace(trace_dict)
 
             # 延迟
             if label not in self._latencies:
@@ -156,6 +185,64 @@ class MetricsCollector:
                         self._hyde_data[label]["hits"] += 1
                     else:
                         self._hyde_data[label]["misses"] += 1
+
+    def _resolve_trace_log_path(self) -> Path | None:
+        """按 config 解析磁盘持久化路径；空字符串表示关闭持久化。"""
+        if self._trace_log_path is not None:
+            return self._trace_log_path  # 可能是 None（已关闭）
+        from src.config import cfg
+        raw = cfg.observability.trace_persist_path
+        if not raw:
+            self._trace_log_path = None
+            return None
+        p = Path(raw)
+        if not p.is_absolute():
+            p = _ROOT / p
+        self._trace_log_path = p
+        return p
+
+    def _persist_trace(self, trace_dict: dict[str, Any]) -> None:
+        """将单条 Trace 追加写入磁盘 JSONL。任何异常都被吞掉，绝不影响主流程。"""
+        try:
+            path = self._resolve_trace_log_path()
+            if path is None:
+                return
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(trace_dict, ensure_ascii=False) + "\n")
+        except Exception:
+            # 持久化是排查辅助能力，失败不影响请求
+            pass
+
+    def get_trace(self, trace_id: str) -> dict[str, Any] | None:
+        """按 trace_id 反查单条 Trace。
+
+        优先命中内存索引；未命中时回退扫描磁盘 JSONL（覆盖进程重启后的场景）。
+        返回完整 trace dict（含各 span 的 metadata，如 generation 的 context/citations）。
+        """
+        with self._lock:
+            hit = self._trace_by_id.get(trace_id)
+        if hit is not None:
+            return hit
+        # 内存未命中 → 扫描磁盘（仅用于重启后或已被 FIFO 淘汰的旧 trace）
+        try:
+            path = self._resolve_trace_log_path()
+            if path is None or not path.exists():
+                return None
+            with path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if rec.get("trace_id") == trace_id:
+                        return rec
+        except Exception:
+            pass
+        return None
 
     def record_ragas_score(
         self, config_label: str, query_id: str,
