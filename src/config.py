@@ -23,6 +23,9 @@ class ObservabilityConfig:
     log_file: str = "logs/app.jsonl"
     trace_enabled: bool = True
     dashboard_enabled: bool = True
+    # 单条 Trace 的磁盘持久化路径（相对项目根，可被 YAML 覆盖）。
+    # 置空字符串 "" 可关闭持久化（仅内存，进程重启后无法反查）。
+    trace_persist_path: str = "logs/api_traces.jsonl"
     latency_p95_threshold_ms: int = 5000
     recall_at_5_min: float = 0.5
     faithfulness_min: float = 0.6
@@ -148,6 +151,7 @@ class Config:
             log_file=raw.get("log_file", "logs/app.jsonl"),
             trace_enabled=raw.get("trace_enabled", True),
             dashboard_enabled=raw.get("dashboard_enabled", True),
+            trace_persist_path=raw.get("trace_persist_path", "logs/api_traces.jsonl"),
             latency_p95_threshold_ms=alerting_raw.get("latency_p95_threshold_ms", 5000),
             recall_at_5_min=alerting_raw.get("recall_at_5_min", 0.5),
             faithfulness_min=alerting_raw.get("faithfulness_min", 0.6),

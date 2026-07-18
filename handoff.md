@@ -340,6 +340,11 @@ prism-rag/
 - [x] **Observability 模块实现**（tracer → collector → alerting → logging → middleware → dashboard → reporter，38 测试全过，lint 干净）
 - [x] **Span 注入**：BM25/Dense/Visual/HyDE/Reranker + PrismRAGRetriever + RAGAS metrics
 - [x] **API Middleware**：自动 HTTP Trace + X-Trace-Id 响应头
+- [x] **线上单条答案排查闭环（2026-07-18, `feat/observability-trace-gaps`）**：补齐此前三块缺口 —
+  - ① 生成层埋点：`Generator.answer` 包 `tracer.start_span("generation")`，metadata 含 model/k_context/num_retrieved/num_citations/citations/完整 context
+  - ② `/ask` 返回 `retrieval_trace`（bm25/dense/visual top5，复用 `search_with_trace`）；新增 `GET /trace/{trace_id}` 反查端点（404 if not found）
+  - ③ `MetricsCollector` 增 `_trace_by_id` 内存索引（FIFO cap=2000）+ 磁盘 JSONL 持久化（`logs/api_traces.jsonl`，由 `config observability.trace_persist_path` 控制，空串关闭）；`get_trace(id)` 内存优先、未命中回退扫描磁盘（覆盖进程重启）
+  - **效果**：拿响应 `X-Trace-Id` → `GET /trace/{id}` 即可看 retrieval_trace + generation.context，二分定位"检索层 vs 生成层"错误，端到端可落地（聚焦单测已验证）
 
 **表格摘要 + 大表保护（2026-07-09, `runs/20260709-table-summary-ndcg`）— 实现后首次云端全量验证：**
 - [x] 重新入库（`ingest_vidore.py --skip-faiss`, `table_summary_enabled=True`；chunks 8835 = text 6530 + table 2305，table_summary 100% 非空）
