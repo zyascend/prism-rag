@@ -140,6 +140,18 @@ async def invalidate_cache():
     return {"status": "ok", "index_version": retriever.index_version}
 
 
+@app.get("/prompts")
+async def list_prompt_versions():
+    """只读：列出所有 prompt 的当前生效版本与版本历史。
+
+    用于排查线上当前生效的是哪一版 prompt。方案 A 不提供写入/切换端点，
+    改 prompt 走"改 YAML → code review → 发版"流程。
+    """
+    from src.prompts import list_prompts
+
+    return {"status": "ok", "prompts": list_prompts()}
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health():
     retriever = get_retriever()

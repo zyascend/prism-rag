@@ -1,0 +1,14 @@
+id: hyde
+description: HyDE 查询改写 - 为 query 生成假设性技术段落（hyde.py）
+versions:
+  - version: 1
+    created_at: "2026-07-18"
+    author: yang
+    changelog: "初始版本，从 hyde.py HYDE_PROMPT 迁移，文本零改动（原为字符串拼接，首句合并为一行）"
+    active: true
+    template: |-
+      Write a technical passage that answers the following question about industrial documents. Be specific and factual.
+
+      Question: {query}
+
+      Passage:

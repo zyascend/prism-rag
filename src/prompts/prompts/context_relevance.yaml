@@ -1,0 +1,18 @@
+id: context_relevance
+description: RAGAS Context Relevance - 逐句判断是否与问题相关（ragas_metrics.py）
+# 注意：本模板经 str.format() 注入，JSON 大括号需保留双写 {{ }} 转义，勿改。
+versions:
+  - version: 1
+    created_at: "2026-07-18"
+    author: yang
+    changelog: "初始版本，从 ragas_metrics.py CONTEXT_RELEVANCE_PROMPT 迁移，文本零改动（含 {{ }} 转义）"
+    active: true
+    template: |-
+      Please evaluate whether each sentence below is relevant to answering the given question.
+      A sentence is relevant if it contains information that could help answer the question,
+      even indirectly. Reply with a JSON array: [{{"id": <number>, "relevant": true/false}}, ...]
+
+      Question: {query}
+
+      Sentences:
+      {sentences}

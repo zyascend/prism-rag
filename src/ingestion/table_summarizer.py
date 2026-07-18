@@ -12,18 +12,12 @@ import logging
 from functools import lru_cache
 
 from src.evaluation.ragas_metrics import call_llm
+from src.prompts import get_active
 
 logger = logging.getLogger(__name__)
 
-_TABLE_SUMMARY_PROMPT = """\
-You are a precise technical writer. Summarize the following markdown table into \
-1-3 factual sentences that describe: (1) what the table is about, (2) its columns, \
-and (3) any notable rows or extreme values. Do NOT invent data not present in the table. \
-Output only the summary, no preamble.
-
-Table:
-{table}
-"""
+# 模板已外置到 src/prompts/prompts/table_summary.yaml，import 期解析为生效版本文本。
+_TABLE_SUMMARY_PROMPT = get_active("table_summary").template
 
 
 class TableSummarizer:

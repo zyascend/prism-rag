@@ -9,6 +9,7 @@ import openai
 from src.config import cfg
 from src.evaluation.ragas_metrics import compress_context
 from src.observability import get_tracer
+from src.prompts import get_active
 
 logger = logging.getLogger(__name__)
 
@@ -73,11 +74,10 @@ class Generator:
 
         context = "\n\n".join(table_parts[i] for i in sorted(table_parts))
 
+        pv = get_active("answer_generation")
         prompt = [
-            {"role": "system", "content":
-             "You are a precise assistant. Answer ONLY from the provided context. "
-             "If the context lacks the answer, say you don't know."},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"},
+            {"role": "system", "content": pv.system},
+            {"role": "user", "content": pv.render("user", context=context, query=query)},
         ]
         try:
             resp = self.client.chat.completions.create(
