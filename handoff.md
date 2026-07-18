@@ -346,6 +346,19 @@ prism-rag/
   - ③ `MetricsCollector` 增 `_trace_by_id` 内存索引（FIFO cap=2000）+ 磁盘 JSONL 持久化（`logs/api_traces.jsonl`，由 `config observability.trace_persist_path` 控制，空串关闭）；`get_trace(id)` 内存优先、未命中回退扫描磁盘（覆盖进程重启）
   - **效果**：拿响应 `X-Trace-Id` → `GET /trace/{id}` 即可看 retrieval_trace + generation.context，二分定位"检索层 vs 生成层"错误，端到端可落地（聚焦单测已验证）
 
+**检索缓存（2026-07-18, `feat/cache-layers`）— L3 结果缓存 + L4 Answer 缓存 + 全局开关 + 可观测命中率：**
+- [x] **CacheStore 抽象 + InMemoryLRUCache**（`src/cache/store.py`）：进程内 LRU 淘汰 + 可选 TTL 兜底；RedisCache 预留接口（多 worker 场景）
+- [x] **L3 检索结果缓存**（`PrismRAGRetriever.search_with_trace` 包裹）：key = 归一化 query + k + 各路开关 + reranker_type + index_version 盐；命中跳过三路检索+融合+重排
+- [x] **L4 Answer 缓存**（`/ask` 包裹 + `PrismRAGRetriever._answer_cache`/`answer_cache_key`）：命中跳过整次 LLM 生成；key 含 归一化 query + model + k_context + doc_id + index_version 盐
+- [x] **Generator.cacheable 确定性守卫**（`generator.py`：`temperature==0` 才可缓存，非确定性生成不读不写 L4）
+- [x] **index_version 版本盐失效（`invalidate_cache` 同时清 L3 + L4）**：`delete_document` 调 `invalidate_cache()`（版本+1，旧 key 天然失效，零脏读）；新增 `POST /cache/invalidate` 端点供重索引后失效服务侧缓存
+- [x] **全局开关**（`cache.enabled`，`src/config.py` CacheConfig + `models.yaml` cache 段）：门控所有缓存层（L3/L4），运行时每请求读取，关闭即穿透
+- [x] **可观测 cache 命中率**（`MetricsCollector.record_cache_event` + `ConfigMetrics.retrieval_cache_hit_rate` + `answer_cache_hit_rate`）：命中写 `retrieval`/`answer` 事件（供 `GET /trace/{id}` 可见）+ 聚合两层命中率进 report
+- [x] **K1 修复**：`vidore_adapter.py:349` fused 末路径 cache miss 补 `config_label=config_label`（原漏传默认 `"api"`，仅指标归类偏差，非正确性 bug）
+- [x] 正确性约束：L3 key 含全部检索开关、`doc_id` 在路由层后置过滤不入 key（C1）；L4 key 含 doc_id/model/k_context（C6）；`visual_query_embedding` 非 None 按 tensor hash 编 key；TTL 仅兜底不依赖正确性
+- 聚焦单测 `tests/test_retrieval_cache.py` 全过（11 个：LRU/TTL、retrieval+answer 命中率聚合、cache_key 归一化+版本盐、L4 answer_cache_key/doc_id/版本盐、命中/未命中、全局开关关闭、K1 回归、`/ask` L4 集成）
+- 规格文档：`docs/cache-retrieval-spec-2026-07-18.md`（v1.1，含 L4 设计/C6/K1 已修复）
+
 **表格摘要 + 大表保护（2026-07-09, `runs/20260709-table-summary-ndcg`）— 实现后首次云端全量验证：**
 - [x] 重新入库（`ingest_vidore.py --skip-faiss`, `table_summary_enabled=True`；chunks 8835 = text 6530 + table 2305，table_summary 100% 非空）
 - [x] 复用 ColQwen2 视觉 FAISS 索引（未重编码，省 GPU 时间）

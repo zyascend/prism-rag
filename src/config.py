@@ -33,6 +33,21 @@ class ObservabilityConfig:
     context_relevancy_min: float = 0.05
 
 
+@dataclass
+class CacheConfig:
+    """检索缓存配置，从 YAML cache 段加载，缺失时使用默认值。
+
+    enabled: 全局开关，控制所有缓存层（L1/L3/L4）是否生效。
+    max_size: 内存 LRU 容量上限（条目数）。
+    ttl_seconds: 0 = 仅依赖 index_version 盐失效（推荐，正确性由版本保证）；
+                 >0 仅作跨进程异常兜底，不作为正确性依赖。
+    """
+
+    enabled: bool = True
+    max_size: int = 2048
+    ttl_seconds: int = 0
+
+
 class Config:
     """全局配置，单例模式"""
     _instance = None
@@ -157,6 +172,16 @@ class Config:
             faithfulness_min=alerting_raw.get("faithfulness_min", 0.6),
             rerank_score_min=alerting_raw.get("rerank_score_min", 0.0),
             context_relevancy_min=alerting_raw.get("context_relevancy_min", 0.05),
+        )
+
+    @property
+    def cache(self) -> "CacheConfig":
+        """返回 cache 配置，YAML 缺失时回退到默认值。"""
+        raw = self.get("cache", {})
+        return CacheConfig(
+            enabled=raw.get("enabled", True),
+            max_size=raw.get("max_size", 2048),
+            ttl_seconds=raw.get("ttl_seconds", 0),
         )
 
     @property

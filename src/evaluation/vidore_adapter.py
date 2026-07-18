@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import unicodedata
 from typing import List, Optional
 
 import torch
@@ -21,6 +23,8 @@ from src.retrieval.visual_retriever import VisualRetriever
 from src.observability import get_tracer, get_collector
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
+from src.config import cfg
+from src.cache.store import InMemoryLRUCache
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +59,11 @@ class PrismRAGRetriever:
         self.reranker = reranker
         self.hyde = hyde
         self.zerank_reranker = zerank_reranker
+        # ── 检索缓存（L3 结果缓存）──
+        self.index_version = 0  # 语料版本盐；语料变更时 +1，旧 key 天然失效
+        self._cache: "InMemoryLRUCache | None" = None  # 惰性创建（受 cache.enabled 控制）
+        # ── 答案缓存（L4 整次生成结果缓存）── 同样受 cache.enabled + index_version 盐控制
+        self._answer_cache: "InMemoryLRUCache | None" = None  # 惰性创建
 
     def delete_document(self, doc_id: str) -> dict:
         """删除一份文档，保证三路不再返回其内容（修复 D2 正确性缺陷）。
@@ -75,6 +84,9 @@ class PrismRAGRetriever:
         faiss_removed = self.faiss.delete_by_doc_id(doc_id)
         faiss_compacted = self.faiss.maybe_compact()
 
+        # 文档删除 = 语料变更 → 失效检索缓存（index_version 盐变化，旧 key 天然查不到）
+        self.invalidate_cache()
+
         return {
             "doc_id": doc_id,
             "pg_deleted_rows": deleted_rows,
@@ -83,6 +95,66 @@ class PrismRAGRetriever:
             "faiss_compacted": faiss_compacted,
             "page_ids": page_ids,
         }
+
+    def invalidate_cache(self) -> None:
+        """失效检索缓存：递增 index_version 并清空内存缓存。
+
+        语料任何变更（删除/重索引）后调用，确保旧缓存 key 因版本盐不匹配而失效，
+        杜绝脏读。调用方：delete_document、POST /cache/invalidate（重索引后）。
+        """
+        self.index_version += 1
+        if self._cache is not None:
+            self._cache.clear()
+        if self._answer_cache is not None:
+            self._answer_cache.clear()
+
+    def _cache_key(
+        self, query: str, k: int,
+        use_bm25: bool, use_dense: bool, use_visual: bool, use_rerank: bool,
+        visual_query_embedding: Optional[torch.Tensor], use_hyde: bool, reranker_type: str,
+    ) -> str:
+        """构造检索缓存 key：归一化 query + 全部检索开关 + reranker + index_version 盐。
+
+        key 必须包含影响结果的所有维度，否则不同配置会串结果。
+        index_version 保证语料变更后旧 key 自动失效（不依赖 TTL）。
+        """
+        norm = unicodedata.normalize("NFKC", query).lower().strip()
+        norm = " ".join(norm.split())
+        parts = [
+            f"q={norm}",
+            f"k={k}",
+            f"bm25={use_bm25}", f"dense={use_dense}", f"visual={use_visual}",
+            f"rerank={use_rerank}", f"hyde={use_hyde}", f"rt={reranker_type}",
+            f"v={self.index_version}",
+        ]
+        if visual_query_embedding is not None:
+            try:
+                tb = visual_query_embedding.detach().cpu().numpy().tobytes()
+                parts.append("ve=" + hashlib.sha256(tb).hexdigest()[:16])
+            except Exception:
+                parts.append("ve=unknown")
+        else:
+            parts.append("ve=none")
+        return "|".join(parts)
+
+    def answer_cache_key(
+        self, query: str, model: str, k_context: int, doc_id: Optional[str]
+    ) -> str:
+        """构造 L4 Answer 缓存 key：归一化 query + model + k_context + doc_id + index_version 盐。
+
+        与 L3 不同，doc_id 影响最终答案（路由层在检索后做确定性后置过滤），必须纳入 key；
+        index_version 保证语料变更后旧 key 自动失效（不依赖 TTL）。
+        """
+        norm = unicodedata.normalize("NFKC", query).lower().strip()
+        norm = " ".join(norm.split())
+        parts = [
+            f"q={norm}",
+            f"model={model}",
+            f"kctx={k_context}",
+            f"doc={doc_id or '*'}",
+            f"v={self.index_version}",
+        ]
+        return "|".join(parts)
 
     def search(
         self,
@@ -158,6 +230,33 @@ class PrismRAGRetriever:
             tracer.start_trace(query=query, config_label=config_label)
             owns_trace = True
 
+        # ── L3 Retrieval Cache ───────────────────────────────
+        cache_on = cfg.cache.enabled
+        cache_key: str | None = None
+        cached = None
+        if cache_on:
+            if self._cache is None:
+                self._cache = InMemoryLRUCache(max_size=cfg.cache.max_size)
+            cache_key = self._cache_key(
+                query, k, use_bm25, use_dense, use_visual, use_rerank,
+                visual_query_embedding, use_hyde, reranker_type,
+            )
+            cached = self._cache.get(cache_key)
+        if cached is not None:
+            # 命中：记录 cache 事件；仅当我们拥有该 trace 时发出轻量 trace（供 GET /trace/{id} 可见）
+            collector.record_cache_event("retrieval", hit=True, config_label=config_label)
+            if owns_trace:
+                with tracer.start_span("retrieval") as _span:
+                    _span.set_metadata({
+                        "cache_hit": True,
+                        "cache_layer": "retrieval",
+                        "num_results": len(cached.get("results", [])),
+                    })
+                _t = tracer.finish_trace()
+                if _t:
+                    collector.ingest_trace(_t)
+            return cached
+
         routes = []
         trace = {"bm25_top5": [], "dense_top5": [], "visual_top5": [], "hyde": ""}
 
@@ -229,7 +328,11 @@ class PrismRAGRetriever:
                 obs_trace = tracer.finish_trace()
                 if obs_trace:
                     collector.ingest_trace(obs_trace)
-            return {"results": [], "retrieval_trace": trace}
+            result = {"results": [], "retrieval_trace": trace}
+            if cache_on and self._cache is not None and cache_key is not None:
+                self._cache.put(cache_key, result)
+                collector.record_cache_event("retrieval", hit=False, config_label=config_label)
+            return result
 
         fused = self.fusion.fuse(routes, k=min(k * 2, 40))
 
@@ -253,10 +356,18 @@ class PrismRAGRetriever:
                 obs_trace = tracer.finish_trace()
                 if obs_trace:
                     collector.ingest_trace(obs_trace)
-            return {"results": reranked, "retrieval_trace": trace}
+            result = {"results": reranked, "retrieval_trace": trace}
+            if cache_on and self._cache is not None and cache_key is not None:
+                self._cache.put(cache_key, result)
+                collector.record_cache_event("retrieval", hit=False, config_label=config_label)
+            return result
 
         if owns_trace:
             obs_trace = tracer.finish_trace()
             if obs_trace:
                 collector.ingest_trace(obs_trace)
-        return {"results": fused[:k], "retrieval_trace": trace}
+        result = {"results": fused[:k], "retrieval_trace": trace}
+        if cache_on and self._cache is not None and cache_key is not None:
+            self._cache.put(cache_key, result)
+            collector.record_cache_event("retrieval", hit=False, config_label=config_label)
+        return result
