@@ -46,6 +46,7 @@ class ConfigMetrics:
     # 缓存
     hyde_hit_rate: float = 0.0
     retrieval_cache_hit_rate: float = 0.0
+    answer_cache_hit_rate: float = 0.0
     # 质量
     avg_faithfulness: float = 0.0
     avg_answer_relevancy: float = 0.0
@@ -73,6 +74,7 @@ class ConfigMetrics:
             "cache": {
                 "hyde_hit_rate": round(self.hyde_hit_rate, 2),
                 "retrieval_cache_hit_rate": round(self.retrieval_cache_hit_rate, 2),
+                "answer_cache_hit_rate": round(self.answer_cache_hit_rate, 2),
             },
             "quality": {
                 "avg_faithfulness": round(self.avg_faithfulness, 4),
@@ -348,6 +350,11 @@ class MetricsCollector:
                     total = cd["retrieval"]["hits"] + cd["retrieval"]["misses"]
                     if total > 0:
                         metrics.retrieval_cache_hit_rate = cd["retrieval"]["hits"] / total
+                # Answer cache hit rate (L4)
+                if "answer" in cd:
+                    total = cd["answer"]["hits"] + cd["answer"]["misses"]
+                    if total > 0:
+                        metrics.answer_cache_hit_rate = cd["answer"]["hits"] / total
 
             # RAGAS
             if config_label in self._ragas_scores:

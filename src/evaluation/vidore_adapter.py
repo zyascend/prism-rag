@@ -62,6 +62,8 @@ class PrismRAGRetriever:
         # ── 检索缓存（L3 结果缓存）──
         self.index_version = 0  # 语料版本盐；语料变更时 +1，旧 key 天然失效
         self._cache: "InMemoryLRUCache | None" = None  # 惰性创建（受 cache.enabled 控制）
+        # ── 答案缓存（L4 整次生成结果缓存）── 同样受 cache.enabled + index_version 盐控制
+        self._answer_cache: "InMemoryLRUCache | None" = None  # 惰性创建
 
     def delete_document(self, doc_id: str) -> dict:
         """删除一份文档，保证三路不再返回其内容（修复 D2 正确性缺陷）。
@@ -103,6 +105,8 @@ class PrismRAGRetriever:
         self.index_version += 1
         if self._cache is not None:
             self._cache.clear()
+        if self._answer_cache is not None:
+            self._answer_cache.clear()
 
     def _cache_key(
         self, query: str, k: int,
@@ -131,6 +135,25 @@ class PrismRAGRetriever:
                 parts.append("ve=unknown")
         else:
             parts.append("ve=none")
+        return "|".join(parts)
+
+    def answer_cache_key(
+        self, query: str, model: str, k_context: int, doc_id: Optional[str]
+    ) -> str:
+        """构造 L4 Answer 缓存 key：归一化 query + model + k_context + doc_id + index_version 盐。
+
+        与 L3 不同，doc_id 影响最终答案（路由层在检索后做确定性后置过滤），必须纳入 key；
+        index_version 保证语料变更后旧 key 自动失效（不依赖 TTL）。
+        """
+        norm = unicodedata.normalize("NFKC", query).lower().strip()
+        norm = " ".join(norm.split())
+        parts = [
+            f"q={norm}",
+            f"model={model}",
+            f"kctx={k_context}",
+            f"doc={doc_id or '*'}",
+            f"v={self.index_version}",
+        ]
         return "|".join(parts)
 
     def search(
@@ -346,5 +369,5 @@ class PrismRAGRetriever:
         result = {"results": fused[:k], "retrieval_trace": trace}
         if cache_on and self._cache is not None and cache_key is not None:
             self._cache.put(cache_key, result)
-            collector.record_cache_event("retrieval", hit=False)
+            collector.record_cache_event("retrieval", hit=False, config_label=config_label)
         return result

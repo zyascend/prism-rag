@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from src.cache.store import InMemoryLRUCache
 
 from src.config import cfg
 from src.evaluation.vidore_adapter import PrismRAGRetriever
@@ -254,6 +255,35 @@ async def ingest(file: UploadFile = File(...)):
 async def ask(request: AskRequest):
     retriever = get_retriever()
     use_visual = cfg.get("retrieval.use_visual", True)
+    collector = get_collector()
+    # L4 Answer 缓存的 config_label 与 L3 在线路径保持一致（空串：在线请求无 per-config 拆分）
+    cache_label = ""
+
+    # ── L4 Answer Cache ───────────────────────────────────────
+    gen = get_generator(retriever.bge)
+    answer_key = None
+    cached_answer = None
+    if cfg.cache.enabled and gen.cacheable:
+        if retriever._answer_cache is None:
+            retriever._answer_cache = InMemoryLRUCache(max_size=cfg.cache.max_size)
+        answer_key = retriever.answer_cache_key(
+            request.query, gen.model, request.k, request.doc_id,
+        )
+        cached_answer = retriever._answer_cache.get(answer_key)
+    if cached_answer is not None:
+        collector.record_cache_event("answer", hit=True, config_label=cache_label)
+        rt = cached_answer["retrieval_trace"]
+        trace = RetrievalTrace(
+            bm25_top5=[RouteTraceItem(**t) for t in rt["bm25_top5"]],
+            dense_top5=[RouteTraceItem(**t) for t in rt["dense_top5"]],
+            visual_top5=[RouteTraceItem(**t) for t in rt["visual_top5"]],
+        )
+        return AskResponse(
+            query=request.query, answer=cached_answer["answer"],
+            citations=[Citation(**c) for c in cached_answer["citations"]],
+            retrieval_trace=trace,
+        )
+
     try:
         search_result = retriever.search_with_trace(
             request.query, k=request.k,
@@ -278,11 +308,21 @@ async def ask(request: AskRequest):
             citations=[], retrieval_trace=trace,
         )
     try:
-        gen = get_generator(retriever.bge).answer(request.query, results, k_context=request.k)
+        gen_out = gen.answer(request.query, results, k_context=request.k)
     except GenerationError as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+    # 写入 L4 Answer 缓存（受全局开关 + 确定性守卫；命中率经 cache_label 聚合）
+    if cfg.cache.enabled and gen.cacheable and answer_key is not None and retriever._answer_cache is not None:
+        retriever._answer_cache.put(answer_key, {
+            "answer": gen_out["answer"],
+            "citations": gen_out["citations"],
+            "retrieval_trace": retrieval_trace,
+        })
+        collector.record_cache_event("answer", hit=False, config_label=cache_label)
+
     return AskResponse(
-        query=request.query, answer=gen["answer"],
-        citations=[Citation(**c) for c in gen["citations"]],
+        query=request.query, answer=gen_out["answer"],
+        citations=[Citation(**c) for c in gen_out["citations"]],
         retrieval_trace=trace,
     )

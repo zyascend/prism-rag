@@ -28,6 +28,8 @@ class Generator:
         self.client = client
         self.model = cfg.get("llm.model", "gpt-4o-mini")
         self.bge = bge_embedder
+        # 生成温度：硬编码 0.0 保证答案确定性，从而可安全缓存（L4 Answer 缓存守卫）。
+        self.temperature = 0.0
 
     def answer(self, query: str, retrieved: List[dict], k_context: int = 5) -> dict:
         tracer = get_tracer()
@@ -79,7 +81,7 @@ class Generator:
         ]
         try:
             resp = self.client.chat.completions.create(
-                model=self.model, messages=prompt, temperature=0.0,
+                model=self.model, messages=prompt, temperature=self.temperature,
             )
         except (openai.APIError, openai.APIConnectionError, openai.APITimeoutError) as e:
             raise GenerationError(f"LLM call failed: {e}") from e
@@ -99,3 +101,12 @@ class Generator:
             "context": context,
         })
         return {"answer": answer_text, "citations": citations, "context": context}
+
+    @property
+    def cacheable(self) -> bool:
+        """生成结果是否可安全缓存：仅当温度确定性（temperature==0）时为 True。
+
+        非确定性生成（temperature>0）不可缓存，否则会返回不稳定的旧答案。
+        L4 Answer 缓存据此守卫：非 cacheable 时既不读也不写答案缓存。
+        """
+        return self.temperature == 0.0
