@@ -27,6 +27,7 @@ import requests
 
 from src.config import cfg
 from src.observability import get_tracer, get_collector
+from src.prompts import get_active
 
 logger = logging.getLogger(__name__)
 
@@ -152,49 +153,17 @@ def call_ollama_embed(texts: List[str], model: str = "nomic-embed-text") -> Opti
         return None
 
 
-# ─── Prompt 模板 ──────────────────────────────────────────────
+# ─── Prompt 模板（集中管理，从 src/prompts registry 加载生效版本） ────
+# 模板正文已外置到 src/prompts/prompts/*.yaml（带 version/changelog，进 git 可追溯）。
+# 下方模块级常量在 import 期解析为生效版本文本，保持原有 .format() 调用不变。
 
-CLAIM_DECOMPOSITION_PROMPT = """\
-Break down the following answer into individual factual claims.
-Each claim must be a single, atomic, verifiable statement.
-Format: one claim per line, numbered.
+CLAIM_DECOMPOSITION_PROMPT = get_active("claim_decomposition").template
 
-Answer: {answer}
+CLAIM_VERIFICATION_PROMPT = get_active("claim_verification").template
 
-Claims:"""
+REVERSE_QUESTION_PROMPT = get_active("reverse_question").template
 
-CLAIM_VERIFICATION_PROMPT = """\
-Determine whether the following claim is DIRECTLY SUPPORTED by the given context.
-Answer ONLY with YES or NO.
-
-Context:
-{context}
-
-Claim: {claim}
-
-Is this claim directly supported by the context? (YES/NO)"""
-
-REVERSE_QUESTION_PROMPT = """\
-Given the following answer, generate {n} different questions that this answer could be answering.
-Each question should be phrased as a natural question someone might ask.
-Format: one question per line, numbered.
-
-Answer: {answer}
-
-Questions:"""
-
-GENERATION_PROMPT = """\
-You are a helpful assistant for industrial document QA.
-Answer the question based ONLY on the provided context.
-If the context does not contain enough information, say "I cannot answer this question based on the available documents."
-Do NOT make up information.
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
+GENERATION_PROMPT = get_active("ragas_generation").template
 
 
 # ─── Faithfulness ─────────────────────────────────────────────
@@ -384,15 +353,7 @@ def compute_answer_relevancy(
     return result
 
 
-_RELEVANCY_FALLBACK_PROMPT = """\
-On a scale of 0.0 to 1.0, how relevant is the following ANSWER to the QUESTION?
-Consider: does the answer directly address the question, or is it tangential?
-Reply with ONLY a number between 0.0 and 1.0.
-
-Question: {question}
-Answer: {answer}
-
-Relevance score:"""
+_RELEVANCY_FALLBACK_PROMPT = get_active("relevancy_fallback").template
 
 
 def _llm_relevancy_fallback(question: str, answer: str) -> float:
@@ -483,15 +444,7 @@ def compress_context(
 
 # ─── Context Relevance ─────────────────────────────────────────
 
-CONTEXT_RELEVANCE_PROMPT = """\
-Please evaluate whether each sentence below is relevant to answering the given question.
-A sentence is relevant if it contains information that could help answer the question,
-even indirectly. Reply with a JSON array: [{{"id": <number>, "relevant": true/false}}, ...]
-
-Question: {query}
-
-Sentences:
-{sentences}"""
+CONTEXT_RELEVANCE_PROMPT = get_active("context_relevance").template
 
 
 def split_context_to_sentences(context_chunks: List[str]) -> List[str]:

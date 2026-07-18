@@ -11,17 +11,14 @@ import requests
 
 from src.config import cfg
 from src.observability import get_tracer
+from src.prompts import get_active
 
 logger = logging.getLogger(__name__)
 
 OLLAMA_CHAT_URL = "http://localhost:11434/api/chat"
 
-HYDE_PROMPT = (
-    "Write a technical passage that answers the following question about "
-    "industrial documents. Be specific and factual.\n\n"
-    "Question: {query}\n\n"
-    "Passage:"
-)
+# 模板已外置到 src/prompts/prompts/hyde.yaml，import 期解析为生效版本文本。
+HYDE_PROMPT = get_active("hyde").template
 
 
 class HyDEGenerator:

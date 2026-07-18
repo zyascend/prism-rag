@@ -1,0 +1,16 @@
+id: claim_decomposition
+description: RAGAS Faithfulness - 将答案分解为原子声明（ragas_metrics.py）
+versions:
+  - version: 1
+    created_at: "2026-07-18"
+    author: yang
+    changelog: "初始版本，从 ragas_metrics.py CLAIM_DECOMPOSITION_PROMPT 迁移，文本零改动"
+    active: true
+    template: |-
+      Break down the following answer into individual factual claims.
+      Each claim must be a single, atomic, verifiable statement.
+      Format: one claim per line, numbered.
+
+      Answer: {answer}
+
+      Claims:

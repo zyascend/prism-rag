@@ -1,0 +1,16 @@
+id: reverse_question
+description: RAGAS Answer Relevancy - 由答案反推可能的问题（ragas_metrics.py）
+versions:
+  - version: 1
+    created_at: "2026-07-18"
+    author: yang
+    changelog: "初始版本，从 ragas_metrics.py REVERSE_QUESTION_PROMPT 迁移，文本零改动"
+    active: true
+    template: |-
+      Given the following answer, generate {n} different questions that this answer could be answering.
+      Each question should be phrased as a natural question someone might ask.
+      Format: one question per line, numbered.
+
+      Answer: {answer}
+
+      Questions:
