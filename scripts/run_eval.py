@@ -101,13 +101,14 @@ def main():
         selected = [c for c in ABLATION_CONFIGS if c.name in (
             "Full_BGE_HyDE", "Full_zerank2_HyDE",
         )]
-    if args.no_hyde:
-        selected = [c for c in selected if c.name in GOLDEN_NO_HYDE_NAMES]
     if args.config_filter:
         selected = [
             c for c in selected
             if args.config_filter.lower() in c.name.lower()
         ]
+    # --no-hyde：先 filter 再剔除 HyDE（避免 Full_zerank2 子串命中 Full_zerank2_HyDE）
+    if args.no_hyde:
+        selected = [c for c in selected if not c.use_hyde]
     need_hyde = any(c.use_hyde for c in selected)
     hyde = HyDEGenerator() if need_hyde else None
     # zerank-2 延迟到 ColPali 卸载后加载，避免三模型同时占满 24GB 显存

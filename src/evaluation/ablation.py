@@ -188,15 +188,16 @@ def run_ablation(
             "Full_BGE_HyDE", "Full_zerank2_HyDE"
         )]
         logger.info(f"Quick 模式：仅跑 {len(configs)} 组新配置")
-    if no_hyde:
-        configs = [c for c in configs if c.name in GOLDEN_NO_HYDE_NAMES]
-        logger.info(
-            f"--no-hyde / GOLDEN_NO_HYDE: {len(configs)} 组 "
-            f"({[c.name for c in configs]})"
-        )
     if config_filter:
         configs = [c for c in configs if config_filter.lower() in c.name.lower()]
         logger.info(f"Config filter '{config_filter}': 仅跑 {len(configs)} 组配置 ({[c.name for c in configs]})")
+    if no_hyde:
+        # 在 filter 之后剔除 HyDE，避免子串 Full_zerank2 命中 Full_zerank2_HyDE
+        configs = [c for c in configs if not c.use_hyde]
+        logger.info(
+            f"--no-hyde: {len(configs)} 组 "
+            f"({[c.name for c in configs]})"
+        )
 
     results = []
 
