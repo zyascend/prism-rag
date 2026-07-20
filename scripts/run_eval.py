@@ -152,11 +152,13 @@ def main():
     # ── 加载 zerank-2（ColPali 已卸载，Ollama 已释放，显存充足）──
     logger.info("加载 zerank-2 reranker (bf16)...")
     try:
+        torch.cuda.empty_cache()
         zerank_reranker = Reranker(model_id=cfg.zerank_reranker_model_id,
                                    automodel_args={"torch_dtype": torch.bfloat16})
     except Exception as e:
-        logger.warning(f"zerank-2 加载失败，降级到 BGE: {e}")
-        zerank_reranker = None
+        # 禁止置 None：Full_zerank2 配置会调用 .rerank 直接炸
+        logger.warning(f"zerank-2 加载失败，降级到 BGE reranker: {e}")
+        zerank_reranker = reranker
 
     # ── Phase B: Ingest / Load FAISS ──────────────────────────
     # 此时 Visual 模型已卸载，FAISS GPU 向量可以安全加载
