@@ -14,9 +14,12 @@
 | 默认 | **`generation.self_rag.enabled: false`** |
 | 单测 | `tests/test_self_rag_gate2.py`（mock judge；含 attempts_detail fail→regen） |
 | Trace | `self_rag.gate2` + 子 span `attempt.N`；`attempts_detail` 回放每轮 score/answer/unsupported |
-| 待做 | 开/关对照：RAGAS 100q 或 E2E 50+20；有正 Δ 再写简历 ③ |
+| 评测接入 | RAGAS/E2E：`generation.eval_via_generator` 或 self_rag 开时走 `answer_for_eval` |
+| 云上 A/B | `bash scripts/cloud_self_rag_ab.sh` → `runs/YYYYMMDD-self-rag-gate2/{off,on}/` |
+| 待做 | 云上开/关对照；有正 Δ 再写简历 ③ |
 
-开关示例：`config/models.yaml` → `generation.self_rag.enabled: true`（或 profile 覆盖）。
+开关示例：`generation.self_rag.enabled: true`；A/B 两臂另设 `eval_via_generator: true`（脚本已写）。  
+云上：`bash scripts/cloud_self_rag_ab.sh`（`MAX_QUERIES=100 RUN_E2E=1`）。
 
 ---
 

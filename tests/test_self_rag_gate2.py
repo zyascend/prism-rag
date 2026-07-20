@@ -353,3 +353,17 @@ def test_self_rag_cache_salt_on_off():
     assert off == "sr=off"
     assert "sr=on" in on
     assert off != on
+
+
+def test_answer_for_eval_disabled_uses_generator(monkeypatch):
+    from src.generation import self_rag as sr_mod
+
+    monkeypatch.setattr(
+        sr_mod,
+        "self_rag_config",
+        lambda: {"enabled": False},
+    )
+    gen = _FakeGenerator(["via gen"])
+    out = sr_mod.answer_for_eval("q", _retrieved(), generator=gen)
+    assert out["answer"] == "via gen"
+    assert out["self_rag"]["enabled"] is False

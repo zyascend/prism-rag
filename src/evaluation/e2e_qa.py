@@ -386,12 +386,24 @@ def evaluate_e2e_qa(
 
             # 检索
             retrieved = retriever.search(question, k=k, use_rerank=use_rerank)
-            context = "\n\n---\n\n".join(
-                [r.get("text", "") for r in retrieved]
-            ) if retrieved else ""
+            from src.generation.self_rag import answer_for_eval, eval_via_generator
 
-            # 生成
-            generated = generate_answer(question, context)
+            if eval_via_generator():
+                gen_out = answer_for_eval(
+                    question,
+                    retrieved or [],
+                    k_context=k,
+                    bge_embedder=getattr(retriever, "bge", None),
+                )
+                generated = gen_out.get("answer") or ""
+                context = gen_out.get("context") or ""
+                sr_meta = gen_out.get("self_rag") or {}
+            else:
+                context = "\n\n---\n\n".join(
+                    [r.get("text", "") for r in retrieved]
+                ) if retrieved else ""
+                generated = generate_answer(question, context)
+                sr_meta = {}
 
             elapsed = time.time() - start
             latency_total += elapsed
@@ -413,6 +425,11 @@ def evaluate_e2e_qa(
                 "type": "answerable",
                 "correct": correctness_result.is_correct,
                 "latency": round(elapsed, 2),
+                **({
+                    "self_rag_action": sr_meta.get("final_action"),
+                    "self_rag_score": sr_meta.get("score"),
+                    "self_rag_attempts": sr_meta.get("attempts"),
+                } if sr_meta else {}),
             })
 
             if not correctness_result.is_correct:
@@ -431,11 +448,21 @@ def evaluate_e2e_qa(
             start = time.time()
 
             retrieved = retriever.search(question, k=k, use_rerank=use_rerank)
-            context = "\n\n---\n\n".join(
-                [r.get("text", "") for r in retrieved]
-            ) if retrieved else ""
+            from src.generation.self_rag import answer_for_eval, eval_via_generator
 
-            generated = generate_answer(question, context)
+            if eval_via_generator():
+                gen_out = answer_for_eval(
+                    question,
+                    retrieved or [],
+                    k_context=k,
+                    bge_embedder=getattr(retriever, "bge", None),
+                )
+                generated = gen_out.get("answer") or ""
+            else:
+                context = "\n\n---\n\n".join(
+                    [r.get("text", "") for r in retrieved]
+                ) if retrieved else ""
+                generated = generate_answer(question, context)
 
             elapsed = time.time() - start
             latency_total += elapsed

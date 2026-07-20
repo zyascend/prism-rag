@@ -178,6 +178,39 @@ def _openai_judge_complete(
     return complete
 
 
+def eval_via_generator() -> bool:
+    """评测是否走生产 Generator 路径（与 /ask 对齐）。
+
+    True 条件：显式 ``generation.eval_via_generator`` 或 Self-RAG 已开启。
+    云上 A/B 脚本对两臂都开 eval_via_generator，仅切换 self_rag.enabled。
+    """
+    if bool(cfg.get("generation.eval_via_generator", False)):
+        return True
+    return bool(self_rag_config().get("enabled"))
+
+
+def answer_for_eval(
+    query: str,
+    retrieved: List[dict],
+    *,
+    k_context: int = 5,
+    bge_embedder=None,
+    client=None,
+    generator=None,
+) -> dict:
+    """评测/对照用统一生成入口：Generator ± Self-RAG Gate2。
+
+    返回 ``{answer, citations, context, self_rag}``，与 ``Generator.answer`` /
+    ``SelfRAGOrchestrator.answer`` 一致。空检索返回拒答文案。
+    """
+    from src.generation.generator import Generator
+
+    if generator is None:
+        generator = Generator(client=client, bge_embedder=bge_embedder)
+    orch = SelfRAGOrchestrator(generator)
+    return orch.answer(query, retrieved, k_context=k_context)
+
+
 class SelfRAGOrchestrator:
     """Gate2-only 编排：生成 → 忠实性门 → 重生/拒答。"""
 

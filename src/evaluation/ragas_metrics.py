@@ -716,7 +716,15 @@ def evaluate_generation(
         tracer.start_trace(query=query_text, config_label=config_label)
         
         start = time.time()
-        
+        from src.generation.self_rag import answer_for_eval, eval_via_generator
+
+        answer = ""
+        context = ""
+        ctx_for_eval = ""
+        threshold_rejected = False
+        pipeline_self_rag = None
+        use_pipeline = eval_via_generator()
+
         # Step 1: 检索（span 由 search_with_trace 内部创建，自动挂载到父 Trace）
         with tracer.start_span("retrieval") as retrieval_span:
             retrieved = retriever.search(query_text, k=k, use_rerank=use_rerank)
@@ -724,11 +732,20 @@ def evaluate_generation(
                 "num_retrieved": len(retrieved),
                 "k": k,
             })
-        
+
         if not retrieved:
-            context = ""
-            context_chunks = []
-            ctx_for_eval = ""
+            context_chunks: list = []
+            if use_pipeline:
+                gen_out = answer_for_eval(
+                    query_text, [], k_context=k,
+                    bge_embedder=getattr(retriever, "bge", None),
+                )
+                answer = gen_out.get("answer") or ""
+                context = gen_out.get("context") or ""
+                ctx_for_eval = context
+                pipeline_self_rag = gen_out.get("self_rag")
+            else:
+                answer = generate_answer(query_text, "")
         else:
             context_chunks = [r.get("text", "") for r in retrieved]
 
@@ -749,34 +766,51 @@ def evaluate_generation(
                     "rejected": threshold_rejected,
                 })
 
-            # ── Step 1.5b: 上下文压缩（非拒答时）─────────────
-            compress_ratio = cfg.get("retrieval.context_compression_ratio", 1.0)
-            if not threshold_rejected and compress_ratio < 1.0 and context_chunks:
-                context = compress_context(
-                    query_text, context_chunks, retriever.bge, ratio=compress_ratio,
-                )
-            else:
+            if threshold_rejected:
+                answer = "I cannot answer this question based on the available documents."
                 context = "\n\n---\n\n".join(context_chunks)
+                ctx_for_eval = context
+            elif use_pipeline:
+                # 与 /ask 对齐：Generator ± Self-RAG Gate2
+                gen_out = answer_for_eval(
+                    query_text,
+                    retrieved,
+                    k_context=k,
+                    bge_embedder=getattr(retriever, "bge", None),
+                )
+                answer = gen_out.get("answer") or ""
+                context = gen_out.get("context") or ""
+                ctx_for_eval = context
+                pipeline_self_rag = gen_out.get("self_rag")
+            else:
+                # Legacy：compress_context + ragas generate_answer
+                compress_ratio = cfg.get("retrieval.context_compression_ratio", 1.0)
+                if compress_ratio < 1.0 and context_chunks:
+                    context = compress_context(
+                        query_text, context_chunks, retriever.bge, ratio=compress_ratio,
+                    )
+                else:
+                    context = "\n\n---\n\n".join(context_chunks)
+                ctx_for_eval = context
+                doc_refs = list(dict.fromkeys(
+                    r.get("doc_ref", "") for r in retrieved if r.get("doc_ref")
+                ))
+                if doc_refs and context:
+                    ref_prefix = "Source documents: " + "; ".join(doc_refs)
+                    context = ref_prefix + "\n\n" + context
+                answer = generate_answer(query_text, context)
 
-            # CtxRel 评估的是 LLM 实际看到的检索上下文（压缩后），
-            # 与 generate_answer / compute_faithfulness 使用同一份 context；
-            # doc_ref 前缀是 grounding 元数据，不计入相关性评估
-            ctx_for_eval = context
+        if pipeline_self_rag:
+            with tracer.start_span("self_rag_eval_meta") as sr_span:
+                sr_span.set_metadata({
+                    k: pipeline_self_rag.get(k)
+                    for k in (
+                        "enabled", "passed", "score", "attempts",
+                        "final_action", "gate_degraded",
+                    )
+                    if k in pipeline_self_rag
+                })
 
-            # ── 注入 doc_ref 作为 grounding 元数据 ────────────
-            doc_refs = list(dict.fromkeys(
-                r.get("doc_ref", "") for r in retrieved if r.get("doc_ref")
-            ))  # 去重，保序
-            if doc_refs and context:
-                ref_prefix = "Source documents: " + "; ".join(doc_refs)
-                context = ref_prefix + "\n\n" + context
-
-        # ── 拒答判断（短语拒答 + 阈值拒答）─────────────────
-        if threshold_rejected:
-            answer = "I cannot answer this question based on the available documents."
-        else:
-            # Step 2: 生成（llm_generate span 由 generate_answer 内部创建，自动挂载）
-            answer = generate_answer(query_text, context)
         latency_total += time.time() - start
 
         # 检查是否短语拒答
