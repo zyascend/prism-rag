@@ -46,6 +46,11 @@ def main():
     parser.add_argument("--visual-model", default="colqwen2",
                         choices=["colpali", "colqwen2"],
                         help="Visual embedding model (default: colqwen2)")
+    parser.add_argument(
+        "--no-hyde",
+        action="store_true",
+        help="Boot-A 默认：仅跑 GOLDEN_NO_HYDE（排除 Full_*_HyDE，省 GPU）",
+    )
     args = parser.parse_args()
 
     cfg.load()
@@ -168,6 +173,7 @@ def main():
         language=args.language,
         quick=args.quick,
         config_filter=args.config_filter,
+        no_hyde=args.no_hyde,
     )
 
     dump_collector(f"ablation_{Path(args.output_dir).name}")

@@ -1,8 +1,18 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: main | 远程: origin
-> 最后 commit: dc155f5 (Merge PR #24 feat/production-spine) + fe9ceba (表格摘要+大表保护)
-> 更新: 2026-07-09（表格摘要+大表保护 首次云端全量验证：NDCG 10 路消融 283q + RAGAS 100q 生成端 verdict）
+> 分支: feat/bullet-strengthening（进行中）| 远程: origin
+> 更新: 2026-07-20 — Bullet 强化 Boot 打包：eval protocol v1 + cloud_boot_a（待云上 Boot-A）
+
+### Bullet 强化进度（Cloud Boot Packing）
+
+| Boot | 状态 | 说明 |
+|------|------|------|
+| **本地准备** | ✅ | `docs/eval-protocol.md` v1；`scripts/cloud_boot_a.sh`；`docs/incremental-verification-runbook.md`；`run_eval --no-hyde`；`tests/test_ndcg_metric.py` |
+| **Boot-A**（黄金消融无 HyDE + 增量） | ⏳ 待云上 | `bash scripts/cloud_boot_a.sh`；产物 `runs/YYYYMMDD-bootA/` |
+| Boot-B（路由+RAGAS100） | 未开始 | 本地先合 router/filter 再开机 |
+| Boot-C（RAGAS283） | 默认可跳过 | — |
+
+计划全文：`docs/superpowers/plans/2026-07-20-bullet-strengthening-roadmap.md`
 
 ---
 
