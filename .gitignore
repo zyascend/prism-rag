@@ -116,3 +116,5 @@ dist/
 runs/**/*.sql
 .superpowers
 .workbuddy
+# ===== Local (never commit) =====
+local/

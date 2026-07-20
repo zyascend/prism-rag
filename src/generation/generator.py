@@ -7,7 +7,7 @@ from typing import List
 import openai
 
 from src.config import cfg
-from src.evaluation.ragas_metrics import compress_context
+from src.generation.context_filter import openai_complete_fn, prepare_context
 from src.observability import get_tracer
 from src.prompts import get_active
 
@@ -19,7 +19,7 @@ class GenerationError(RuntimeError):
 
 
 class Generator:
-    def __init__(self, client=None, bge_embedder=None):
+    def __init__(self, client=None, bge_embedder=None, complete_fn=None):
         if client is None:
             from openai import OpenAI
             client = OpenAI(
@@ -29,6 +29,8 @@ class Generator:
         self.client = client
         self.model = cfg.get("llm.model", "gpt-4o-mini")
         self.bge = bge_embedder
+        # 可选注入 complete_fn（测试 / 与主生成模型分离的过滤模型）
+        self._complete_fn = complete_fn
         # 生成温度：硬编码 0.0 保证答案确定性，从而可安全缓存（L4 Answer 缓存守卫）。
         self.temperature = 0.0
 
@@ -60,13 +62,18 @@ class Generator:
                 text_texts.append(r["text"])
 
         if text_texts:
-            if self.bge is not None:
-                compressed_text = compress_context(
-                    query, text_texts, self.bge,
-                    ratio=cfg.get("retrieval.context_compression_ratio", 0.4),
-                )
-            else:
-                compressed_text = "\n\n".join(text_texts)
+            mode = str(cfg.get("context_filter.mode", "bge"))
+            complete_fn = self._complete_fn
+            if complete_fn is None and mode in ("llm", "bge_then_llm"):
+                complete_fn = openai_complete_fn(self.client, self.model)
+            compressed_text = prepare_context(
+                query,
+                text_texts,
+                self.bge,
+                mode=mode,
+                ratio=cfg.get("retrieval.context_compression_ratio", 0.4),
+                complete_fn=complete_fn,
+            )
             # 压缩结果是一个整体块，挂在非表格 chunk 的最小下标处，保持原有相对顺序
             table_parts[min(text_idx)] = (
                 table_parts.get(min(text_idx), "") + "\n\n" + compressed_text

@@ -1,0 +1,41 @@
+{
+  "routing": {
+    "routing-always": [
+      {
+        "config": "Full_zerank2",
+        "ndcg@5": 0.4312,
+        "ndcg@10": 0.4362,
+        "recall@5": 0.3851,
+        "recall@10": 0.4556,
+        "mrr": 0.5559,
+        "avg_latency_ms": 1244.0,
+        "num_queries": 150,
+        "language": "en"
+      }
+    ],
+    "routing-heuristic": [
+      {
+        "config": "Full_zerank2",
+        "ndcg@5": 0.4009,
+        "ndcg@10": 0.4012,
+        "recall@5": 0.3614,
+        "recall@10": 0.411,
+        "mrr": 0.5292,
+        "avg_latency_ms": 1018.6,
+        "num_queries": 150,
+        "language": "en"
+      }
+    ]
+  },
+  "ragas": {
+    "summary": {
+      "num_queries": 150,
+      "generated_count": 126,
+      "rejected_count": 24,
+      "avg_faithfulness": 0.9091,
+      "avg_relevancy": 0.7967,
+      "avg_context_relevancy": 0.2584
+    },
+    "path": "/root/autodl-tmp/runs/20260720-bootB/ragas/bge/ragas_metrics_default.json"
+  }
+}

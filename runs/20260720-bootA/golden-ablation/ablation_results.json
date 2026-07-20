@@ -1,0 +1,90 @@
+[
+  {
+    "config": "BM25_only",
+    "ndcg@5": 0.3957,
+    "ndcg@10": 0.4063,
+    "recall@5": 0.3884,
+    "recall@10": 0.4545,
+    "mrr": 0.4993,
+    "avg_latency_ms": 16.5,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Dense_only",
+    "ndcg@5": 0.3474,
+    "ndcg@10": 0.3638,
+    "recall@5": 0.3231,
+    "recall@10": 0.3979,
+    "mrr": 0.4718,
+    "avg_latency_ms": 112.3,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Visual_only",
+    "ndcg@5": 0.1392,
+    "ndcg@10": 0.159,
+    "recall@5": 0.102,
+    "recall@10": 0.2143,
+    "mrr": 0.1727,
+    "avg_latency_ms": 218.4,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "BM25_Dense",
+    "ndcg@5": 0.4065,
+    "ndcg@10": 0.4208,
+    "recall@5": 0.3837,
+    "recall@10": 0.4611,
+    "mrr": 0.5245,
+    "avg_latency_ms": 127.2,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "BM25_Dense_Visual",
+    "ndcg@5": 0.4024,
+    "ndcg@10": 0.4201,
+    "recall@5": 0.4029,
+    "recall@10": 0.4828,
+    "mrr": 0.4973,
+    "avg_latency_ms": 370.8,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Full_no_rerank",
+    "ndcg@5": 0.4024,
+    "ndcg@10": 0.4201,
+    "recall@5": 0.4029,
+    "recall@10": 0.4828,
+    "mrr": 0.4973,
+    "avg_latency_ms": 0.2,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Full_with_rerank",
+    "ndcg@5": 0.5075,
+    "ndcg@10": 0.5161,
+    "recall@5": 0.4631,
+    "recall@10": 0.538,
+    "mrr": 0.6307,
+    "avg_latency_ms": 717.7,
+    "num_queries": 283,
+    "language": "en"
+  },
+  {
+    "config": "Full_zerank2",
+    "ndcg@5": 0.5293,
+    "ndcg@10": 0.5318,
+    "recall@5": 0.473,
+    "recall@10": 0.5418,
+    "mrr": 0.6601,
+    "avg_latency_ms": 1190.0,
+    "num_queries": 283,
+    "language": "en"
+  }
+]

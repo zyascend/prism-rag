@@ -53,6 +53,18 @@ ABLATION_CONFIGS = [
         reranker_type="zerank", use_hyde=True),
 ]
 
+# Boot-A 默认：无 HyDE（历史结论本场景增益可忽略，省 GPU）
+GOLDEN_NO_HYDE_NAMES = frozenset({
+    "BM25_only",
+    "Dense_only",
+    "Visual_only",
+    "BM25_Dense",
+    "BM25_Dense_Visual",
+    "Full_no_rerank",
+    "Full_with_rerank",
+    "Full_zerank2",
+})
+
 
 def compute_ndcg(relevant: set, ranked: List[str], k: int) -> float:
     """计算 NDCG@k，使用标准 log2(i+1) 折扣（与 pytrec_eval 一致）。
@@ -153,6 +165,7 @@ def run_ablation(
     language: str = "en",
     quick: bool = False,
     config_filter: Optional[str] = None,
+    no_hyde: bool = False,
 ) -> List[dict]:
     """运行全量消融实验
 
@@ -165,6 +178,7 @@ def run_ablation(
         language: 当前评测语言，会写入结果元数据
         quick: 仅跑新增配置（跳过基线消融）
         config_filter: 可选，按名称子串过滤消融配置（如 "Visual" 匹配 Visual_only、BM25_Dense_Visual）
+        no_hyde: True 时只跑 GOLDEN_NO_HYDE（Boot-A 默认，排除 HyDE 配置）
     """
 
     configs = ABLATION_CONFIGS
@@ -177,6 +191,13 @@ def run_ablation(
     if config_filter:
         configs = [c for c in configs if config_filter.lower() in c.name.lower()]
         logger.info(f"Config filter '{config_filter}': 仅跑 {len(configs)} 组配置 ({[c.name for c in configs]})")
+    if no_hyde:
+        # 在 filter 之后剔除 HyDE，避免子串 Full_zerank2 命中 Full_zerank2_HyDE
+        configs = [c for c in configs if not c.use_hyde]
+        logger.info(
+            f"--no-hyde: {len(configs)} 组 "
+            f"({[c.name for c in configs]})"
+        )
 
     results = []
 

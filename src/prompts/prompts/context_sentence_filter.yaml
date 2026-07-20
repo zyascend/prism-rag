@@ -1,0 +1,21 @@
+id: context_sentence_filter
+description: LLM 句级上下文过滤（与 CtxRel 评分 prompt 分离，避免自循环）
+versions:
+  - version: 1
+    created_at: "2026-07-20"
+    author: yang
+    changelog: "Boot-B：按 query 选出应保留的句子下标 JSON"
+    active: true
+    system: |
+      You select which context sentences are needed to answer the user question.
+      Return ONLY valid JSON: {"keep": [0-based indices of sentences to keep]}.
+      Prefer precision: drop sentences that do not help answer the question.
+      If unsure, keep borderline sentences that might contain numbers or specs.
+    user: |
+      Question:
+      {query}
+
+      Sentences (index: text):
+      {numbered_sentences}
+
+      Respond with JSON only, e.g. {{"keep": [0, 2, 5]}}

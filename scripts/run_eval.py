@@ -13,7 +13,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.config import cfg
 from src.ingestion.encoders import BGEEmbedder, create_visual_encoder
 from src.ingestion.text_chunker import TextChunker
-from src.evaluation.ablation import load_eval_data, run_ablation
+from src.evaluation.ablation import (
+    ABLATION_CONFIGS,
+    GOLDEN_NO_HYDE_NAMES,
+    load_eval_data,
+    run_ablation,
+)
 from src.evaluation.vidore_adapter import PrismRAGRetriever
 from src.observability import dump_collector
 from src.retrieval.bm25_retriever import BM25Retriever
@@ -46,6 +51,11 @@ def main():
     parser.add_argument("--visual-model", default="colqwen2",
                         choices=["colpali", "colqwen2"],
                         help="Visual embedding model (default: colqwen2)")
+    parser.add_argument(
+        "--no-hyde",
+        action="store_true",
+        help="Boot-A 默认：仅跑 GOLDEN_NO_HYDE（排除 Full_*_HyDE，省 GPU）",
+    )
     args = parser.parse_args()
 
     cfg.load()
@@ -85,7 +95,22 @@ def main():
     dense = DenseRetriever(pg_store, bge)
     fusion = RRFFusion(rrf_k=60)
     reranker = Reranker()
-    hyde = HyDEGenerator()
+    # 与 run_ablation 一致：仅当选中配置含 use_hyde 时才预计算（Boot-A --no-hyde 可省 ~40min）
+    selected = list(ABLATION_CONFIGS)
+    if args.quick:
+        selected = [c for c in ABLATION_CONFIGS if c.name in (
+            "Full_BGE_HyDE", "Full_zerank2_HyDE",
+        )]
+    if args.config_filter:
+        selected = [
+            c for c in selected
+            if args.config_filter.lower() in c.name.lower()
+        ]
+    # --no-hyde：先 filter 再剔除 HyDE（避免 Full_zerank2 子串命中 Full_zerank2_HyDE）
+    if args.no_hyde:
+        selected = [c for c in selected if not c.use_hyde]
+    need_hyde = any(c.use_hyde for c in selected)
+    hyde = HyDEGenerator() if need_hyde else None
     # zerank-2 延迟到 ColPali 卸载后加载，避免三模型同时占满 24GB 显存
 
     # ── Phase A: 预编码 visual query ──────────────────────────
@@ -100,30 +125,40 @@ def main():
     logger.info(f"Visual encoder ({args.visual_model})已卸载，显存已释放")
     torch.cuda.empty_cache()
 
-    # ── Phase A2: HyDE 预计算（Ollama 独占 GPU，完成后释放）──
-    logger.info("HyDE 预计算 283 条 query（Ollama GPU 加速）...")
-    import subprocess, time
-    # 确保 ollama 在运行
-    result = subprocess.run(["pgrep", "-f", "ollama serve"], capture_output=True)
-    if result.returncode != 0:
-        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(5)  # 等 ollama 启动
-    hyde.precompute(query_texts)
-    logger.info(f"HyDE 预计算完成，缓存 {len(hyde._cache)} 条")
-    # 关闭 Ollama 释放 GPU 显存给后续模型
-    subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True)
-    time.sleep(3)
-    torch.cuda.empty_cache()
-    logger.info("Ollama 已关闭，显存已释放")
+    # ── Phase A2: HyDE 预计算（仅 need_hyde；Ollama 独占 GPU，完成后释放）──
+    if need_hyde:
+        logger.info("HyDE 预计算（Ollama GPU 加速）...")
+        import subprocess, time
+        result = subprocess.run(["pgrep", "-f", "ollama serve"], capture_output=True)
+        if result.returncode != 0:
+            subprocess.Popen(
+                ["ollama", "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            time.sleep(5)
+        hyde.precompute(query_texts)
+        logger.info(f"HyDE 预计算完成，缓存 {len(hyde._cache)} 条")
+        subprocess.run(["pkill", "-f", "ollama serve"], capture_output=True)
+        time.sleep(3)
+        torch.cuda.empty_cache()
+        logger.info("Ollama 已关闭，显存已释放")
+    else:
+        logger.info(
+            "跳过 HyDE 预计算（当前消融配置不含 HyDE；"
+            f"selected={[c.name for c in selected]}）"
+        )
 
     # ── 加载 zerank-2（ColPali 已卸载，Ollama 已释放，显存充足）──
     logger.info("加载 zerank-2 reranker (bf16)...")
     try:
+        torch.cuda.empty_cache()
         zerank_reranker = Reranker(model_id=cfg.zerank_reranker_model_id,
                                    automodel_args={"torch_dtype": torch.bfloat16})
     except Exception as e:
-        logger.warning(f"zerank-2 加载失败，降级到 BGE: {e}")
-        zerank_reranker = None
+        # 禁止置 None：Full_zerank2 配置会调用 .rerank 直接炸
+        logger.warning(f"zerank-2 加载失败，降级到 BGE reranker: {e}")
+        zerank_reranker = reranker
 
     # ── Phase B: Ingest / Load FAISS ──────────────────────────
     # 此时 Visual 模型已卸载，FAISS GPU 向量可以安全加载
@@ -168,6 +203,7 @@ def main():
         language=args.language,
         quick=args.quick,
         config_filter=args.config_filter,
+        no_hyde=args.no_hyde,
     )
 
     dump_collector(f"ablation_{Path(args.output_dir).name}")

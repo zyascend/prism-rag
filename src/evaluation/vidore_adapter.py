@@ -20,6 +20,7 @@ from src.retrieval.fusion import RRFFusion
 from src.retrieval.hyde import HyDEGenerator
 from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
+from src.retrieval.visual_router import VisualRouter, build_visual_router_from_config
 from src.observability import get_tracer, get_collector
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
@@ -59,6 +60,14 @@ class PrismRAGRetriever:
         self.reranker = reranker
         self.hyde = hyde
         self.zerank_reranker = zerank_reranker
+        # Visual 按需路由（None = 关闭，调用方 use_visual 原样生效）
+        # 测试里可能把 cfg 换成无 .get 的 stub，失败时关闭路由
+        try:
+            self.visual_router: Optional[VisualRouter] = build_visual_router_from_config(
+                cfg.get
+            )
+        except Exception:
+            self.visual_router = None
         # ── 检索缓存（L3 结果缓存）──
         self.index_version = 0  # 语料版本盐；语料变更时 +1，旧 key 天然失效
         self._cache: "InMemoryLRUCache | None" = None  # 惰性创建（受 cache.enabled 控制）
@@ -120,11 +129,15 @@ class PrismRAGRetriever:
         """
         norm = unicodedata.normalize("NFKC", query).lower().strip()
         norm = " ".join(norm.split())
+        vr_mode = "off"
+        if self.visual_router is not None:
+            vr_mode = self.visual_router.mode
         parts = [
             f"q={norm}",
             f"k={k}",
             f"bm25={use_bm25}", f"dense={use_dense}", f"visual={use_visual}",
             f"rerank={use_rerank}", f"hyde={use_hyde}", f"rt={reranker_type}",
+            f"vr={vr_mode}",
             f"v={self.index_version}",
         ]
         if visual_query_embedding is not None:
@@ -230,6 +243,13 @@ class PrismRAGRetriever:
             tracer.start_trace(query=query, config_label=config_label)
             owns_trace = True
 
+        # ── Visual 按需路由（在缓存 key 之前解析 effective_visual）──
+        effective_visual = use_visual
+        visual_routed: bool | None = None
+        if use_visual and self.visual_router is not None:
+            effective_visual = self.visual_router.should_use_visual(query)
+            visual_routed = effective_visual
+
         # ── L3 Retrieval Cache ───────────────────────────────
         cache_on = cfg.cache.enabled
         cache_key: str | None = None
@@ -238,7 +258,7 @@ class PrismRAGRetriever:
             if self._cache is None:
                 self._cache = InMemoryLRUCache(max_size=cfg.cache.max_size)
             cache_key = self._cache_key(
-                query, k, use_bm25, use_dense, use_visual, use_rerank,
+                query, k, use_bm25, use_dense, effective_visual, use_rerank,
                 visual_query_embedding, use_hyde, reranker_type,
             )
             cached = self._cache.get(cache_key)
@@ -251,6 +271,7 @@ class PrismRAGRetriever:
                         "cache_hit": True,
                         "cache_layer": "retrieval",
                         "num_results": len(cached.get("results", [])),
+                        "visual_routed": visual_routed,
                     })
                 _t = tracer.finish_trace()
                 if _t:
@@ -258,7 +279,16 @@ class PrismRAGRetriever:
             return cached
 
         routes = []
-        trace = {"bm25_top5": [], "dense_top5": [], "visual_top5": [], "hyde": ""}
+        trace = {
+            "bm25_top5": [],
+            "dense_top5": [],
+            "visual_top5": [],
+            "hyde": "",
+            "visual_routed": visual_routed,
+            "visual_routing_mode": (
+                self.visual_router.mode if self.visual_router is not None else None
+            ),
+        }
 
         # ── HyDE: 生成假设文档 ────────────────────────────────
         hyde_answer = ""
@@ -297,8 +327,8 @@ class PrismRAGRetriever:
                     for r in all_dense[:5]
                 ]
 
-        # ── Visual route（原始 query + 可选 HyDE answer）────
-        if use_visual:
+        # ── Visual route（原始 query + 可选 HyDE answer；可被 router 跳过）────
+        if effective_visual:
             try:
                 # 原始 query — 优先使用预编码 embedding
                 if visual_query_embedding is not None:

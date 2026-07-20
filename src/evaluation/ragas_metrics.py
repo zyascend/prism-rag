@@ -624,10 +624,21 @@ def retrieve_and_generate(
 
     chunks = [r.get("text", "") for r in retrieved]
     compress_ratio = cfg.get("retrieval.context_compression_ratio", 1.0)
-    if bge_embedder is not None and compress_ratio < 1.0:
-        context = compress_context(query, chunks, bge_embedder, ratio=compress_ratio)
-    else:
+    # 与 Generator 对齐：默认 mode=bge。批量评测不传 complete_fn，llm 模式会 fallback 到 bge。
+    from src.generation.context_filter import prepare_context
+
+    mode = str(cfg.get("context_filter.mode", "bge"))
+    if mode == "off" or (bge_embedder is None and mode == "bge"):
         context = "\n\n---\n\n".join(chunks)
+    else:
+        context = prepare_context(
+            query,
+            chunks,
+            bge_embedder,
+            mode=mode,
+            ratio=compress_ratio,
+            complete_fn=None,
+        )
 
     answer = generate_answer(query, context)
     return retrieved, context, answer
