@@ -1,7 +1,7 @@
 # Handoff — PrismRAG 当前状态
 
 > 分支: feat/bullet-strengthening（进行中）| 远程: origin
-> 更新: 2026-07-20 — Bullet 强化 Boot 打包：eval protocol v1 + cloud_boot_a（待云上 Boot-A）
+> 更新: 2026-07-20 — Self-RAG 设计文档修订为 v2 MVP（仅 Gate2）；Boot-A/B 仍待云上
 
 ### Bullet 强化进度（Cloud Boot Packing）
 
@@ -15,6 +15,15 @@
 
 计划全文：`docs/superpowers/plans/2026-07-20-bullet-strengthening-roadmap.md`  
 配置：`retrieval.visual_routing.enabled` 默认 **false**（Boot-A 不受影响）；`context_filter.mode` 默认 **bge**。
+
+### Self-RAG 设计（文档 only，未实现）
+
+| 项 | 状态 |
+|----|------|
+| 设计文档 | ✅ v2：`docs/self-rag-closed-loop-design-2026-07-09.md` |
+| MVP 范围 | **仅 Gate2**（生成后忠实性门 → regenerate/abstain）；Gate1 充分性 = Phase 2 |
+| 相对 Boot | 实现排在 Boot-A/B 数字钉死之后（可选 A 级 bullet） |
+| 关键废止 | 不用 CtxRel 当「够不够答」；不默认 HyDE；不无 cap 直接上线 claim 级 `compute_faithfulness` |
 
 ---
 
