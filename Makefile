@@ -1,4 +1,4 @@
-.PHONY: help install ingest-vidore eval-vidore eval-full eval-ragas clean lint test db up e2e-local ingest-pdf
+.PHONY: help install ingest-vidore eval-vidore eval-full eval-ragas clean lint test db up e2e-local ingest-pdf eval-smoke
 
 help: ## 显示帮助
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -38,6 +38,10 @@ eval-ragas-metrics: .env ## 运行 RAGAS 生成层评测（Faithfulness + Answer
 
 eval-ragas-metrics-quick: .env ## 快速 RAGAS 生成层评测（10 条查询）
 	python scripts/run_ragas_metrics.py --max-queries 10
+
+eval-smoke: ## 本地冒烟：NDCG 单测 + Full_zerank 10q（需已有索引；无索引则只跑单测）
+	python -m pytest tests/test_ndcg_metric.py tests/test_visual_router.py tests/test_llm_context_filter.py -q
+	@echo "Optional (needs index): python scripts/run_eval.py --max-queries 10 --skip-index --config-filter Full_zerank --language en --no-hyde"
 
 fetch-indexes: ## 从 GitHub Release 拉取预编码索引
 	python scripts/fetch_indexes.py

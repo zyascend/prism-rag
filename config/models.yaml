@@ -20,6 +20,14 @@ retrieval:
   rerank_k: 5
   context_compression_ratio: 0.4      # BGE 句级 cosine 过滤保留比（1.0 = 不压缩）
   rerank_score_reject_threshold: 0.0  # 置信度阈值（0 = 禁用，建议 0.3）
+  # Visual 按需路由（Boot-B）：默认关闭，保证 Boot-A 黄金消融与历史可比
+  visual_routing:
+    enabled: false                    # true 时对 use_visual=True 的请求再按 mode 决策
+    mode: heuristic                   # heuristic | always | never
+
+# 生成侧上下文过滤（Boot-B）；默认 bge = 现状
+context_filter:
+  mode: bge                           # off | bge | llm | bge_then_llm
 
 storage:
   pgvector:
