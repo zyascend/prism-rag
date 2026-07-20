@@ -72,7 +72,8 @@ PY
     --skip-index
     --language en
     --visual-model "$VISUAL_MODEL"
-    --config-filter Full_zerank
+    --config-filter Full_zerank2
+    --no-hyde
     --output-dir "$dest"
   )
   if [[ "$FULL" == "1" ]]; then

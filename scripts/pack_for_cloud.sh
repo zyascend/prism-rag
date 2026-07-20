@@ -35,17 +35,19 @@ done
 
 # macOS: 禁止打包 ._ 资源叉 / xattr（Linux 解压会刷屏 LIBARCHIVE 警告）
 export COPYFILE_DISABLE=1
-TAR_EXTRA=()
+# 注意：set -u 下空数组 "${arr[@]}" 会报 unbound，拼成字符串再展开
+TAR_EXTRA_ARGS=""
 if tar --help 2>&1 | grep -q -- '--no-xattrs'; then
-  TAR_EXTRA+=(--no-xattrs)
+  TAR_EXTRA_ARGS+=" --no-xattrs"
 fi
 if tar --help 2>&1 | grep -q -- '--no-mac-metadata'; then
-  TAR_EXTRA+=(--no-mac-metadata)
+  TAR_EXTRA_ARGS+=" --no-mac-metadata"
 fi
 
 echo "==> Packing $ROOT → $OUT"
 # 明确排除：索引、缓存、虚拟环境、巨型产物（云端已有或在数据盘）
-tar czf "$OUT" "${TAR_EXTRA[@]}" \
+# shellcheck disable=SC2086
+tar czf "$OUT" $TAR_EXTRA_ARGS \
   --exclude='.git' \
   --exclude='.venv' \
   --exclude='venv' \

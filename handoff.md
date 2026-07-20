@@ -10,7 +10,7 @@
 | **本地准备 Boot-A** | ✅ | eval protocol v1；`cloud_boot_a.sh`；`--no-hyde`；NDCG 单测 |
 | **本地准备 Boot-B** | ✅ | `VisualRouter` + 配置默认关闭；`context_filter`；`cloud_boot_b.sh` |
 | **Boot-A**（黄金消融 + 漂移） | ✅ **2026-07-20** | 见 `runs/20260720-bootA/`：Full_zerank2 **0.5318**，no_rerank **0.4201**（Δ+0.11）；漂移 **Δ=0** |
-| **Boot-B**（路由 + RAGAS100） | ⏳ 待有卡 | `bash scripts/cloud_boot_b.sh` |
+| **Boot-B**（路由 + RAGAS100） | ⏳ 待有卡 | **已定**：always vs heuristic 双跑 + RAGAS **100q 默认 BGE 压缩**；**不跑** LLM 句过滤。命令：`bash scripts/cloud_boot_b.sh`（默认即该组合） |
 | Boot-C（RAGAS283） | 默认可跳过 | — |
 
 计划全文：`docs/superpowers/plans/2026-07-20-bullet-strengthening-roadmap.md`  
