@@ -1,29 +1,83 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: feat/bullet-strengthening（进行中）| 远程: origin
-> 更新: 2026-07-20 — Self-RAG 设计文档修订为 v2 MVP（仅 Gate2）；Boot-A/B 仍待云上
+> 分支: main（合并 `feat/bullet-strengthening` 后）| 远程: origin  
+> 更新: **2026-07-20** — Bullet 强化 Standard 档完成（Boot-A + Boot-B 云上数字已归档）
+
+---
+
+## 0. 本轮交付摘要（feat/bullet-strengthening）
+
+### 目标与结果
+
+| 目标 | 结果 |
+|------|------|
+| 可辩护检索主结论（精排瓶颈） | ✅ 协议 v1：Full_no_rerank **0.4201** → Full_zerank2 **0.5318**（+0.11）；vs BM25 +0.13 |
+| 同索引复跑不漂移 | ✅ Full_zerank2 两次 **Δ = 0** |
+| Visual 按需路由延迟–质量 | ✅ 150q：always **0.436**/1244ms vs heuristic **0.401**/1019ms（延迟约 **−18%**） |
+| 生成侧 BGE 压缩「有数」 | ✅ RAGAS 150q：Faith **0.909** / Rel **0.797** / CtxRel **0.258** |
+| 云上安全发包（不盖索引、HF 离线） | ✅ `pack_for_cloud` / `cloud_apply_upload` / `cloud_env` |
 
 ### Bullet 强化进度（Cloud Boot Packing）
 
 | Boot | 状态 | 说明 |
 |------|------|------|
-| **本地准备 Boot-A** | ✅ | eval protocol v1；`cloud_boot_a.sh`；`--no-hyde`；NDCG 单测 |
-| **本地准备 Boot-B** | ✅ | `VisualRouter` + 配置默认关闭；`context_filter`；`cloud_boot_b.sh` |
-| **Boot-A**（黄金消融 + 漂移） | ✅ **2026-07-20** | 见 `runs/20260720-bootA/`：Full_zerank2 **0.5318**，no_rerank **0.4201**（Δ+0.11）；漂移 **Δ=0** |
-| **Boot-B**（路由 + RAGAS150） | ✅ **2026-07-20** | `runs/20260720-bootB/`：always NDCG@10 **0.436** / 1244ms vs heuristic **0.401** / 1019ms（延迟−18%）；RAGAS150 BGE：Faith **0.909** / Rel **0.797** / CtxRel **0.258** |
-| Boot-C（RAGAS283） | 默认可跳过 | — |
+| Boot-A 代码+协议 | ✅ | `docs/eval-protocol.md`；`scripts/cloud_boot_a.sh`；`--no-hyde` 跳过 HyDE 预计算 |
+| Boot-B 代码 | ✅ | `VisualRouter`；`context_filter`（bge/llm/…）；`cloud_boot_b.sh` |
+| **Boot-A 云上** | ✅ | `runs/20260720-bootA/`（283q 黄金消融 + 漂移） |
+| **Boot-B 云上** | ✅ | `runs/20260720-bootB/`（路由 150q + RAGAS150 BGE） |
+| Boot-C（RAGAS283） | ⏭ 默认可跳过 | — |
+| 删文档幽灵召回 / page-diff 省 GPU | ⏭ 未上云验收 | runbook 已有，可选补 |
+| LLM 句过滤 vs BGE 对照 | ⏭ 未测 | 估 +1～5s/query；RAGAS 路径需接 `complete_fn` 才真跑 LLM 过滤 |
 
-计划全文：`docs/superpowers/plans/2026-07-20-bullet-strengthening-roadmap.md`  
-配置：`retrieval.visual_routing.enabled` 默认 **false**；`context_filter.mode` 默认 **bge**。
+计划：`docs/superpowers/plans/2026-07-20-bullet-strengthening-roadmap.md`  
+简历素材（不入库）：`local/resume-prismrag.md`
+
+### 配置默认（合并后）
+
+| 项 | 默认 | 说明 |
+|----|------|------|
+| `retrieval.visual_routing.enabled` | **false** | 开启后 `mode=heuristic\|always\|never` |
+| `context_filter.mode` | **bge** | `off\|bge\|llm\|bge_then_llm` |
+| HF 云上 | `source scripts/cloud_env.sh` | 默认 `HF_HUB_OFFLINE=1` |
+
+### 关键代码改动
+
+- `scripts/run_eval.py`：按选中配置决定是否 HyDE 预计算；`--no-hyde` 在 filter 后剔除 HyDE；zerank OOM 降级 BGE 而非 None  
+- `src/retrieval/visual_router.py` + `vidore_adapter` trace/`visual_routed`  
+- `src/generation/context_filter.py` + Generator / RAGAS 接入  
+- 云脚本：`cloud_boot_a/b.sh`、`pack_for_cloud.sh`、`cloud_apply_upload.sh`、`cloud_env.sh`  
+- 测试：`test_ndcg_metric` / `test_visual_router` / `test_llm_context_filter`
+
+### 云上操作备忘（SeetaCloud）
+
+```bash
+# 有卡
+cd /root/prism-rag && source scripts/cloud_env.sh
+export PYTHON=/root/miniconda3/bin/python
+service postgresql start
+# Boot-A: bash scripts/cloud_boot_a.sh
+# Boot-B: MAX_QUERIES=150 bash scripts/cloud_boot_b.sh
+# RAGAS 前必须: ollama serve   # boot_b 尚未自动拉起，勿忘
+```
+
+数据盘：`indexes/results/logs/runs` → `/root/autodl-tmp/`；chunks=8835；ColQwen2 faiss 已缓存。
 
 ### Self-RAG 设计（文档 only，未实现）
 
 | 项 | 状态 |
 |----|------|
 | 设计文档 | ✅ v2：`docs/self-rag-closed-loop-design-2026-07-09.md` |
-| MVP 范围 | **仅 Gate2**（生成后忠实性门 → regenerate/abstain）；Gate1 充分性 = Phase 2 |
-| 相对 Boot | 实现排在 Boot-A/B 数字钉死之后（可选 A 级 bullet） |
-| 关键废止 | 不用 CtxRel 当「够不够答」；不默认 HyDE；不无 cap 直接上线 claim 级 `compute_faithfulness` |
+| MVP 范围 | **仅 Gate2**；Gate1 = Phase 2 |
+| 实现优先级 | Boot-A/B 已完成 → 可选后续实现 |
+| 关键废止 | 不用 CtxRel 当充分性门；不默认 HyDE |
+
+### 建议下一步（可选）
+
+1. `cloud_boot_b.sh` RAGAS 前自动 `ollama serve`  
+2. 幽灵删除 + page-diff 云验收（补 bullet④）  
+3. LLM 过滤 30～50q 延迟对照（先修 RAGAS `complete_fn`）  
+4. Self-RAG Gate2 MVP 实现  
+5. Boot-C RAGAS 全量 283（非必须）
 
 ---
 
