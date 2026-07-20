@@ -8,13 +8,13 @@
 | Boot | 状态 | 说明 |
 |------|------|------|
 | **本地准备 Boot-A** | ✅ | eval protocol v1；`cloud_boot_a.sh`；`--no-hyde`；NDCG 单测 |
-| **本地准备 Boot-B** | ✅ | `VisualRouter` + 配置默认关闭；`context_filter`（bge/llm/…）；`cloud_boot_b.sh`；相关单测 |
-| **Boot-A**（黄金消融无 HyDE + 增量） | ⏳ 待云上 | `bash scripts/cloud_boot_a.sh` |
-| **Boot-B**（路由 always vs heuristic + RAGAS100） | ⏳ 待云上 | 代码已合本分支；`bash scripts/cloud_boot_b.sh` |
+| **本地准备 Boot-B** | ✅ | `VisualRouter` + 配置默认关闭；`context_filter`；`cloud_boot_b.sh` |
+| **Boot-A**（黄金消融 + 漂移） | ✅ **2026-07-20** | 见 `runs/20260720-bootA/`：Full_zerank2 **0.5318**，no_rerank **0.4201**（Δ+0.11）；漂移 **Δ=0** |
+| **Boot-B**（路由 + RAGAS100） | ⏳ 待有卡 | `bash scripts/cloud_boot_b.sh` |
 | Boot-C（RAGAS283） | 默认可跳过 | — |
 
 计划全文：`docs/superpowers/plans/2026-07-20-bullet-strengthening-roadmap.md`  
-配置：`retrieval.visual_routing.enabled` 默认 **false**（Boot-A 不受影响）；`context_filter.mode` 默认 **bge**。
+配置：`retrieval.visual_routing.enabled` 默认 **false**；`context_filter.mode` 默认 **bge**。
 
 ### Self-RAG 设计（文档 only，未实现）
 
