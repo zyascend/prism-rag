@@ -29,6 +29,20 @@ retrieval:
 context_filter:
   mode: bge                           # off | bge | llm | bge_then_llm
 
+# Self-RAG Gate2（生成后忠实性门）；默认关闭，消融/线上显式打开
+generation:
+  self_rag:
+    enabled: false                    # true 时 /ask 走 SelfRAGOrchestrator
+    mode: gate2_only                  # MVP 固定；预留 gate1_and_gate2
+    judge_model: null                 # null = 与主生成 model 相同
+    faith_threshold: 0.8
+    max_generate_attempts: 2          # 含首次生成
+    on_fail: regenerate_then_abstain  # abstain | regenerate_then_abstain
+    gate_timeout_ms: 8000
+    on_judge_error: degrade_pass      # degrade_pass | abstain
+    verdict_mode: whole_answer        # whole_answer（claim_level 预留）
+
+
 storage:
   pgvector:
     host: "localhost"

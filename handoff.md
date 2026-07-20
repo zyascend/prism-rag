@@ -1,11 +1,26 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: main（合并 `feat/bullet-strengthening` 后）| 远程: origin  
-> 更新: **2026-07-20** — Bullet 强化 Standard 档完成（Boot-A + Boot-B 云上数字已归档）
+> 分支: **feat/self-rag-gate2**（进行中）| 远程: origin  
+> 更新: **2026-07-21** — Self-RAG Gate2 MVP 实现（默认关闭；待对照评测）
+
+### Self-RAG Gate2（本分支）
+
+| 项 | 状态 |
+|----|------|
+| 设计 | `docs/self-rag-closed-loop-design-2026-07-09.md` v2 |
+| 实现 | ✅ `src/generation/self_rag.py` + `self_rag_gate2_verdict` / `self_rag_regenerate` prompts |
+| `/ask` | 配置 `generation.self_rag.enabled=true` 时走 `SelfRAGOrchestrator`；响应带 `self_rag` |
+| L4 缓存 | `answer_cache_key` 含 `self_rag_cache_salt()`（开/关不串答案） |
+| 默认 | **`generation.self_rag.enabled: false`** |
+| 单测 | `tests/test_self_rag_gate2.py`（mock judge；含 attempts_detail fail→regen） |
+| Trace | `self_rag.gate2` + 子 span `attempt.N`；`attempts_detail` 回放每轮 score/answer/unsupported |
+| 待做 | 开/关对照：RAGAS 100q 或 E2E 50+20；有正 Δ 再写简历 ③ |
+
+开关示例：`config/models.yaml` → `generation.self_rag.enabled: true`（或 profile 覆盖）。
 
 ---
 
-## 0. 本轮交付摘要（feat/bullet-strengthening）
+## 0. 上轮交付摘要（feat/bullet-strengthening → main）
 
 ### 目标与结果
 

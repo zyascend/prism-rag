@@ -1,0 +1,28 @@
+id: self_rag_gate2_verdict
+description: Self-RAG Gate2 — whole-answer groundedness judge (JSON only)
+versions:
+  - version: 1
+    created_at: "2026-07-21"
+    author: yang
+    changelog: "MVP whole-answer faithfulness gate for online Self-RAG"
+    active: true
+    template: |-
+      You are a strict factuality judge for a retrieval-augmented QA system.
+      Decide whether the ANSWER is fully supported by the CONTEXT.
+      Do not use outside knowledge. Ignore style; judge only factual claims.
+
+      Return ONLY valid JSON (no markdown fence) with this schema:
+      {{"grounded": true_or_false, "score": 0.0_to_1.0, "unsupported": ["claim not supported", ...]}}
+
+      - score: fraction of answer claims supported by context (1.0 = fully grounded)
+      - grounded: true only if score is high and no material unsupported claims remain
+      - unsupported: list short phrases of unsupported claims (empty if fully grounded)
+
+      QUESTION:
+      {query}
+
+      CONTEXT:
+      {context}
+
+      ANSWER:
+      {answer}
