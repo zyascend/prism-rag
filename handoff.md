@@ -19,7 +19,14 @@
 | off | **0.830** | **0.822** | 0.60 | 0.25 | 2.24s |
 | on | 0.786 | 0.763 | 0.60 | **0.95** | 3.96s |
 
-结论：Gate2 **不抬 Faith**（−4pt）、延迟 ×1.8；拒答准确率大涨但可答有误杀。**简历不写 Faith↑**；口述可讲阴性对照。详情见 run README。
+结论（原始表）：Gate2 汇总 Faith −4pt 含**口径污染**；排除拒答后放行答案 Faith 约 0.90。E2E Reject 0.25→0.95；Correctness 持平 0.60。
+
+**Badcase 建议已落实（同分支）：**
+- P0 `src/rejection.py` 统一拒答句/短语；RAGAS Faith/Rel **排除拒答**；E2E 认 Gate2/`I don't know`
+- P1 `trigger: low_rerank`（默认 0.35）— 高置信跳过 Gate2；A/B 仍可用 `SELF_RAG_TRIGGER=always`
+- P2 检索实体错题 **未做**
+
+详情：`runs/20260721-self-rag-gate2/badcase_analysis.md`
 
 ---
 

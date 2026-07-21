@@ -587,8 +587,10 @@ def compute_context_relevancy(query: str, context_chunks: List[str]) -> ContextR
 
 def generate_answer(query: str, context: str) -> str:
     """基于检索上下文生成回答"""
+    from src.rejection import ABSTAIN_ANSWER
+
     if not context:
-        return "I cannot answer this question based on the available documents."
+        return ABSTAIN_ANSWER
 
     tracer = get_tracer()
     with tracer.start_span("llm_generate") as span:
@@ -767,7 +769,9 @@ def evaluate_generation(
                 })
 
             if threshold_rejected:
-                answer = "I cannot answer this question based on the available documents."
+                from src.rejection import ABSTAIN_ANSWER
+
+                answer = ABSTAIN_ANSWER
                 context = "\n\n---\n\n".join(context_chunks)
                 ctx_for_eval = context
             elif use_pipeline:
@@ -813,20 +817,18 @@ def evaluate_generation(
 
         latency_total += time.time() - start
 
-        # 检查是否短语拒答
-        rejection_phrases = [
-            "cannot answer", "not enough information",
-            "based on the available", "cannot provide",
-        ]
-        phrase_rejected = any(phrase in answer.lower() for phrase in rejection_phrases)
+        # 检查是否短语拒答（统一口径 src.rejection，含 Gate2 ABSTAIN_ANSWER）
+        from src.rejection import is_rejection
+
+        phrase_rejected = is_rejection(answer)
         is_rejected = phrase_rejected or threshold_rejected
 
         if is_rejected:
             rejected_count += 1
         else:
             generated_count += 1
-        
-        # Step 3: Faithfulness（只在非拒答时算，否则无意义）
+
+        # Step 3: Faithfulness（只在非拒答时算；拒答不进均值）
         with tracer.start_span("ragas_faithfulness") as faith_span:
             if not is_rejected and answer:
                 f_result = compute_faithfulness(answer, context)
@@ -844,15 +846,22 @@ def evaluate_generation(
                 "is_rejected": is_rejected,
                 "num_claims": len(f_result.claims),
                 "score": f_result.faithfulness_score,
+                "excluded_from_avg": is_rejected,
             })
-        
-        # Step 4: Answer Relevancy
+
+        # Step 4: Answer Relevancy（拒答不计入 avg_relevancy）
         with tracer.start_span("ragas_answer_relevancy") as ar_span:
-            r_result = compute_answer_relevancy(query_text, answer)
+            if not is_rejected and answer:
+                r_result = compute_answer_relevancy(query_text, answer)
+            else:
+                r_result = AnswerRelevancyResult(
+                    query=query_text, answer=answer, relevancy_score=0.0
+                )
             relevancy_results.append(r_result)
             ar_span.set_metadata({
                 "score": r_result.relevancy_score,
                 "num_gen_questions": len(r_result.generated_questions),
+                "excluded_from_avg": is_rejected,
             })
 
         # Step 5: Context Relevance — 评估 LLM 实际看到的上下文（压缩后），
@@ -895,10 +904,20 @@ def evaluate_generation(
         if trace:
             collector.ingest_trace(trace)
     
-    # ── 汇总 ──
-    faithfulness_scores = [r.faithfulness_score for r in faithfulness_results if r.claims]
+    # ── 汇总（拒答不进 Faith / Rel 均值，避免 Gate2 硬拒污染）──
+    from src.rejection import is_rejection as _is_rej
+
+    faithfulness_scores = [
+        r.faithfulness_score
+        for r in faithfulness_results
+        if r.claims and not _is_rej(r.answer)
+    ]
     avg_faithfulness = float(np.mean(faithfulness_scores)) if faithfulness_scores else 0.0
-    relevancy_scores = [r.relevancy_score for r in relevancy_results]
+    relevancy_scores = [
+        r.relevancy_score
+        for r in relevancy_results
+        if not _is_rej(r.answer)
+    ]
     avg_relevancy = float(np.mean(relevancy_scores)) if relevancy_scores else 0.0
     context_relevancy_scores = [r.relevance_score for r in context_relevancy_results if r.num_sentences > 0]
     avg_context_relevancy = float(np.mean(context_relevancy_scores)) if context_relevancy_scores else 0.0

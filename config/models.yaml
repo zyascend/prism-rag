@@ -34,8 +34,11 @@ generation:
   # true：RAGAS/E2E 走 Generator±Gate2（与 /ask 对齐）；云上 A/B 两臂均应开
   eval_via_generator: false
   self_rag:
-    enabled: false                    # true 时 /ask 与 eval_via_generator 路径走 Gate2
+    enabled: false                    # true 时允许 Gate2；是否本条执行见 trigger
     mode: gate2_only                  # MVP 固定；预留 gate1_and_gate2
+    # always: 每条过门；low_rerank: 仅 max(rerank_score) < 阈值时过门（推荐）
+    trigger: low_rerank
+    low_rerank_threshold: 0.35        # 低于此视为低置信，才跑 Gate2
     judge_model: null                 # null = 与主生成 model 相同
     faith_threshold: 0.8
     max_generate_attempts: 2          # 含首次生成

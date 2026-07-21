@@ -25,6 +25,7 @@ import numpy as np
 import requests
 
 from src.observability import get_tracer
+from src.rejection import ABSTAIN_ANSWER, REJECTION_PHRASES, is_rejection
 
 logger = logging.getLogger(__name__)
 
@@ -177,24 +178,12 @@ Question: {question}
 
 Answer:"""
 
-REJECTION_PHRASES = [
-    "cannot answer", "not enough information",
-    "based on the available", "cannot provide",
-    "i don't have", "i do not have",
-    "no information", "not covered",
-    "out of scope", "beyond the scope",
-    "the context does not contain",
-    "the provided context does not",
-]
-
 # ─── 核心评测函数 ──────────────────────────────────────────────
 
 
 def is_answer_rejected(answer: str) -> bool:
-    """判断回答是否为拒绝回答"""
-    if not answer:
-        return True
-    return any(phrase in answer.lower() for phrase in REJECTION_PHRASES)
+    """判断回答是否为拒绝回答（统一口径：src.rejection）。"""
+    return is_rejection(answer)
 
 
 def compute_answer_correctness(
@@ -283,7 +272,7 @@ def compute_answer_correctness(
 def generate_answer(query: str, context: str) -> str:
     """基于检索上下文生成回答"""
     if not context:
-        return "I cannot answer this question based on the available documents."
+        return ABSTAIN_ANSWER
     prompt = GENERATION_PROMPT.format(context=context[:12000], question=query)
     answer = call_llm(prompt)
     return answer if answer else ""

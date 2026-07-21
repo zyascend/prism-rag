@@ -61,13 +61,9 @@ def generate_answer(retriever: PrismRAGRetriever, query: str) -> Dict:
     if not answer:
         is_rejected = True  # Ollama failure → safer to count as rejected
     else:
-        is_rejected = any(phrase in answer.lower() for phrase in [
-            "cannot answer", "not enough information",
-            "based on the available", "cannot provide",
-            "i don't have", "i do not have",
-            "no information", "not covered",
-            "out of scope", "beyond the scope",
-        ])
+        from src.rejection import is_rejection
+
+        is_rejected = is_rejection(answer)
 
     return {
         "query": query,

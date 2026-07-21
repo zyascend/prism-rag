@@ -15,10 +15,12 @@ from typing import Any, Callable, Dict, List, Optional
 from src.config import cfg
 from src.observability import get_tracer
 from src.prompts import get_active
+from src.rejection import ABSTAIN_ANSWER
 
 logger = logging.getLogger(__name__)
 
-ABSTAIN_ANSWER = "I don't have enough information to answer that question."
+# 兼容：历史 import from self_rag import ABSTAIN_ANSWER
+__all__ = ["ABSTAIN_ANSWER", "SelfRAGOrchestrator", "self_rag_config", "answer_for_eval"]
 
 # Trace / self_rag.attempts_detail 中答案截断长度（控制 api_traces.jsonl 体积）
 _ANSWER_TRACE_MAX = 500
@@ -67,6 +69,9 @@ def self_rag_config() -> Dict[str, Any]:
     return {
         "enabled": bool(raw.get("enabled", False)),
         "mode": str(raw.get("mode", "gate2_only")),
+        # always: 开启即每条过 Gate2；low_rerank: 仅 max(rerank_score) < 阈值时过门
+        "trigger": str(raw.get("trigger", "low_rerank")),
+        "low_rerank_threshold": float(raw.get("low_rerank_threshold", 0.35)),
         "judge_model": raw.get("judge_model"),
         "faith_threshold": float(raw.get("faith_threshold", 0.8)),
         "max_generate_attempts": int(raw.get("max_generate_attempts", 2)),
@@ -77,6 +82,34 @@ def self_rag_config() -> Dict[str, Any]:
     }
 
 
+def should_apply_gate2(
+    retrieved: Optional[List[dict]],
+    sr: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """是否对本条请求跑 Gate2（enabled + trigger）。"""
+    sr = sr or self_rag_config()
+    if not sr.get("enabled"):
+        return False
+    trigger = str(sr.get("trigger", "low_rerank")).lower()
+    if trigger in ("always", "all", "on"):
+        return True
+    if trigger in ("low_rerank", "low_confidence", "rerank"):
+        scores = [
+            float(r["rerank_score"])
+            for r in (retrieved or [])
+            if r.get("rerank_score") is not None
+        ]
+        if not scores:
+            # 无 rerank 分：保守过门（避免漏拦）
+            return True
+        thr = float(sr.get("low_rerank_threshold", 0.35))
+        return max(scores) < thr
+    if trigger in ("never", "off", "none"):
+        return False
+    logger.warning("unknown self_rag.trigger=%s; treating as always", trigger)
+    return True
+
+
 def self_rag_cache_salt(sr: Optional[Dict[str, Any]] = None) -> str:
     """L4 Answer 缓存 key 盐：开/关与门参数变化不得串答案。"""
     sr = sr or self_rag_config()
@@ -85,6 +118,8 @@ def self_rag_cache_salt(sr: Optional[Dict[str, Any]] = None) -> str:
     return (
         f"sr=on"
         f"|mode={sr.get('mode', 'gate2_only')}"
+        f"|trg={sr.get('trigger', 'low_rerank')}"
+        f"|lr={sr.get('low_rerank_threshold', 0.35)}"
         f"|th={sr.get('faith_threshold', 0.8)}"
         f"|vm={sr.get('verdict_mode', 'whole_answer')}"
         f"|of={sr.get('on_fail', 'regenerate_then_abstain')}"
@@ -235,9 +270,17 @@ class SelfRAGOrchestrator:
         k_context: int = 5,
     ) -> dict:
         sr = self._cfg_now()
-        if not sr.get("enabled"):
+        apply_gate = should_apply_gate2(retrieved, sr)
+        if not apply_gate:
             out = self.generator.answer(query, retrieved, k_context=k_context)
-            out["self_rag"] = {"enabled": False}
+            out["self_rag"] = {
+                "enabled": bool(sr.get("enabled")),
+                "applied": False,
+                "trigger": sr.get("trigger"),
+                "skip_reason": (
+                    "disabled" if not sr.get("enabled") else "trigger_not_met"
+                ),
+            }
             return out
 
         tracer = get_tracer()
@@ -245,6 +288,8 @@ class SelfRAGOrchestrator:
             "self_rag.gate2",
             metadata={
                 "enabled": True,
+                "applied": True,
+                "trigger": sr.get("trigger"),
                 "faith_threshold": sr["faith_threshold"],
                 "verdict_mode": sr.get("verdict_mode", "whole_answer"),
                 "on_fail": sr.get("on_fail"),
@@ -264,6 +309,8 @@ class SelfRAGOrchestrator:
             def _finish_meta(**kwargs: Any) -> Dict[str, Any]:
                 meta = {
                     "enabled": True,
+                    "applied": True,
+                    "trigger": sr.get("trigger"),
                     "attempts_detail": list(attempts_detail),
                     **kwargs,
                 }

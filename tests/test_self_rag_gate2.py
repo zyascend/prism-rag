@@ -9,7 +9,9 @@ from src.generation.self_rag import (
     _parse_verdict_json,
     evaluate_gate2_whole_answer,
     self_rag_cache_salt,
+    should_apply_gate2,
 )
+from src.rejection import is_rejection
 
 
 class _FakeCompletions:
@@ -151,7 +153,55 @@ def test_orchestrator_disabled_passthrough():
     out = orch.answer("q", _retrieved(), k_context=5)
     assert out["answer"] == "plain answer"
     assert out["self_rag"]["enabled"] is False
+    assert out["self_rag"].get("applied") is False
     assert len(gen.calls) == 1
+
+
+def test_orchestrator_low_rerank_skips_when_confident():
+    """高 rerank 分时 trigger=low_rerank 跳过 Gate2。"""
+    gen = _FakeGenerator(["confident answer"])
+    retrieved = _retrieved()
+    retrieved[0]["rerank_score"] = 0.9
+    orch = SelfRAGOrchestrator(
+        gen,
+        config={
+            "enabled": True,
+            "trigger": "low_rerank",
+            "low_rerank_threshold": 0.35,
+            "faith_threshold": 0.8,
+            "max_generate_attempts": 2,
+            "on_fail": "abstain",
+            "on_judge_error": "degrade_pass",
+            "verdict_mode": "whole_answer",
+        },
+        judge_complete_fn=lambda p: (_ for _ in ()).throw(AssertionError("gate should not run")),
+    )
+    out = orch.answer("q", retrieved)
+    assert out["answer"] == "confident answer"
+    assert out["self_rag"]["applied"] is False
+    assert out["self_rag"]["skip_reason"] == "trigger_not_met"
+    assert len(gen.calls) == 1
+
+
+def test_should_apply_gate2_low_rerank():
+    assert should_apply_gate2(
+        [{"rerank_score": 0.1}],
+        {"enabled": True, "trigger": "low_rerank", "low_rerank_threshold": 0.35},
+    )
+    assert not should_apply_gate2(
+        [{"rerank_score": 0.9}],
+        {"enabled": True, "trigger": "low_rerank", "low_rerank_threshold": 0.35},
+    )
+    assert should_apply_gate2(
+        [{"rerank_score": 0.9}],
+        {"enabled": True, "trigger": "always"},
+    )
+
+
+def test_gate2_abstain_is_rejection():
+    assert is_rejection(ABSTAIN_ANSWER) is True
+    assert is_rejection("I don't know.") is True
+    assert is_rejection("The torque is 50 Nm.") is False
 
 
 def test_orchestrator_pass_first_try():
@@ -160,6 +210,7 @@ def test_orchestrator_pass_first_try():
         gen,
         config={
             "enabled": True,
+            "trigger": "always",
             "faith_threshold": 0.8,
             "max_generate_attempts": 2,
             "on_fail": "regenerate_then_abstain",
@@ -173,6 +224,7 @@ def test_orchestrator_pass_first_try():
     out = orch.answer("interval?", _retrieved())
     assert out["answer"] == "500 hours"
     assert out["self_rag"]["passed"] is True
+    assert out["self_rag"]["applied"] is True
     assert out["self_rag"]["attempts"] == 1
     assert out["self_rag"]["final_action"] == "return"
     assert len(gen.calls) == 1
@@ -194,6 +246,7 @@ def test_orchestrator_fail_then_regen_pass():
         gen,
         config={
             "enabled": True,
+            "trigger": "always",
             "faith_threshold": 0.8,
             "max_generate_attempts": 2,
             "on_fail": "regenerate_then_abstain",
@@ -236,6 +289,7 @@ def test_attempts_detail_on_double_fail_abstain():
         gen,
         config={
             "enabled": True,
+            "trigger": "always",
             "faith_threshold": 0.8,
             "max_generate_attempts": 2,
             "on_fail": "regenerate_then_abstain",
@@ -260,6 +314,7 @@ def test_orchestrator_fail_abstain():
         gen,
         config={
             "enabled": True,
+            "trigger": "always",
             "faith_threshold": 0.8,
             "max_generate_attempts": 2,
             "on_fail": "regenerate_then_abstain",
@@ -284,6 +339,7 @@ def test_orchestrator_on_fail_abstain_no_regen():
         gen,
         config={
             "enabled": True,
+            "trigger": "always",
             "faith_threshold": 0.8,
             "max_generate_attempts": 2,
             "on_fail": "abstain",
@@ -306,6 +362,7 @@ def test_orchestrator_judge_error_degrade_pass():
         gen,
         config={
             "enabled": True,
+            "trigger": "always",
             "faith_threshold": 0.8,
             "max_generate_attempts": 2,
             "on_fail": "regenerate_then_abstain",
@@ -326,6 +383,7 @@ def test_orchestrator_judge_error_abstain():
         gen,
         config={
             "enabled": True,
+            "trigger": "always",
             "faith_threshold": 0.8,
             "max_generate_attempts": 2,
             "on_fail": "regenerate_then_abstain",

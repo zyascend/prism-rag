@@ -74,6 +74,8 @@ gen = data.setdefault("generation", {})
 gen["eval_via_generator"] = True
 sr = gen.setdefault("self_rag", {})
 sr["enabled"] = os.environ["ENABLED_SR"].lower() in ("1", "true", "yes")
+# A/B 默认 trigger=always 以隔离 Gate2 全量效应；生产默认 low_rerank
+sr["trigger"] = os.environ.get("SELF_RAG_TRIGGER", "always")
 # 隔离变量：A/B 不混 visual 路由
 vr = data.setdefault("retrieval", {}).setdefault("visual_routing", {})
 vr["enabled"] = False
