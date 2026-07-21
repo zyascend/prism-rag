@@ -15,6 +15,7 @@ from src.cache.store import InMemoryLRUCache
 from src.config import cfg
 from src.evaluation.vidore_adapter import PrismRAGRetriever
 from src.generation.generator import Generator, GenerationError
+from src.generation.self_rag import SelfRAGOrchestrator, self_rag_config
 from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
 from src.ingestion.pdf_ingestor import PDFIngestor
 from src.ingestion.text_chunker import TextChunker
@@ -221,11 +222,37 @@ class AskRequest(BaseModel):
     use_rerank: bool = True
 
 
+class SelfRAGAttemptDetail(BaseModel):
+    """单轮生成+Gate2 记录（fail→regen 回放）。"""
+    attempt: int
+    prompt_id: str
+    answer: str = ""
+    action: str = ""
+    passed: Optional[bool] = None
+    score: Optional[float] = None
+    unsupported: List[str] = []
+    latency_ms: Optional[float] = None
+    gate_degraded: bool = False
+    error: Optional[str] = None
+
+
+class SelfRAGInfo(BaseModel):
+    """Gate2 结果（向后兼容：默认关闭时仅 enabled=false）。"""
+    enabled: bool = False
+    passed: Optional[bool] = None
+    score: Optional[float] = None
+    attempts: Optional[int] = None
+    final_action: Optional[str] = None
+    gate_degraded: Optional[bool] = None
+    attempts_detail: Optional[List[SelfRAGAttemptDetail]] = None
+
+
 class AskResponse(BaseModel):
     query: str
     answer: str
     citations: List[Citation] = []
     retrieval_trace: RetrievalTrace = RetrievalTrace()
+    self_rag: Optional[SelfRAGInfo] = None
 
 
 UPLOAD_DIR = Path("data/uploads")
@@ -290,10 +317,12 @@ async def ask(request: AskRequest):
             dense_top5=[RouteTraceItem(**t) for t in rt["dense_top5"]],
             visual_top5=[RouteTraceItem(**t) for t in rt["visual_top5"]],
         )
+        sr_info = cached_answer.get("self_rag")
         return AskResponse(
             query=request.query, answer=cached_answer["answer"],
             citations=[Citation(**c) for c in cached_answer["citations"]],
             retrieval_trace=trace,
+            self_rag=SelfRAGInfo(**sr_info) if sr_info else None,
         )
 
     try:
@@ -320,9 +349,34 @@ async def ask(request: AskRequest):
             citations=[], retrieval_trace=trace,
         )
     try:
-        gen_out = gen.answer(request.query, results, k_context=request.k)
+        sr_cfg = self_rag_config()
+        if sr_cfg.get("enabled"):
+            orchestrator = SelfRAGOrchestrator(gen)
+            gen_out = orchestrator.answer(
+                request.query, results, k_context=request.k
+            )
+        else:
+            gen_out = gen.answer(request.query, results, k_context=request.k)
+            gen_out.setdefault("self_rag", {"enabled": False})
     except GenerationError as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+    sr_payload = gen_out.get("self_rag") or {"enabled": False}
+    # 响应暴露稳定字段 + attempts_detail（答案已在 orchestrator 侧截断）
+    sr_public = {
+        k: sr_payload.get(k)
+        for k in (
+            "enabled",
+            "passed",
+            "score",
+            "attempts",
+            "final_action",
+            "gate_degraded",
+            "attempts_detail",
+        )
+        if k in sr_payload or k == "enabled"
+    }
+    sr_public.setdefault("enabled", bool(sr_payload.get("enabled", False)))
 
     # 写入 L4 Answer 缓存（受全局开关 + 确定性守卫；命中率经 cache_label 聚合）
     if cfg.cache.enabled and gen.cacheable and answer_key is not None and retriever._answer_cache is not None:
@@ -330,6 +384,7 @@ async def ask(request: AskRequest):
             "answer": gen_out["answer"],
             "citations": gen_out["citations"],
             "retrieval_trace": retrieval_trace,
+            "self_rag": sr_public,
         })
         collector.record_cache_event("answer", hit=False, config_label=cache_label)
 
@@ -337,4 +392,5 @@ async def ask(request: AskRequest):
         query=request.query, answer=gen_out["answer"],
         citations=[Citation(**c) for c in gen_out["citations"]],
         retrieval_trace=trace,
+        self_rag=SelfRAGInfo(**sr_public),
     )

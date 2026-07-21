@@ -1,0 +1,128 @@
+{
+  "title": "Self-RAG clean comparison under post-P0 metrics",
+  "note": "OFF 未重跑生成：对 20260721-self-rag-gate2/off 的 JSON 用 src.rejection 重算。ON-new 为 20260721-self-rag-on-only 在线评测（代码含 P0，trigger=always）。ON-old 为修复前同日 always 跑，亦用新口径重算以对照。",
+  "ragas": {
+    "off_recomputed": {
+      "source": "runs/20260721-self-rag-gate2/off/ragas/ragas_metrics_default.json",
+      "metric_version": "post-P0 (src.rejection + exclude rejects from Faith/Rel mean)",
+      "num_queries": 100,
+      "rejected_count": 17,
+      "generated_count": 83,
+      "avg_faithfulness": 0.9188,
+      "avg_relevancy": 0.8157,
+      "avg_context_relevancy": 0.2549,
+      "n_faith_in_avg": 83,
+      "n_rel_in_avg": 83,
+      "raw_summary_as_stored": {
+        "num_queries": 100,
+        "generated_count": 98,
+        "rejected_count": 2,
+        "avg_faithfulness": 0.8295,
+        "avg_relevancy": 0.822,
+        "avg_context_relevancy": 0.2549
+      }
+    },
+    "on_old_recomputed": {
+      "source": "runs/20260721-self-rag-gate2/on/ragas/ragas_metrics_default.json",
+      "metric_version": "post-P0 (src.rejection + exclude rejects from Faith/Rel mean)",
+      "num_queries": 100,
+      "rejected_count": 16,
+      "generated_count": 84,
+      "avg_faithfulness": 0.9122,
+      "avg_relevancy": 0.813,
+      "avg_context_relevancy": 0.2551,
+      "n_faith_in_avg": 84,
+      "n_rel_in_avg": 84,
+      "raw_summary_as_stored": {
+        "num_queries": 100,
+        "generated_count": 100,
+        "rejected_count": 0,
+        "avg_faithfulness": 0.7857,
+        "avg_relevancy": 0.7631,
+        "avg_context_relevancy": 0.2551
+      }
+    },
+    "on_new_live": {
+      "source": "runs/20260721-self-rag-on-only/on/ragas/ragas_metrics_default.json",
+      "metric_version": "post-P0 (src.rejection + exclude rejects from Faith/Rel mean)",
+      "num_queries": 100,
+      "rejected_count": 17,
+      "generated_count": 83,
+      "avg_faithfulness": 0.9277,
+      "avg_relevancy": 0.8144,
+      "avg_context_relevancy": 0.2606,
+      "n_faith_in_avg": 83,
+      "n_rel_in_avg": 83,
+      "raw_summary_as_stored": {
+        "num_queries": 100,
+        "generated_count": 83,
+        "rejected_count": 17,
+        "avg_faithfulness": 0.9277,
+        "avg_relevancy": 0.8144,
+        "avg_context_relevancy": 0.2606
+      }
+    }
+  },
+  "e2e": {
+    "off_recomputed": {
+      "source": "runs/20260721-self-rag-gate2/off/e2e/e2e_qa_results.json",
+      "metric_version": "post-P0 is_rejection",
+      "num_answerable": 50,
+      "num_rejection": 20,
+      "avg_correctness": 0.6,
+      "rejection_accuracy": 0.9,
+      "rejected_count_answerable": 6,
+      "combined_score": 0.69,
+      "avg_latency_seconds": 2.24,
+      "raw_summary_as_stored": {
+        "num_answerable": 50,
+        "num_rejection": 20,
+        "avg_correctness": 0.6,
+        "rejection_accuracy": 0.25,
+        "combined_score": 0.495,
+        "avg_latency_seconds": 2.24,
+        "rejected_count_answerable": 0
+      }
+    },
+    "on_old_recomputed": {
+      "source": "runs/20260721-self-rag-gate2/on/e2e/e2e_qa_results.json",
+      "metric_version": "post-P0 is_rejection",
+      "num_answerable": 50,
+      "num_rejection": 20,
+      "avg_correctness": 0.6,
+      "rejection_accuracy": 0.95,
+      "rejected_count_answerable": 4,
+      "combined_score": 0.705,
+      "avg_latency_seconds": 3.96,
+      "raw_summary_as_stored": {
+        "num_answerable": 50,
+        "num_rejection": 20,
+        "avg_correctness": 0.6,
+        "rejection_accuracy": 0.95,
+        "combined_score": 0.705,
+        "avg_latency_seconds": 3.96,
+        "rejected_count_answerable": 3
+      }
+    },
+    "on_new_live": {
+      "source": "runs/20260721-self-rag-on-only/on/e2e/e2e_qa_results.json",
+      "metric_version": "post-P0 is_rejection",
+      "num_answerable": 50,
+      "num_rejection": 20,
+      "avg_correctness": 0.62,
+      "rejection_accuracy": 0.95,
+      "rejected_count_answerable": 6,
+      "combined_score": 0.719,
+      "avg_latency_seconds": 3.81,
+      "raw_summary_as_stored": {
+        "num_answerable": 50,
+        "num_rejection": 20,
+        "avg_correctness": 0.62,
+        "rejection_accuracy": 0.95,
+        "combined_score": 0.719,
+        "avg_latency_seconds": 3.81,
+        "rejected_count_answerable": 6
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+job=self_rag_on_only
+date=20260721
+code=rejection.py+low_rerank+faith_exclude
+2026-07-21T05:13:37Z
+PID=1728

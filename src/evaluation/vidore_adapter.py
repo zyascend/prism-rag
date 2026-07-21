@@ -157,7 +157,10 @@ class PrismRAGRetriever:
 
         与 L3 不同，doc_id 影响最终答案（路由层在检索后做确定性后置过滤），必须纳入 key；
         index_version 保证语料变更后旧 key 自动失效（不依赖 TTL）。
+        Self-RAG 开关/阈值变化也必须入 key，避免开/关串答案。
         """
+        from src.generation.self_rag import self_rag_cache_salt
+
         norm = unicodedata.normalize("NFKC", query).lower().strip()
         norm = " ".join(norm.split())
         parts = [
@@ -166,6 +169,7 @@ class PrismRAGRetriever:
             f"kctx={k_context}",
             f"doc={doc_id or '*'}",
             f"v={self.index_version}",
+            self_rag_cache_salt(),
         ]
         return "|".join(parts)
 

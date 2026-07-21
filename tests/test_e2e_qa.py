@@ -143,6 +143,14 @@ class TestIsAnswerRejected:
     def test_rejection_phrases_not_enough_info(self):
         assert is_answer_rejected("There is not enough information in the context to answer.") is True
 
+    def test_rejection_gate2_abstain_phrase(self):
+        assert is_answer_rejected(
+            "I don't have enough information to answer that question."
+        ) is True
+
+    def test_rejection_soft_i_dont_know(self):
+        assert is_answer_rejected("I don't know.") is True
+
     def test_rejection_phrases_no_info(self):
         assert is_answer_rejected("No information about this topic was found.") is True
 

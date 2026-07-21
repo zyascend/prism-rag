@@ -29,6 +29,25 @@ retrieval:
 context_filter:
   mode: bge                           # off | bge | llm | bge_then_llm
 
+# Self-RAG Gate2（生成后忠实性门）；默认关闭，消融/线上显式打开
+generation:
+  # true：RAGAS/E2E 走 Generator±Gate2（与 /ask 对齐）；云上 A/B 两臂均应开
+  eval_via_generator: false
+  self_rag:
+    enabled: false                    # true 时允许 Gate2；是否本条执行见 trigger
+    mode: gate2_only                  # MVP 固定；预留 gate1_and_gate2
+    # always: 每条过门；low_rerank: 仅 max(rerank_score) < 阈值时过门（推荐）
+    trigger: low_rerank
+    low_rerank_threshold: 0.35        # 低于此视为低置信，才跑 Gate2
+    judge_model: null                 # null = 与主生成 model 相同
+    faith_threshold: 0.8
+    max_generate_attempts: 2          # 含首次生成
+    on_fail: regenerate_then_abstain  # abstain | regenerate_then_abstain
+    gate_timeout_ms: 8000
+    on_judge_error: degrade_pass      # degrade_pass | abstain
+    verdict_mode: whole_answer        # whole_answer（claim_level 预留）
+
+
 storage:
   pgvector:
     host: "localhost"

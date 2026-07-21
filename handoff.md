@@ -1,11 +1,82 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: main（合并 `feat/bullet-strengthening` 后）| 远程: origin  
-> 更新: **2026-07-20** — Bullet 强化 Standard 档完成（Boot-A + Boot-B 云上数字已归档）
+> 分支: **main**（合并 `feat/self-rag-gate2` 后）| 远程: origin  
+> 更新: **2026-07-21** — Self-RAG Gate2 MVP + 拒答口径 P0/P1 + 云上干净对照定稿
 
 ---
 
-## 0. 本轮交付摘要（feat/bullet-strengthening）
+## 0. 本轮交付摘要（feat/self-rag-gate2 → main）
+
+### 目标与结果
+
+| 目标 | 结果 |
+|------|------|
+| 工程版 Self-RAG Gate2（生成后忠实性门） | ✅ 默认关；`trigger=low_rerank`；`/ask` + Trace `attempts_detail` |
+| 评测与生产对齐 | ✅ `eval_via_generator` / `answer_for_eval` 接 RAGAS·E2E |
+| 拒答口径污染修复（P0） | ✅ `src/rejection.py`；Faith/Rel **排除拒答** |
+| 低置信过门（P1） | ✅ `low_rerank` + 阈值 0.35 |
+| 云上可辩护数字 | ✅ post-P0 干净对照（见下） |
+
+### 干净对照（定稿 · post-P0）
+
+机器可读：`runs/20260721-self-rag-on-only/comparison_post_p0.json`  
+叙事：`runs/20260721-self-rag-on-only/README.md` · badcase：`runs/20260721-self-rag-gate2/badcase_analysis.md`
+
+| 臂 | Faith | Rel | 拒答 | E2E Correct | E2E Reject | latency |
+|----|------:|----:|-----:|------------:|-----------:|--------:|
+| OFF 重算（旧生成+新口径） | 0.919 | 0.816 | 17 | 0.60 | **0.90** | 2.24s |
+| ON-new always（在线） | **0.928** | 0.814 | 17 | **0.62** | **0.95** | 3.81s |
+| Δ | +0.9pt | ~0 | 0 | +0.02 | +0.05 | ×1.7 |
+
+- 原始污染表（Faith 0.83→0.79）**作废**（Gate2 拒答未进 rejected_count、却记 Faith=0）。
+- Gate2 always **仅边际** Faith↑；E2E Correctness 主错仍在**检索/错 chunk**。
+- **默认** `generation.self_rag.enabled: false`；生产可开 + `trigger: low_rerank`。
+- **简历**：不写旧 Faith 大跌；若提 Gate2，写口径修复后微升 + 硬拒答 + 延迟代价。
+
+### 配置默认（合并后）
+
+| 项 | 默认 | 说明 |
+|----|------|------|
+| `generation.self_rag.enabled` | **false** | 总开关 |
+| `generation.self_rag.trigger` | **low_rerank** | `always` / `low_rerank` |
+| `generation.self_rag.low_rerank_threshold` | 0.35 | max(rerank_score) 低于此才过门 |
+| `generation.eval_via_generator` | false | true 时 RAGAS/E2E 走 Generator±Gate2 |
+| `retrieval.visual_routing.enabled` | false | （上轮） |
+| `context_filter.mode` | bge | （上轮） |
+
+### 关键代码
+
+- `src/generation/self_rag.py` — Gate2 编排 + attempts_detail + trigger  
+- `src/rejection.py` — 统一拒答句/检测  
+- `src/api/routes.py` — `/ask` self_rag 字段  
+- `src/evaluation/ragas_metrics.py` / `e2e_qa.py` — 接入 + 拒答不进 Faith/Rel 均值  
+- `scripts/cloud_self_rag_ab.sh` — 云上 A/B（`SKIP_OFF=1` 可只跑 ON）  
+- prompts：`self_rag_gate2_verdict` / `self_rag_regenerate`  
+- 测试：`tests/test_self_rag_gate2.py` 等  
+
+### 云上操作（Self-RAG 对照）
+
+```bash
+cd /root/prism-rag && source scripts/cloud_env.sh
+export PYTHON=/root/miniconda3/bin/python
+service postgresql start
+pgrep -x ollama >/dev/null || nohup ollama serve >> /root/autodl-tmp/logs/ollama.log 2>&1 &
+# 双臂：bash scripts/cloud_self_rag_ab.sh
+# 仅 ON：SKIP_OFF=1 SELF_RAG_TRIGGER=always bash scripts/cloud_self_rag_ab.sh
+```
+
+### 未做 / 下一步
+
+| 项 | 状态 |
+|----|------|
+| P2 检索 badcase（TC/TCTO、Type I/II…） | ⏳ |
+| claim 级 Gate2 | ⏳ |
+| low_rerank 单独云上数字 | 可选 |
+| 简历 bullet ③ 写入 Gate2 涨分 | ❌ 不写大涨；可口述 |
+
+---
+
+## 0b. 上轮交付摘要（feat/bullet-strengthening → main）
 
 ### 目标与结果
 

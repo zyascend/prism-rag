@@ -2,8 +2,8 @@
 
 > **日期**：2026-07-09 初稿 · **2026-07-20 修订为 v2**  
 > **状态**：Draft v2 — **MVP 仅 Gate2（答案忠实性门）**；Gate1 为 Phase 2  
-> **实现状态**：未实现（仅设计）  
-> **分支建议**：实现时从 `main` 或当前 feat 拉 `feat/self-rag-gate2`，禁止直接改 main
+> **实现状态**：**MVP 代码已实现**（`feat/self-rag-gate2`）：`src/generation/self_rag.py` + prompts + `/ask` 接入；默认 `enabled: false`  
+> **分支**：`feat/self-rag-gate2`
 
 ### 关联文档
 
@@ -265,7 +265,7 @@ abstain 时：
 | **拒答 prompt** | 模型自觉说「无法回答」 | Gate2 是 **强制** abstain；两者可叠加 |
 | **L3 检索缓存** | 缓存融合/精排结果 | Gate2 不改变检索 key；重试生成仍可用同批 `results` |
 | **L4 Answer 缓存** | `temperature==0` 时可缓存整答 | key 必须含 **`self_rag.enabled` + mode + threshold + verdict_mode`**（或 `self_rag` 开时 **禁用 L4**，二选一；**推荐 key 加盐**，避免开/关串答案） |
-| **Trace / `GET /trace/{id}`** | 二分检索 vs 生成 | 必填 span：`self_rag.gate2`（score、passed、attempts、action、degraded、judge_model） |
+| **Trace / `GET /trace/{id}`** | 二分检索 vs 生成 | 必填 span：`self_rag.gate2`（score、passed、attempts、final_action、**attempts_detail**、degraded）；子 span `self_rag.gate2.attempt.{n}` 每轮一条（answer 截断 500 字、score、unsupported、action） |
 | **PromptRegistry** | YAML 版本化 prompt | Gate2 judge + regenerate 约束 **新建** prompt id，禁止硬编码散落 |
 | **Visual 路由** | 是否跑 Visual 路 | MVP 不重检索，无交互；Phase 2 重检索须 **复用同一路由决策** 或显式记录 |
 | **HyDE** | 查询改写实验 | **MVP/Phase2 默认不用**（消融阴性） |

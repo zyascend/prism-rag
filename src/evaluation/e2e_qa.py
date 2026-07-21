@@ -25,6 +25,7 @@ import numpy as np
 import requests
 
 from src.observability import get_tracer
+from src.rejection import ABSTAIN_ANSWER, REJECTION_PHRASES, is_rejection
 
 logger = logging.getLogger(__name__)
 
@@ -177,24 +178,12 @@ Question: {question}
 
 Answer:"""
 
-REJECTION_PHRASES = [
-    "cannot answer", "not enough information",
-    "based on the available", "cannot provide",
-    "i don't have", "i do not have",
-    "no information", "not covered",
-    "out of scope", "beyond the scope",
-    "the context does not contain",
-    "the provided context does not",
-]
-
 # ─── 核心评测函数 ──────────────────────────────────────────────
 
 
 def is_answer_rejected(answer: str) -> bool:
-    """判断回答是否为拒绝回答"""
-    if not answer:
-        return True
-    return any(phrase in answer.lower() for phrase in REJECTION_PHRASES)
+    """判断回答是否为拒绝回答（统一口径：src.rejection）。"""
+    return is_rejection(answer)
 
 
 def compute_answer_correctness(
@@ -283,7 +272,7 @@ def compute_answer_correctness(
 def generate_answer(query: str, context: str) -> str:
     """基于检索上下文生成回答"""
     if not context:
-        return "I cannot answer this question based on the available documents."
+        return ABSTAIN_ANSWER
     prompt = GENERATION_PROMPT.format(context=context[:12000], question=query)
     answer = call_llm(prompt)
     return answer if answer else ""
@@ -386,12 +375,24 @@ def evaluate_e2e_qa(
 
             # 检索
             retrieved = retriever.search(question, k=k, use_rerank=use_rerank)
-            context = "\n\n---\n\n".join(
-                [r.get("text", "") for r in retrieved]
-            ) if retrieved else ""
+            from src.generation.self_rag import answer_for_eval, eval_via_generator
 
-            # 生成
-            generated = generate_answer(question, context)
+            if eval_via_generator():
+                gen_out = answer_for_eval(
+                    question,
+                    retrieved or [],
+                    k_context=k,
+                    bge_embedder=getattr(retriever, "bge", None),
+                )
+                generated = gen_out.get("answer") or ""
+                context = gen_out.get("context") or ""
+                sr_meta = gen_out.get("self_rag") or {}
+            else:
+                context = "\n\n---\n\n".join(
+                    [r.get("text", "") for r in retrieved]
+                ) if retrieved else ""
+                generated = generate_answer(question, context)
+                sr_meta = {}
 
             elapsed = time.time() - start
             latency_total += elapsed
@@ -413,6 +414,11 @@ def evaluate_e2e_qa(
                 "type": "answerable",
                 "correct": correctness_result.is_correct,
                 "latency": round(elapsed, 2),
+                **({
+                    "self_rag_action": sr_meta.get("final_action"),
+                    "self_rag_score": sr_meta.get("score"),
+                    "self_rag_attempts": sr_meta.get("attempts"),
+                } if sr_meta else {}),
             })
 
             if not correctness_result.is_correct:
@@ -431,11 +437,21 @@ def evaluate_e2e_qa(
             start = time.time()
 
             retrieved = retriever.search(question, k=k, use_rerank=use_rerank)
-            context = "\n\n---\n\n".join(
-                [r.get("text", "") for r in retrieved]
-            ) if retrieved else ""
+            from src.generation.self_rag import answer_for_eval, eval_via_generator
 
-            generated = generate_answer(question, context)
+            if eval_via_generator():
+                gen_out = answer_for_eval(
+                    question,
+                    retrieved or [],
+                    k_context=k,
+                    bge_embedder=getattr(retriever, "bge", None),
+                )
+                generated = gen_out.get("answer") or ""
+            else:
+                context = "\n\n---\n\n".join(
+                    [r.get("text", "") for r in retrieved]
+                ) if retrieved else ""
+                generated = generate_answer(question, context)
 
             elapsed = time.time() - start
             latency_total += elapsed
