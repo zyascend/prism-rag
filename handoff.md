@@ -12,21 +12,18 @@
 | 默认 | **`generation.self_rag.enabled: false`**（云上对照后维持） |
 | 云上 A/B | ✅ `runs/20260721-self-rag-gate2/`（SeetaCloud 4090） |
 
-**A/B 主数字（100q RAGAS + E2E 50/20，eval_via_generator 两臂）：**
+**干净对照（post-P0 口径，定稿）** — `runs/20260721-self-rag-on-only/comparison_post_p0.json`：
 
-| | Faith | Rel | E2E Correct | E2E Reject | latency |
-|--|------:|----:|------------:|-----------:|--------:|
-| off | **0.830** | **0.822** | 0.60 | 0.25 | 2.24s |
-| on | 0.786 | 0.763 | 0.60 | **0.95** | 3.96s |
+| 臂 | Faith | Rel | 拒答 | E2E Correct | E2E Reject | latency |
+|----|------:|----:|-----:|------------:|-----------:|--------:|
+| OFF 重算（旧生成+新口径） | 0.919 | 0.816 | 17 | 0.60 | **0.90** | 2.24s |
+| ON-new 在线 always | **0.928** | 0.814 | 17 | **0.62** | **0.95** | 3.81s |
+| Δ | +0.9pt | ~0 | 0 | +0.02 | +0.05 | ×1.7 |
 
-结论（原始表）：Gate2 汇总 Faith −4pt 含**口径污染**；排除拒答后放行答案 Faith 约 0.90。E2E Reject 0.25→0.95；Correctness 持平 0.60。
+原始污染表（Faith 0.83/0.79）**作废**。Gate2 always 仅边际 Faith↑，主坏 case 仍在检索。
 
-**Badcase 建议已落实（同分支）：**
-- P0 `src/rejection.py` 统一拒答句/短语；RAGAS Faith/Rel **排除拒答**；E2E 认 Gate2/`I don't know`
-- P1 `trigger: low_rerank`（默认 0.35）— 高置信跳过 Gate2；A/B 仍可用 `SELF_RAG_TRIGGER=always`
-- P2 检索实体错题 **未做**
-
-详情：`runs/20260721-self-rag-gate2/badcase_analysis.md`
+**Badcase 建议：** P0/P1 已合；P2 检索未做。  
+详情：`runs/20260721-self-rag-on-only/README.md` · `runs/20260721-self-rag-gate2/badcase_analysis.md`
 
 ---
 

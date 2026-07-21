@@ -1,0 +1,605 @@
+{
+  "summary": {
+    "num_answerable": 50,
+    "num_rejection": 20,
+    "avg_correctness": 0.62,
+    "rejection_accuracy": 0.95,
+    "combined_score": 0.719,
+    "avg_latency_seconds": 3.81,
+    "rejected_count_answerable": 6
+  },
+  "correctness": [
+    {
+      "question": "key components aircraft fuel servicing safety protocols equipment standards",
+      "expected_answer": "Key components of aircraft fuel servicing safety protocols include:  1. Monitoring refueling flow meters and stopping operations upon detection of backflow. 2. Continuously monitoring the tank wet/dry sensor indicator lights on main control panels for Kovatch R-11s, and immediately stopping refueling if the wet (RED) indicator light illuminates during operation. 3. Positioning multiple refueling trucks at the aircraft before initiating fuel flow and remaining bonded until all trucks have terminated fuel flow on that side of the aircraft. 4. Verifying operational status of high level shutoff systems through pre-checks/pretests, especially for Condiesel (1981) R-9 vehicles equipped with electronically controlled high level shutoff systems. 5. Ensuring nozzles are equipped with ball strainer valves in the correct refuel/defuel position and inspecting/cleaning them every time they are switched from one position to another. 6. Providing secondary visual verification for proper placement and condition of ball valve strainers by available 2FOX1 personnel before commencing operations. 7. Conducting pressurized serviceability checks on refueling equipment once every 24 hours or after maintenance returns the equipment to service. 8. Stopping at least 25 feet from aircraft, approaching only upon direction from a servicing crew member, and maintaining minimum distances between vehicles and aircraft during fueling operations.  These components ensure safety standards are met in various aircraft fuel servicing scenarios including simultaneous fuel servicing and munitions loading (CSO), hot defueling, and hot refueling of specific helicopter models.",
+      "generated_answer": "The key components of aircraft fuel servicing safety protocols include:\n\n1. Clothing restrictions for personnel wearing garments with more than 65% nylon, rayon, wool, or polyester.\n2. Required support equipment such as Material Handling Equipment, Maintenance Stands (as required), Straight Nozzles for Underwing Servicing, and the Fuel Servicing Safety Zone (FSSZ).\n3. Guidelines on positioning fuel servicing equipment at least 50 feet from the aircraft and ensuring cab windows are closed before approaching.\n4. Instructions to keep aircraft engines running during operations with personnel responsible for verifying they are in \"Hotel Mode\" prior to directing vehicles into position.\n5. Procedures for obtaining appropriate fuel billing cards/information, verifying fuel grade, conducting a safety briefing, and positioning one flightline fire extinguisher between the equipment and crew members.\n6. Requirements for operating external power units being parked at least 50 feet from pressurized fuel servicing components and at least 25 feet from aircraft fuel vents.\n7. Guidelines on maintaining separation distances of at least 25 feet between vehicles authorized inside the FSSZ and aircraft fuel vent outlets, except for specific aircraft types like Boeing 747/757/767 including KC-46.\n8. The use of the aero-medical aircraft APU during all single point fuel servicing operations to supply electrical and pneumatic power for ECSs and life support medical equipment.\n9. On-site supervision by an individual who receives familiarization training on safety requirements and potential hazards, certified as required by MAJCOM and local maintenance/training directives.\n10. Prohibitions against oxygen servicing during fuel servicing.\n\nThese components are designed to prevent injury to personnel and damage to aircraft or equipment during fuel servicing operations.",
+      "context_length": 3983,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer introduces new information not present in the expected answer, such as clothing restrictions based on fabric content (point 1), guidelines for positioning equipment relative to aircraft engines running with specific engine mode requirements (point 4), and prohibitions against oxygen servicing during fuel servicing (point 10). It also omits some key components from the expected answer, like monitoring refueling flow meters, tank wet/dry sensor indicators, high level shutoff systems checks, ball strainer valve inspections, pressurized serviceability checks, secondary visual verification for ball valve strainers, and specific procedures for simultaneous fuel servicing and munitions loading (CSO), hot defueling, and hot refueling of specific helicopter models."
+    },
+    {
+      "question": "List two acceptable conditions for the shield termination of a braid clamp.",
+      "expected_answer": "Two acceptable conditions for the shield termination of a braid clamp are: 1) The braid/shield should be evenly distributed around the braid clamp, ensuring that the strands are close to but not in contact with the outer shoulder flange. 2) Shield ground strands should hold the braid clamp in tight contact with the cable outer jacket without impeding the assembly of the connector.",
+      "generated_answer": "1. Shield strands are evenly distributed around the braid clamp.\n2. Shield strands hold the braid clamp in tight contact with the cable outer jacket.",
+      "context_length": 5887,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer, although it lacks detail about the distance between the strands and the flange (condition 1) and mentions only one action of the shield ground strands (condition 2). However, these differences do not contradict or miss key information."
+    },
+    {
+      "question": "What signal is used to indicate hot brakes, and what is the first step if one is detected during inspection?",
+      "expected_answer": "The signal used to indicate hot brakes is a rapid fanning motion with one hand in front of the face and pointing to the wheel with the other hand. If hot brakes are detected during inspection, the first step is to check for hot brakes as per procedure c.",
+      "generated_answer": "The signal used to indicate hot brakes is making a rapid fanning motion with one hand in front of the face and pointing to the wheel with the other hand. If hot brakes are detected during inspection, the first step is to signal the aircrew to shut down the right engine.",
+      "context_length": 1313,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer provides a different action for the first step when hot brakes are detected (signaling the aircrew to shut down the right engine) instead of checking according to procedure c as in the expected answer. Additionally, it reverses the signal used to indicate hot brakes (fanning motion followed by pointing with another hand) compared to what was expected."
+    },
+    {
+      "question": "Contrast the role of visual aids in the aircraft fuel servicing manual and the UID asset marking manual, focusing on how each type of aid supports procedural accuracy in high-risk operations.",
+      "expected_answer": "In the aircraft fuel servicing manual (TO 00-25-172CL-4), magnifying loops and other optical magnification enhancement tools are utilized to support procedural accuracy. This is particularly important for tasks like ensuring all High Risk Information (HRI) data is legible, spelled correctly, and applicable to the aircraft during concurrent servicing operations. The use of these aids helps in maintaining safety standards by enabling precise identification and verification of critical information.  In contrast, the UID asset marking manual focuses on visual inspection techniques for existing indirect UID labels and DPM symbols. Magnifying loops are also mentioned as a useful tool when inspecting items returning for maintenance to locate small or hard-to-find UID labels or data plates. The emphasis here is on confirming the correct location of UID labels or data plates, ensuring readability of encoded data matrices, and identifying any damage that could impede readability. This visual inspection process supports accuracy in marking assets with unique identifiers, which is crucial for tracking and managing inventory efficiently while maintaining security standards.  Both manuals utilize visual aids to enhance procedural accuracy, but their specific applications differ based on the context: one focuses on ensuring correct data identification during fuel servicing operations, while the other ensures proper asset identification through UID markings.",
+      "generated_answer": "The aircraft fuel servicing manual utilizes visual aids such as illustrations, tables, and diagrams to supplement text material that guides personnel through safety procedures, equipment operation, and maintenance tasks related to aircraft fuel systems. These aids are crucial for ensuring that operators understand the complex interactions between different components of the fuel system, how to safely handle hazardous materials like JP-5, JP-8, Jet A, and Jet A-1 fuels, and how to perform critical operations such as battery management, fuel quantity wiring harness repairs, and fuel probe testing. Visual aids help in visualizing the physical layout of aircraft systems, the location of specific components, and the steps involved in troubleshooting and leak evaluation.\n\nIn contrast, the UID asset marking manual employs illustrations, tables, and diagrams to explain technical details related to the Air Force's Item Unique Identification (IUID) program. This includes guidance on how to mark assets with unique identifiers for tracking purposes, the characteristics of Unique Item Identifiers (UIIs), surface preparation techniques, label application methods, indirect part marking procedures, Direct Part Marking (DPM), verification and validation processes, inspection protocols, safe storage practices, handling guidelines, inspection requirements, testing methodologies, maintenance procedures, and preparation for use. Visual aids in this context are essential for demonstrating the correct placement of IUID labels on various types of assets, showing examples of different marking methods suitable for each type of asset, and illustrating the application of protective coatings to ensure durability and compatibility with the asset's environment.\n\nBoth manuals leverage visual aids to enhance understanding and reduce errors by providing clear, step-by-step instructions that are critical in high-risk operations. However, the focus differs: aircraft fuel servicing manuals emphasize operational safety and efficiency in handling potentially explosive materials, while UID asset marking manuals concentrate on ensuring accurate identification and tracking of assets through unique identifiers for logistical purposes.",
+      "context_length": 6539,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides a detailed comparison between the roles of visual aids in aircraft fuel servicing manual and UID asset marking manual. It correctly identifies that both manuals use visual aids to enhance procedural accuracy but focuses on different aspects - safety procedures for fuel handling versus unique identification systems for assets. However, there is an inconsistency in stating that the aircraft fuel servicing manual utilizes illustrations, tables, and diagrams when the expected answer mentioned magnifying loops and other optical tools as primary aids. Despite this minor discrepancy, the overall comparison of roles and purposes remains semantically equivalent to the expected answer."
+    },
+    {
+      "question": "Is non-wetting or de-wetting in the overlap area considered an acceptable condition?",
+      "expected_answer": "No, nonwetting or dewetting in the overlap area is not considered an acceptable condition. It falls under the defect conditions as indicated in the provided context.",
+      "generated_answer": "Nonwetting or dewetting in the overlap area is a defect condition and requires rework, as it indicates that molten solder did not form a metallic bond with the base metal or surface finish.",
+      "context_length": 4771,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer states that nonwetting or dewetting in the overlap area is a defect condition requiring rework, which aligns with the information provided in the expected answer. Both answers agree on the fact that it's not an acceptable condition and requires corrective action."
+    },
+    {
+      "question": "Explain the engineering considerations for nozzle positioning during defueling operations based on equipment configuration and aircraft interface requirements.",
+      "expected_answer": "During defueling operations, it is crucial to ensure that nozzles equipped with ball strainer valves are in the correct refuel/defuel position. The ball valve strainer acts as the last line of protection against solid contaminants entering the aircraft's fuel system or the refueling vehicle components. It must be inspected and cleaned every time the ball valve position is switched, to prevent potential damage to equipment or fuel spillage. Failure to comply with these procedures could result in damage to equipment or loss of mission effectiveness. Additionally, nozzle strainers should be removed or reversed on all designated defuel units before each operation, and they must be inspected and cleaned if necessary prior to the next refueling process, as outlined in TO 37A-1-101.",
+      "generated_answer": "During defueling operations, several engineering considerations are crucial to ensure safety and efficiency:\n\n1. **Nozzle Positioning**: The nozzle must be correctly positioned either in the refuel or defuel position depending on whether you are transferring fuel into the aircraft (refueling) or out of it (defueling). This is typically controlled by a ball valve strainer.\n\n2. **Ball Valve Strainer Inspection and Cleaning**: Every time the ball valve position changes from refuel to defuel or vice versa, the ball valve strainer must be inspected and cleaned as required. This ensures that there are no obstructions that could affect flow rates or cause operational issues.\n\n3. **Visual Verification**: Before commencing operations, secondary visual verification for the proper placement and condition of the ball valve strainer is necessary by a crew member. This helps prevent any misalignments that could lead to leaks or other safety hazards.\n\n4. **Strainer Coupling Quick Disconnect Testing**: If equipped with a strainer coupling quick disconnect, it must be tested for positive engagement before pressurizing the hose. This ensures that there are no unexpected disconnections during refueling/defueling operations.\n\n5. **Supporting Nozzles and Hoses**: To prevent damage to aircraft receptacles or hoses, nozzles and hoses should be supported properly when using specific types of nozzles like D-1 45-degree nozzles. This prevents them from coming into contact with the aircraft in a way that could cause wear or tear.\n\n6. **Connecting Nozzles**: Before pressurizing the hose, ensure that the nozzle is securely connected to the aircraft and that the dry break coupler quick disconnect locking device is positively engaged. This prevents accidental disconnection of the fuel line during operations.\n\n7. **Grade Verification**: Prior to refueling/defueling, it's essential to verify with the Aircraft Servicing Supervisor/Crew the correct grade of fuel required for safety and operational compatibility.\n\n8. **Preventing Damage During Single Point Nozzle Operations**: Brief or warn servicing crew members not to lower lift on specific models (like 1997/98 Beta model) when single point nozzles are connected, as this could cause damage to the aircraft's fuel receptacles.\n\nThese considerations ensure that defueling operations are conducted safely and efficiently, minimizing risks of leaks, damage, or operational errors.",
+      "context_length": 3309,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides a detailed explanation of engineering considerations for nozzle positioning during defueling operations, which aligns with the expected answer. It covers aspects such as nozzle position control by ball valve strainers, inspection and cleaning procedures, visual verification, quick disconnect testing, support measures for nozzles and hoses, grade verification, and precautions against damage. The generated answer does not contradict or miss key information from the expected answer, although there are minor differences in phrasing and emphasis."
+    },
+    {
+      "question": "Required step for gaseous oxygen carts before beginning operations.",
+      "expected_answer": "Before beginning operations with gaseous oxygen carts, they must be cleaned and kept free of moisture, oil, and grease at all times. Only approved anti-seize tape should be used for oxygen servicing fittings due to the temperatures, pressures, and fire hazards involved. Additionally, it is crucial not to park GOX (gaseous oxygen) carts in areas that are sodded.",
+      "generated_answer": "Statically ground the Gaseous Oxygen Servicing Cart to a common ground before connecting servicing hose.",
+      "context_length": 2893,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer misses key information from the expected answer. It only mentions one step (static grounding) while omitting crucial details about cleaning, moisture/oil/grease prevention, approved anti-seize tape usage, and parking restrictions for GOX carts."
+    },
+    {
+      "question": "Explain the key safety protocols for hot refueling Navy aircraft at Air Force bases as outlined in the technical manual.",
+      "expected_answer": "The key safety protocols for hot refueling Navy aircraft at Air Force bases, as outlined in the technical manual TO 00-25-172CL-3, include:  1. **Pre-refueling checks**: Before pressurizing the fuel source, ensure the nozzle is locked onto the aircraft by attempting to remove it with the flow handle open; if removal is possible, do not start refueling until the nozzle is replaced.  2. **Ventilation and protection**: Use only in well-ventilated areas, wear skin/eye protection, avoid repeated or prolonged contact with fuel, and keep away from open flames or other ignition sources.  3. **Equipment grounding**: Make sure aircraft fuel servicing equipment and external electrical power source are grounded to prevent static electricity discharge.  4. **Firefighting equipment**: Ensure enough fire-fighting equipment is available as specified in Technical Order (TO) 00-25-172.  5. **No refueling during storms**: Do not carry or wear loose metal objects, avoid fueling or defueling during electrical storms, and do not carry matches or cigarette lighters.  6. **Personal safety measures**: Avoid wearing shoes with exposed nails, metal plates, or hobnails; ensure the aircraft is chocked to prevent movement.  7. **Arming safeties**: All ordnance must be safetied before refueling begins.  8. **Correct fuel identification**: Verify that the correct type of fuel (JP-4, JP-5, or JP-8) is being used for the aircraft.  9. **Pre-refueling precautions**: Observe all refueling precautions, avoid the engine inlet, and dissipate static potential by gripping grounding wire before starting the operation.  10. **Nozzle engagement**: Ensure the nozzle is fully engaged by turning it clockwise until it resists turning; lock it in position by positioning the manual fuel shutoff lever in the full open position.  11. **Prevent spillage**: Make sure the refueling hose quick disconnect fitting engages properly and that there are no obstructions to venting.  12. **Pressure control**: Keep fuel pressure from servicing equipment at or below 55 PSI during normal refueling operations.  13. **External tank safety**: Do not refuel aircraft if the TANK OVER PRESS warning lamp is inoperative; test its operation and ensure REFUEL VALVES are closed to prevent fuel from entering tanks with refueling pressure applied.  14. **Prevent overpressure**: Monitor external fuel control panel assembly for any indication of overpressure during refueling, as indicated by the TANK OVER PRESS (red) warning light.  15. **Venting and monitoring**: After 60 to 120 gallons of fuel have entered tanks, ensure air is venting from the vent mast; if tanks become overpressurized, stop refueling immediately and investigate the cause.  These protocols are designed to prevent injury to personnel and damage to equipment during hot refueling operations.",
+      "generated_answer": "The key safety protocols for hot refueling Navy aircraft at Air Force bases, as outlined in the technical manual, include:\n\n1. **Approval of Equipment**: Only United States Air Force (USAF)-approved hot refueling equipment is to be used.\n\n2. **Avoid Hot Brake Condition**: Do not hot refuel aircraft with a hot brake condition.\n\n3. **Preparation Before Refueling**: All external tanks, stores, and weapons must be safed prior to hot refueling.\n\n4. **ARFF Location Determination**: The Base Fire Chief will determine the location for standby Aircraft Rescue and Firefighting (ARFF) personnel.\n\n5. **Verification of Fuel Dump**: Verify with the aircrew that fuel has not been dumped on the previous flight, especially if the position of the dump valve is unknown; aircraft will not be hot refueled in such cases.\n\n6. **Pre-check High Level Shutoff Valves**: Pre-check aircraft high level shutoff valves at the beginning of the operation.\n\n7. **Check for Air Flow**: During hot refueling, check that air is flowing from the aircraft fuel vent outlet(s), except for EF/F-18 models.\n\n8. **Wartime Refueling**: In wartime situations, US Navy aircraft may land to refuel on their way to home base or carrier; this checklist provides procedures for such scenarios specifically.\n\n9. **Engine Shutdown**: For certain Navy aircraft like E/A-6, E-2, F-14, and S-3 models, the right engine must be shut down for hot refueling operations.\n\n10. **EF/F-18 Refueling Approval**: The EF/F-18 model has been approved to hot refuel with both engines running.\n\n11. **Use of Emergency Dry-Break Disconnect Devices**: Many Navy hot refueling operations use these devices for rapid taxi away in emergencies; however, USAF bases do not use this device, so Navy pilots must be advised on current USAF emergency procedures beforehand.\n\nThese protocols ensure safety and operational efficiency during the complex process of hot refueling Navy aircraft at Air Force bases.",
+      "context_length": 1953,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides a detailed list of safety protocols for hot refueling Navy aircraft at Air Force bases, which aligns with the expected answer. However, there are minor differences in phrasing and some details that might be considered as missing or not directly stated in the expected answer:"
+    },
+    {
+      "question": "Are emergency shutdown protocols, winterization, and fault isolation prioritized for safety as per the AFTF technical manual?",
+      "expected_answer": "Yes, according to the TO 35E1-2-13-1 WP 009 00 section of the document, emergency shutdown procedures, winterization protocols, and fault isolation are prioritized for safety. The document emphasizes the importance of these procedures in ensuring operational safety, including wearing appropriate protective clothing, being aware of emergency procedures, using SCBA during high voltage situations, and making sure propane tank levels are sufficient for training exercises.",
+      "generated_answer": "Yes, according to the context provided in the document, emergency shutdown protocols, winterization procedures, and fault isolation are prioritized for safety. The document emphasizes the importance of being aware of emergency procedures, wearing appropriate protective clothing, and performing checks on equipment such as ignitor switches and circuit breakers. It also mentions that failure to comply with these procedures may cause serious injury or death to personnel.",
+      "context_length": 4490,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both affirm that emergency shutdown protocols, winterization, and fault isolation are prioritized for safety as per the document. They also highlight the importance of following procedures, wearing protective clothing, and performing equipment checks. Minor differences in phrasing do not affect the core information conveyed."
+    },
+    {
+      "question": "How many internal fuel tanks are located in the center wing of the S-3 aircraft?",
+      "expected_answer": "The S-3 aircraft carries 1933 gallons in four internal fuel tanks located in the center wing section, inboard of the wing folds.",
+      "generated_answer": "The S-3 aircraft has four internal fuel tanks located in the center wing section.",
+      "context_length": 3849,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. It correctly identifies that there are four internal fuel tanks located in the center wing of the S-3 aircraft, which matches the information provided in the expected answer. The missing details about the gallons capacity and specific location within the wing section do not contradict the core fact stated in the question."
+    },
+    {
+      "question": "Which military aircraft models necessitate specialized defueling procedures when using hydrant servicing equipment?",
+      "expected_answer": "The Type II (Pritchard-Modified) and Type III (Phillips) hydrant systems are specifically mentioned in the context as requiring specialized defueling procedures.",
+      "generated_answer": "The context mentions that the following military aircraft models require additional procedures when being defueled using specific equipment or systems:\n\n- Condiesel (1981) R-9\n- Kovatch R-9\n- Oshkosh R-11 fuel servicing vehicles\n\nThese are highlighted as requiring verification of certain operational features, such as the high level shutoff, during defueling operations.",
+      "context_length": 4695,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer does not provide information about which military aircraft models necessitate specialized defueling procedures. Instead, it focuses on fuel servicing vehicles and their operational features, which contradicts the expected answer that specifies aircraft types requiring special defueling procedures."
+    },
+    {
+      "question": "What objects are prohibited inside Fuel Servicing Safety Zones?",
+      "expected_answer": "Cargo containing explosives, oxygen or flammable gases or liquids is not allowed to be loaded or unloaded during concurrent servicing operations.",
+      "generated_answer": "Active ignition sources are prohibited inside Fuel Servicing Safety Zones.",
+      "context_length": 3490,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer only mentions \"active ignition sources\" as the prohibited object, while the expected answer includes multiple types of cargo (explosives, oxygen, flammable gases, and liquids) that are also not allowed inside Fuel Servicing Safety Zones. The generated answer misses key information from the expected answer."
+    },
+    {
+      "question": "EPTFE sealing tape applications and specifications",
+      "expected_answer": "EPTFE sealing tapes, such as AMS 3255 EPTFE Skyflex@ and Av-DECQ HT3935-7 and HT3000 Sealing Tapes, are used for peel and stick applications. These tapes require careful application to ensure adequate adhesion and prevent damage or loss of mission effectiveness. The Dry Film Thickness (DFT) of spray sealant coatings should be in the range of 1 to 5 millimeters (mm). For corners, the ends of the tape must be cut at a 30-degree angle with an overlap of one-quarter to half inch for proper sealing. Special care is taken not to pull or stretch the tapes during application as this can lead to inadequate sealing and potential damage to equipment.",
+      "generated_answer": "EPTFE (Expanded Polytetrafluoroethylene) sealing tapes, often referred to as Skyflex@ or Av-DecQ HT3935-7/HT3000, are designed for various sealing tasks in aerospace and equipment applications. These tapes offer resistance to water, fuel, oil, hydraulic fluids, and are suitable for sealing faying surfaces, access panels, removable panels, and floorboards. They do not require removal and replacement unless damaged.\n\n**Specifications:**\n- **GUA-1071-1:** For fay surfaces less than 1 inch wide.\n- **GUA-1001-1:** For fay surfaces wider than 1 inch but requiring thinner tape to fill gaps.\n- **GUA-1001-2:** For fay surfaces wider than 1 inch where thicker tape is needed to fill gaps and accommodate larger surface areas.\n- **GUA-1401-1:** For fay surfaces less than 1 inch wide in dry areas of floorboards, with the option for thicker tapes when necessary.\n- **GSC-21-80767-00:** For high moisture areas of floorboards and larger gaps needing to be filled.\n\n**Properties:**\n- **Service No Corrosion Inhibitors:** Ensures compatibility with various environmental conditions without causing corrosion on the surface it seals.\n- **Resists Water, Fuel, Oil, and Hydraulic Fluids:** Provides durability in harsh environments where fluid exposure is common.\n- **Peel Strength:** Typically 2 pounds per inch width for the side with adhesive only.\n\n**Intended Use:**\n- Sealing of faying surfaces to prevent ingress of fluids or moisture.\n- Access and removable panels sealing to ensure integrity during maintenance operations.\n- Floorboards sealing in aircraft, missiles, or equipment where water resistance is crucial.\n\nThese tapes are non-hazardous alternatives to low-adhesion two-component sealants, offering a simpler application process with the advantage of not requiring removal and replacement unless damaged.",
+      "context_length": 4958,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides information about EPTFE sealing tapes, their applications, specifications, and properties. It correctly identifies that these tapes are used for various sealing tasks in aerospace and equipment applications, including faying surfaces, access panels, removable panels, and floorboards. The answer also mentions the need for careful application to ensure adequate adhesion and prevent damage or loss of mission effectiveness. However, it does not explicitly mention the Dry Film Thickness (DFT) range for spray sealant coatings as stated in the expected answer. Additionally, the generated answer includes details about specific GUA and GSC part numbers which were not mentioned in the expected answer. The information about peel strength is also included but was not present in the expected answer. Despite these differences, the core concepts of EPTFE sealing tape applications and specifications are covered in both answers.\nREASONING: The generated answer provides a comprehensive overview of EPTFE sealing tape applications, specifications, properties, and intended use without contradicting any key points from the expected answer. Although it includes additional details not mentioned in the expected answer (such as specific part numbers), these do not detract from the core information about the tapes' usage and requirements for proper application. The judgment is based on the overall semantic equivalence of the answers, with minor differences being acceptable given the context."
+    },
+    {
+      "question": "Does reflectorization enhance visibility for ground vehicles and trailers as per the USAF technical manual (TO_35-1-18)?",
+      "expected_answer": "Yes, according to TO 35-1-18, reflectorization enhances visibility for ground vehicles and trailers by using black reflective strips that are 2 inches wide and 6 inches in length, conforming to L-S-300C Type II, Class I, Reflectivity 2, Durability 1. This ensures that units can be easily identified during nighttime operations.",
+      "generated_answer": "Yes, according to the context provided in the USAF Technical Order TO_35-1-18, reflectorization enhances visibility for ground vehicles. Specifically, it states that all reflectors must be installed on vehicles and should not exceed a height of 60 inches or be less than 24 inches above the ground. Additionally, all devices should be illuminated and visible both day and night at a distance of 100 feet, indicating that reflectorization is used to improve visibility for USAF vehicles and trailers.",
+      "context_length": 5436,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer affirms that reflectorization enhances visibility for ground vehicles and trailers as per the USAF technical manual TO_35-1-18. It also provides details about the dimensions of the reflective strips (2 inches wide and 6 inches in length) and their type (L-S-300C Type II, Class I, Reflectivity 2, Durability 1), which are consistent with the expected answer. The generated answer might not explicitly mention the nighttime operations requirement from the expected answer but does highlight that reflectors must be illuminated and visible both day and night at a distance of 100 feet, indicating an overall alignment in content."
+    },
+    {
+      "question": "How do standardized maintenance protocols in Air Force technical manuals balance regulatory compliance with site-specific operational needs across different systems?",
+      "expected_answer": "Standardized maintenance protocols outlined in Air Force technical manuals, such as TO 35E1-2-13-1 and TO 25-25-245, balance regulatory compliance with site-specific operational needs by providing a comprehensive set of guidelines that are adaptable to various systems. These manuals include specific elements like semi-annual system safety inspections, operational checks, and documentation requirements (TO 35E1-2-13-1) as well as detailed inspection procedures for items such as restraint assemblies, safety nets, escape ropes, lanyards, and lifelines (TO 25-25-245). They ensure that all equipment is used for its intended purpose and inspected regularly to prevent damage or loss of mission effectiveness. The manuals also emphasize the importance of personal protective equipment (PPE) and require adherence to local policies and procedures while maintaining a standard set of practices across different systems. This approach allows for consistency in maintenance standards while accommodating site-specific conditions, ensuring regulatory compliance without compromising operational flexibility.",
+      "generated_answer": "Standardized maintenance protocols in Air Force technical manuals balance regulatory compliance with site-specific operational needs by providing a comprehensive guide that adheres to military, federal, and commercial item description (CID) specifications. These manuals ensure consistency in corrosion prevention and control practices while allowing for flexibility through references to system or item technical data. This approach enables the use of standard materials and procedures that meet broader defense standards but also permits adjustments based on specific equipment requirements outlined in weapon system-specific manuals and drawings. The manuals are designed to be adaptable, ensuring compliance with regulations like Defense Standardization Program guidelines and Air Force policy while accommodating unique operational contexts through detailed instructions and precedence rules for technical conflicts between general guidance and system-specific documentation. This balance ensures that maintenance activities are both compliant and responsive to the diverse needs of different systems within the Air Force.",
+      "context_length": 4507,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer, providing a detailed explanation on how standardized maintenance protocols in Air Force technical manuals balance regulatory compliance with site-specific operational needs. Both answers highlight the use of specific manuals (TO 35E1-2-13-1 and TO 25-25-245) as examples, discuss the importance of personal protective equipment, emphasize consistency while accommodating flexibility, and mention adherence to regulations like Defense Standardization Program guidelines and Air Force policy. The generated answer also includes additional information about corrosion prevention and control practices, which is consistent with the expected answer's focus on maintenance protocols across different systems."
+    },
+    {
+      "question": "What is the diameter and length of the wooden maul head, in inches?",
+      "expected_answer": "The wooden maul head has a diameter of about 8 inches and is about 10 inches long.",
+      "generated_answer": "The wooden maul has a cylindrical head which is about 8 inches in diameter and about 10 inches long.",
+      "context_length": 4944,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides the same information as the expected answer but uses slightly different phrasing. It mentions that the wooden maul head is cylindrical, which implies it has a diameter, and states its dimensions (diameter of 8 inches and length of 10 inches) in a clear manner. Although the question asks specifically about \"the wooden maul head,\" mentioning \"the wooden maul\" instead of just \"the wooden maul head\" does not change the meaning significantly. The answer is semantically equivalent to the expected answer, even though there are minor differences in phrasing and structure."
+    },
+    {
+      "question": "Which is the most common type of TC used in SATs, TUSs, and load TC monitoring according to the USAF technical manuals and orders?",
+      "expected_answer": "The most common type of Thermocouple (TC) used in SATs, TUSs, and load TC monitoring is Type D.",
+      "generated_answer": "Type K base metal expendable with high temperature insulation, such as Silica or Nextel fiber, is the most common type of thermocouple (TC) used in SATs (System Accuracy Tests), TUSs (Temperature Uniformity Surveys), and load TC monitoring according to the USAF technical manuals and orders.",
+      "context_length": 3584,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer mentions Type K thermocouples with high temperature insulation, which contradicts the expected answer that specifies Type D thermocouples. Additionally, it includes details about base metal expendable thermocouples and insulation types (Silica or Nextel fiber) not mentioned in the expected answer."
+    },
+    {
+      "question": "State the purpose of a TC device and how it is constructed as per the USAF technical manuals and orders.",
+      "expected_answer": "The purpose of a thermocouple (TC) device, as indicated in TO 1-1A-9 NAVAIR 01-1A-9, is to measure temperature. TC wires manufactured according to specifications such as ANSI/MC96.1, BS 1843, DIN 43714, JIS C 1610-1981, or NF C 42-323 have been certified by manufacturers and do not require special initial or subsequent calibration. TCs must be supplied with the manufacturer's initial calibration certificate or deviation limits certification to ensure proper temperature offset and indication when changed or replaced in field test instruments.  TC devices are constructed based on thermoelectric principles, where two different metal junctions create an electrical potential difference proportional to the temperature difference between them. This electrical signal is then converted into a readable temperature measurement by the field test instrument.",
+      "generated_answer": "The purpose of a Time Compliance Technical Order (TCTO) device, as described in the provided context, is to provide operation and service instructions for standard Air Force torque devices used to obtain predetermined torque values on low, medium, and high pressure hoses, tubing, nuts, bolts, and related fasteners. These devices are constructed by using a wire with two leads of dissimilar metals that form a junction when welded or twisted together. Welded TCs (Thermocouples) are more prone to problems but can be used when available. Twisted TCs, while less reliable than welded ones, can be made by overlapping the bare ends of two TC wires 1/4 inch at a 90-degree angle to each other. The temperature reading is measured closest to the field test instrument or other TC going unit.",
+      "context_length": 4779,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer incorrectly identifies the purpose and construction of a Time Compliance Technical Order (TCTO) device instead of a thermocouple (TC) device as asked in the question. Additionally, it provides incorrect information about the construction methods for TCs and misidentifies ANSI/MC96.1 as a standard related to torque devices."
+    },
+    {
+      "question": "Will the refueling operator ensure that the nozzles equipped with ball strainer valves are in the correct refuel/defuel position as per the USAF technical manuals and orders?",
+      "expected_answer": "Yes, according to the provided context from the industrial document, the refueling operator is required to ensure that nozzles equipped with ball strainer valves are in the correct refuel/defuel position. This includes inspecting and cleaning the ball valve strainer every time the position is switched, as it serves as a critical line of protection against solid contaminants entering aircraft or refueling vehicle components. Failure to comply could result in damage to equipment or loss of mission effectiveness.",
+      "generated_answer": "Yes, according to the provided context, the Refueling Operator is responsible for ensuring that nozzles equipped with ball strainer valves are in the correct refuel/defuel position.",
+      "context_length": 3646,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both affirm that the refueling operator is responsible for ensuring the correct position of nozzles with ball strainer valves, as per USAF technical manuals and orders. The details about inspecting, cleaning the valve strainer, and potential consequences are not contradictory but go beyond what was asked in the question, hence do not affect the judgment."
+    },
+    {
+      "question": "USAF Briner 2905 thickness ratio dry film to wet film.",
+      "expected_answer": "A dry film thickness of 2.5 mils requires a 5.0 mil wet film thickness for Briner 2905.",
+      "generated_answer": "The context provided does not specify a direct thickness ratio for the dry film to wet film for Briner 2905. However, it mentions that when applying Briner 2905 by conventional spray, a dry film thickness of 2 mils is recommended with a wet film thickness of approximately 6 mils (since the context states \"a dry film of 2 mils wet film thickness\"). This information can be used to infer that for Briner 2905, when applying it correctly by conventional spray method, the ratio would be roughly:\n\nDry Film Thickness : Wet Film Thickness = 2 mils : approximately 6 mils\n\nPlease note that this is an inferred calculation based on the provided context and might not reflect a precise industry-standard ratio.",
+      "context_length": 6858,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "System refused to answer (rejection detected)"
+    },
+    {
+      "question": "Discuss the safety considerations when using Type I heavy-duty solvent-based cleaners during maintenance as per the USAF technical manuals.",
+      "expected_answer": "When using Type I heavy-duty solvent-based cleaners for maintenance according to USAF technical manuals, several key safety considerations must be observed:  1. **Avoid Eye and Skin Contact**: The document warns that cleaning with compressed air can create airborne particles that may enter eyes or penetrate skin. Therefore, it is essential to wear goggles and protective clothing when using these solvents.  2. **Pressure Limitation**: Pressure should not exceed 30 pounds per square inch gauge (PSIG) during the application of compressed air for cleaning.  3. **Use Approved Equipment**: When applying cleaners and primers, approved equipment must be used. Ensure that firefighting equipment is readily available and in working order to manage any potential fire risks.  4. **Grounding Requirements**: All metal drain containers should be grounded to the fuel tank and common ground point when disposing of full containers according to specific USAF directives (AFI 23-101, AFMAN 23-122, AFH 23-123). This is crucial for preventing damage or loss of mission effectiveness.  5. **Proper Drainage**: For fuel tanks and compartments, ensure that they are completely dumped and drained following specific procedures outlined in TO 36-1-191.  6. **Safety Clothing**: Wear clean cotton clothing without metal buttons, zippers, or fittings to prevent static electricity generation during chemical neutralization operations.  7. **Avoid Static Electricity**: Personnel engaged in neutralization or purging operations should not wear wool, nylon, silk, rayon, or other fabrics that generate static electricity. Failure to comply could result in damage to equipment or loss of mission effectiveness.  8. **Use Cotton Cloths**: For cleaning purposes, use cotton cloths as they do not generate static electricity.  9. **Prevent Ignition Sources**: Ensure the area is free from any building, source of ignition, or sewer system before starting operations and maintain at least two fire extinguishers upwind that are maintained by qualified individuals.  10. **Grounding Equipment**: Static ground tank(s) to an approved (earth) ground as per TO 00-25-172 guidelines for safety during maintenance procedures.  These considerations ensure the safe handling of Type I heavy-duty solvent-based cleaners in accordance with USAF technical manuals and best practices for maintenance operations.",
+      "generated_answer": "When using Type I heavy-duty solvent-based cleaners for maintenance, several safety considerations must be observed to ensure personal safety, health protection, and property preservation:\n\n1. **Personal Protective Equipment (PPE):** Wear chemical-resistant rubber gloves and chemical or splash-proof goggles to protect hands and eyes from exposure to the solvent.\n\n2. **Ventilation:** Type I cleaners should not be used in poorly ventilated areas due to their solvent content. Ensure adequate ventilation is available during application to prevent inhalation of harmful vapors.\n\n3. **Fire Hazard:** The added solvents create a fire hazard, so caution must be exercised when using these cleaners near ignition sources or flammable materials.\n\n4. **Disposal Issues:** Proper disposal procedures are crucial as the use of solvents can lead to serious disposal problems due to environmental regulations and potential contamination risks.\n\n5. **Non-Metallic Material Damage:** Be aware that Type I solvents may damage non-metallic materials, so avoid contact with sensitive components unless specifically designed for such surfaces.\n\n6. **Electrical Wiring and Plastic Surfaces:** Do not apply these cleaners to electrical wiring or plastic aircraft canopies as they might cause damage to insulation or crazing of transparent surfaces.\n\n7. **Concentration Control:** Use cleaning compounds at concentrations recommended by the manufacturer; applying them too concentratedly can lead to streaking, damaging finishes and components.\n\n8. **Prevent Drying:** Do not allow cleaning solutions to dry on aircraft surfaces as this can cause damage due to the formation of residues or stains.\n\n9. **Safety Harnesses and Lines:** When standing on upper surfaces of aircraft during cleaning operations, use safety harnesses and safety lines for added security against falls.\n\n10. **Approved Equipment Usage:** Use explosion-proof lights, blowers, and other approved equipment when cleaners are being applied to prevent ignition risks associated with solvent vapors.\n\n11. **General Safety Precautions:** Understand and apply general safety precautions that ensure personal safety and health during various phases of operation and maintenance as outlined in the technical manual.\n\nBy adhering to these guidelines, personnel can minimize risks and ensure safe operations when using Type I heavy-duty solvent-based cleaners for aircraft maintenance tasks.",
+      "context_length": 3528,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides a comprehensive list of safety considerations that align with the expected answer's key points. It mentions wearing PPE, ensuring adequate ventilation, being cautious about fire hazards, proper disposal procedures, avoiding damage to non-metallic materials and electrical wiring, controlling solvent concentration, preventing drying on surfaces, using safety harnesses, employing approved equipment, understanding general safety precautions, and following guidelines outlined in the technical manual. The generated answer might have slightly different phrasing for some points (e.g., \"Ensure that firefighting equipment is readily available\" vs. \"use explosion-proof lights\"), but it covers all major aspects of the expected answer without missing key information or contradicting any details."
+    },
+    {
+      "question": "factors influencing physical strain during live-fire training",
+      "expected_answer": "The factors influencing physical strain during live-fire training include exposure to extremely high temperatures, open flames, liquid propane vapor and fumes, hot surfaces, and the presence of high voltage at burn area ignitors. It is imperative for personnel to wear appropriate protective clothing and be aware of emergency procedures as failure to comply may cause serious injury or death. Additionally, using Self Contained Breathing Apparatus (SCBA) is required for all fires due to exposed skin areas that may result in burns by heat/steam.",
+      "generated_answer": "The intensity and prolonged duration of firefighter training evolutions place substantial physical stress on trainees and instructors. Common injuries that occur during such training include those involving the knees, lower back, strains, and sprains. Increased fitness and conditioning help to reduce the incidence of injury and enable firefighters to cope with the intense physical demands of practical training and tactical operations.",
+      "context_length": 4100,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer misses key information from the expected answer. It does not mention specific environmental factors like high temperatures, flames, propane vapor, hot surfaces, or voltage presence during live-fire training. Instead, it focuses on injuries common in firefighter training and the importance of fitness and conditioning, which are not directly related to physical strain due to environmental factors as specified in the question."
+    },
+    {
+      "question": "What is the difference between the packaging of garments, shoe covers, and wiping cloths as per the USAF technical manuals and orders?",
+      "expected_answer": "The packaging of garments, shoe covers, and wiping cloths differs based on their specific requirements. Garments are hermetically sealed in clean polyethylene bags with a minimum thickness of two mils. Shoe covers can be packaged in pairs instead of individually. Wiping cloths must be packaged in multiples of 10 per package.",
+      "generated_answer": "The packaging differences are as follows:\n- Garments: They will be packaged individually except for shoe covers which may be packaged in pairs.\n- Shoe covers: Packaged either individually or in pairs.\n- Wiping cloths: Packaged in multiples of 10 per package.",
+      "context_length": 3968,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. It correctly identifies that garments are hermetically sealed, shoe covers can be packaged individually or in pairs, and wiping cloths must be packaged in multiples of 10 per package. Minor phrasing differences exist but do not alter the core information conveyed."
+    },
+    {
+      "question": "Explain the markings and safety for the tires of the United States Air Force aircraft.",
+      "expected_answer": "The United States Air Force aircraft tire maintenance guidelines emphasize several key points for ensuring safety and performance:  1. Valve stem caps are equipped on each valve to prevent dirt entry and reduce leakage risk. 2. Metal valve stem caps are not authorized; they will be disposed of, and plastic caps will replace them. 3. Tire inspections and servicing are essential for maximum tire use. Guidelines ensure economic and safe utilization with procedures that can be locally altered if beneficial to the Air Force but must never compromise personnel safety or equipment mission accomplishment. 4. New vehicles equipped with nitrogen-filled tires offer advantages such as longer service life and lower fire/explosion potential during hot weather/high heat conditions. These tires require specific servicing equipment, and only trained vehicle management personnel should perform this task. 5. Inspections include checking for valve caps presence, breaks, deep cuts, embedded glass or nails, bulges, hazardous conditions, tread wear indicators, minimum tread depth requirements (4/32 inch for trucks over 10,000 GVW), and adequate inflation pressures when tires are cold. 6. Tire pressure should be checked using a gauge suitable for nitrogen valve stems; operators may check but not add nitrogen to the tires. 7. Vehicle management technicians will service nitrogen-filled tires by gauging them cold and ensuring side wall pressure is not exceeded, following manufacturer's guidance or data plate specifications. 8. For solid rubber tires on drive wheels of vehicles using the same tread type, they should be replaced when necessary. 9. Pneumatic tires must be removed from vehicles being processed for disposal unless specific situations apply; serviceable tires will be replaced with unserviceable but inflatable tires whenever possible. 10. Tires considered unserviceable due to visual inspection criteria (less than half or quarter of original tread remaining) should not be removed from equipment being processed for disposal.  These guidelines ensure that aircraft tires are maintained safely and efficiently, supporting the overall mission readiness and safety standards of the United States Air Force.",
+      "generated_answer": "The context provided discusses several aspects of marking and safety on US Air Force aircraft, including tire pressure and tow speed markings under section 2.1 which covers caution/warning markings. Specifically:\n\n- **Tire Pressure/Tow Speed Markings**: These are mentioned as part of the caution/warning markings that should be maintained on all units of equipment at all times. The context does not provide detailed instructions for these markings, but it implies they are necessary safety indicators.\n\nThe context does not delve into specific details about tire pressure or tow speed markings beyond stating their importance in maintaining safety and operational readiness. For precise specifications on how to apply these markings (e.g., location, size, color), one would need to refer to more detailed guidelines or manuals that might provide the exact standards and procedures for marking tires based on air pressure levels and towing speeds appropriate for different aircraft models and operational conditions.",
+      "context_length": 6005,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "System refused to answer (rejection detected)"
+    },
+    {
+      "question": "Why are daily updates of documentation and storage of the US Air Force vehicles required?",
+      "expected_answer": "Daily updates of documentation and storage of US Air Force vehicles are required to maintain an accurate condition status for each vehicle, including its location and all processing performed. This ensures that the vehicles remain in operational readiness and can be quickly identified as serviceable or needing attention. The records help in managing the fleet efficiently, facilitating timely maintenance, repair, and deployment when necessary.",
+      "generated_answer": "Daily updates of documentation and storage of US Air Force vehicles are required to ensure safe daily operation, meet mission needs, and prevent shifting of workload. These practices help maintain the vehicles' serviceability standards and preserve their condition for future use.",
+      "context_length": 4473,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both answers highlight the importance of daily updates and storage for maintaining operational readiness, ensuring safety, meeting mission requirements, preserving vehicle condition, and facilitating efficient fleet management. Minor differences in phrasing do not affect the core information conveyed."
+    },
+    {
+      "question": "Enumerate the three types of instrumentation that allow for an extended TUS interval, and analyze the maximum allowable working pressure (PSIA) for 1 1/2-inch pipe at Schedule 80 and 160. ",
+      "expected_answer": "The three types of instrumentation that allow for an extended TUS interval are Type B, Type C, and Type D. The maximum allowable working pressure (PSIG) for a 1 1/2-inch pipe can be calculated using the Lame' formula provided in the document. For Schedule 80 pipe, the allowable fiber stress at 100°F is approximately 350 PSI, resulting in a PSIG of about 497.5 (PSI * S = P). For Schedule 160 pipe, assuming it has slightly less strength than double extra-strong pipe which corresponds to schedule 80, the allowable fiber stress might be around 250-300 PSI, leading to a PSIG of approximately 375-450.",
+      "generated_answer": "I don't have enough information to answer that question.",
+      "context_length": 5405,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "System refused to answer (rejection detected)"
+    },
+    {
+      "question": "What are the specific PPE requirements for liquid oxygen and nitrogen servicing?",
+      "expected_answer": "For liquid oxygen servicing, personnel shall wear Personal Protective Equipment (PPE) required for either gaseous or liquid oxygen as applicable. For liquid nitrogen servicing, no specific PPE requirements were mentioned in the provided context.",
+      "generated_answer": "The specific Personal Protective Equipment (PPE) requirements for both liquid oxygen and liquid nitrogen servicing include:\n\n- For liquid oxygen and liquid nitrogen servicing, personnel shall wear PPE required for either gaseous or liquid oxygen servicing when inside the servicing safety zone.\n- All personnel inside the servicing safety zone must wear the PPE required for either gaseous or liquid oxygen as applicable.\n\nThese guidelines ensure that individuals involved in the servicing operations are adequately protected from potential hazards associated with these substances.",
+      "context_length": 2883,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides a detailed explanation of the PPE requirements for both liquid oxygen and liquid nitrogen servicing, which is semantically equivalent to the expected answer. Both answers highlight that personnel need PPE suitable for either gaseous or liquid oxygen when involved in these operations. The generated answer also mentions the importance of wearing appropriate PPE inside the servicing safety zone, aligning with the expectation."
+    },
+    {
+      "question": "Are Vapor Corrosion Inhibitors (VCIs) ineffective beyond 6 inches of material exposure according to USAF technical manuals and orders?",
+      "expected_answer": "Vapor Corrosion Inhibitors (VCIs) should be applied no more than 12 inches away from any surfaces to be protected, as per the guidelines in USAF technical manuals. This ensures effective corrosion protection within a closer proximity to the treated items.",
+      "generated_answer": "I don't have enough information to answer that question.",
+      "context_length": 3279,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "System refused to answer (rejection detected)"
+    },
+    {
+      "question": "Explain the sequence of actions required to execute an emergency shutdown during aircraft fuel servicing",
+      "expected_answer": "To execute an emergency shutdown during aircraft fuel servicing, follow these steps:  1. Release the deadman control. 2. Push the engine auxiliary throttle control all the way in. 3. Turn off the emergency switch. 4. Close the hose reel shut off valve. 5. Close the main tank emergency shut off valve. 6. Notify the aircraft servicing supervisor and operations expediter, as well as Fuels Control Center (FCC), if possible. 7. Evacuate the area according to instructions from the fuel servicing supervisor or fire department personnel.  These actions ensure a safe shutdown of the refueling unit in case of an emergency during aircraft servicing.",
+      "generated_answer": "To execute an emergency shutdown during aircraft fuel servicing, follow these steps:\n\n1. **Stop fuel flow** - Immediately halt the delivery of fuel.\n2. **Notify relevant personnel**:\n   - Aircraft servicing supervisor\n   - Operations expediter\n   - Fuels Service Center (FSC)\n3. **If applicable**, activate the emergency shutoff mechanism.\n4. **Aircraft servicing crew should disconnect**:\n   - Refueling hose\n   - Bond wires\n\nThese actions are designed to ensure safety and prevent further complications in case of an emergency during fuel servicing operations.",
+      "context_length": 1439,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both provide a sequence of steps for executing an emergency shutdown during aircraft fuel servicing. However, there are minor differences in wording and some actions listed (e.g., \"release the deadman control\" vs. \"stop fuel flow\"). These differences do not significantly alter the meaning or completeness of the response. The generated answer omits specific details from the expected answer but includes all key information necessary for executing an emergency shutdown, such as notifying relevant personnel and disconnecting refueling hoses."
+    },
+    {
+      "question": "How far away should the dry heat source be from the wire or wire group for the shrinking of polyethylene tubing?",
+      "expected_answer": "The dry heat source, such as a hot-air gun, should be held four to five inches away from the wire or wire group when applying heat to shrink polyethylene tubing.",
+      "generated_answer": "The heat source should be held four to five inches away from the wire.",
+      "context_length": 5056,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both specify a distance range (four to five inches) for the heat source relative to the wire or wire group. The generated answer omits the mention of polyethylene tubing and using it \"to apply heat\" but includes the key information about the distance requirement, which aligns with the intent of both answers."
+    },
+    {
+      "question": "State the maximum water pressure (PSI) allowed for manual rinsing in Clear Water Rinsing of Aircraft per the TO 1-1-691 Manual.",
+      "expected_answer": "The maximum water pressure (PSI) allowed for manual rinsing in Clear Water Rinsing of Aircraft, as specified in the TO 1-1-691 Manual, is 175 PSI.",
+      "generated_answer": "The maximum water pressure (PSI) allowed for manual rinsing in Clear Water Rinsing of Aircraft, according to the provided context, is up to 175 PSI.",
+      "context_length": 3251,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer states that the maximum water pressure allowed for manual rinsing is up to 175 PSI, which matches the expected answer. It uses slightly different phrasing (\"up to\" instead of \"the\") but still conveys the same meaning and information as required in the question."
+    },
+    {
+      "question": "maximum allowed nozzle pressure type i hydrant system psi",
+      "expected_answer": "The maximum allowed nozzle pressure for the Type I hydrant system is 55 PSI.",
+      "generated_answer": "The maximum allowed nozzle pressure for a Type II hydrant system, as specified in the provided context, is 55 PSI.",
+      "context_length": 2894,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by specifying a Type II hydrant system instead of Type I. Additionally, it does not mention the unit (PSI) in its response, which was present in the expected answer."
+    },
+    {
+      "question": "What operational frameworks ensure the Aircraft Fire Training Facility maintains alignment with both national fire protection standards and Air Force-specific safety requirements?",
+      "expected_answer": "The Aircraft Fire Training Facility (AFTF) ensures alignment with national fire protection standards and Air Force-specific safety requirements through adherence to Air Force Technical Order 35E1-2-13-1 Operation and Maintenance Instructions for AFTFs, manufacturer's recommendations and procedures, and local, state, and federal guidelines applicable to the work involved. This includes conducting semi-annual system safety inspections and operational checks as outlined in Work Package 006 00, which is an integral part of the general maintenance procedures for the AFTF.",
+      "generated_answer": "The operational frameworks that ensure the Aircraft Fire Training Facility maintains alignment with both national fire protection standards and Air Force-specific safety requirements include:\n\n1. **Quality Training Standards**: The facility is designed to provide high-quality training while meeting necessary operational and safety standards.\n\n2. **Live Fire Simulations**: It features a 100-foot lined burn area equipped with an aircraft mock-up and a large water tank, providing realistic scenarios for multi-aircraft type fires.\n\n3. **Controlled Training Scenarios**: The use of various switches and valves allows for the simulation of different fire conditions during training exercises.\n\n4. **Proper Protective Gear**: Personnel are required to wear appropriate protective clothing and use Self Contained Breathing Apparatus (SCBA) when necessary, as outlined in emergency procedures.\n\n5. **Emergency Procedures**: Work Package 004 00 contains detailed emergency procedures that must be followed during training exercises.\n\n6. **Radio Communications**: A Training Instructor in Charge has dedicated radio communications with the Safety Officer and Ignition Team to ensure safety protocols are adhered to throughout the exercise.\n\n7. **Safety Officer Responsibilities**: The Safety Officer oversees critical aspects of safety, including ensuring the propane tank level is sufficient for scheduled training exercises.\n\n8. **No Smoking Policy**: The entire facility is designated as a no smoking area to prevent fire hazards.\n\nThese frameworks collectively ensure that the Aircraft Fire Training Facility operates within stringent safety guidelines and meets high standards for both national fire protection norms and Air Force-specific requirements.",
+      "context_length": 1722,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides a detailed explanation of operational frameworks ensuring alignment with national fire protection standards and Air Force-specific safety requirements. It mentions specific documents, procedures, and practices that are part of the AFTF's operations, which aligns with the expected answer. Although there are minor differences in phrasing (e.g., \"Quality Training Standards\" instead of referring to specific guidelines), these do not significantly alter the meaning or content of the information provided. The generated answer does not miss any key facts mentioned in the expected answer and acknowledges the importance of adherence to national standards, Air Force-specific requirements, and local regulations."
+    },
+    {
+      "question": "What is the primary method of identifying counterfeit components by USAF technicians?",
+      "expected_answer": "The primary method of identifying counterfeit components for USAF technicians includes visual inspection, which looks for general signs of wear or low quality, such as refurbished or re-plated leads with dents and bends that deviate from standard manufacturing processes. Other indicators include components with identical part numbers and date codes but inconsistent indents, deep surface scratches, cracks, or abrasion marks, scuff marks from re-tooling, inconsistent or questionable markings, evidence of blacktopping/re-marking, unidirectional scratches indicating sanding, and signs of previous markings or partially filled indents.",
+      "generated_answer": "The primary method for USAF technicians to identify counterfeit components is through visual inspection.",
+      "context_length": 3220,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer states that the primary method for identifying counterfeit components by USAF technicians is through visual inspection, which aligns with the expected answer. Although the generated answer does not include all the specific indicators mentioned in the expected answer, it captures the core aspect of using visual inspection as the main technique."
+    },
+    {
+      "question": "List all safety precautions mentioned in the document that address the risks of fuel flammability and toxicity during aircraft refueling operations.",
+      "expected_answer": "The safety precautions addressing the risks of fuel flammability and toxicity during aircraft refueling operations include:  1. Avoiding refueling an aircraft with suspected hot brakes. 2. Ensuring that aircraft fuel servicing equipment and external electrical power sources are grounded. 3. Having enough fire-fighting equipment available as specified in Technical Order (TO) 00-25-172. 4. Using only well-ventilated areas for refueling operations to avoid repeated or prolonged contact with the fuel, which is flammable and toxic to eyes, skin, and respiratory tract. 5. Wearing appropriate skin/eye protection when handling aviation turbine fuel. 6. Keeping away from open flames or other sources of ignition during refueling operations.  These precautions are aimed at preventing accidents, injuries, and damage due to the flammability and toxicity of aviation turbine fuel.",
+      "generated_answer": "The safety precautions mentioned in the document that address the risks of fuel flammability and toxicity during aircraft refueling operations include:\n\n1. **Carrying or wearing loose metal objects, such as knives, keys, or other objects which might cause sparks** - This helps prevent accidental ignition sources that could lead to fuel fires.\n\n2. **Fuel pressure from servicing equipment should not exceed 55 PSI** - Excessive pressure can increase the risk of fuel spillage and leaks, which are potential fire hazards.\n\n3. **Make sure aircraft is receiving correct fuel (JP-4, JP-5 or JP-8)** - Using incorrect types of fuel could lead to operational issues or safety risks due to differences in properties like flashpoint and toxicity.\n\n4. **Static bond aircraft and refueling equipment** - Bonding helps prevent static electricity buildup which can ignite fuel vapors.\n\n5. **Make sure nozzle is in locked position** - Ensuring the nozzle is securely fastened prevents accidental spillage, which could result in fire or explosion risks.\n\n6. **All personnel involved in refueling shall dissipate static potential by gripping grounding wire before starting refueling operation and repeating frequently during refueling operation** - This measure reduces the risk of static electricity discharge igniting fuel vapors.\n\n7. **Necessary safety precautions will be taken and repairs accomplished prior to resuming operations if a leak develops during refueling or defueling** - Immediate action on leaks minimizes risks associated with fuel spills and leaks, which can lead to fires or explosions.\n\n8. **(2) Within a 50 foot radius of operating aircraft, or with aircraft turned in such a way that engine exhaust is directed upon fueling/defueling operation** - This precaution limits the risk of engine exhaust igniting fuel vapors near refueling operations.\n\n9. **(6) When there are fuel leaks in the aircraft, fuel servicing equipment, or other equipment in the area** - Addressing leaks promptly reduces risks associated with fuel leakage and potential ignition sources.\n\n10. **(8) If glowing or crackling fuel is noted when servicing the aircraft** - Immediate cessation of operations prevents further risk from potentially explosive conditions due to fuel instability or contamination.",
+      "context_length": 2966,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer provides a list of safety precautions that are semantically equivalent to those in the expected answer. Both lists include measures such as grounding equipment, using correct fuel types, preventing static electricity buildup, ensuring nozzle security, dissipating static potential, addressing leaks promptly, maintaining a safe distance from aircraft exhaust, and stopping operations if fuel instability is noted. The generated answer might have slightly different phrasing or organization but does not contradict any information in the expected answer."
+    },
+    {
+      "question": "Determine the title of DAFMAN 91-223",
+      "expected_answer": "Water and Fuel Systems",
+      "generated_answer": "I don't have enough information to answer that question.",
+      "context_length": 5468,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "System refused to answer (rejection detected)"
+    },
+    {
+      "question": "minimum wing tip separation distance during rapid defueling with fire truck presence",
+      "expected_answer": "The minimum wing tip separation distance during rapid defueling operations when a fire truck is present is 35 feet. This ensures safety and prevents potential hazards to personnel or long-term health issues.",
+      "generated_answer": "The minimum wing tip separation distance during rapid defueling operations, when a crash fire rescue vehicle is present due to limited space or less than the preferred 50 feet of clearance, is reduced to a minimum of 35 feet. However, whenever a distance of less than 50 feet (wing tip to wing tip) is maintained, an aircraft rescue and firefighting vehicle must be at the aircraft during rapid defueling operations.",
+      "context_length": 2300,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: Both the expected answer and generated answer convey that the minimum wing tip separation distance for rapid defueling with a fire truck present is 35 feet. The generated answer provides additional context about the reduced clearance when space is limited or below the preferred 50 feet, as well as the requirement of an aircraft rescue and firefighting vehicle being at the aircraft under certain conditions. These details do not contradict the core information provided in the expected answer."
+    },
+    {
+      "question": "How do visual indicators in technical diagrams communicate revision updates according to the manual's documentation standards?",
+      "expected_answer": "Visual indicators in technical diagrams communicate revision updates through shaded or screened areas, miniature pointing hands, and vertical lines in the outer margin of the page. These graphical elements highlight changes made since the original publication date of 7 August 2009, allowing users to easily identify modified sections without needing to compare multiple versions of the document.",
+      "generated_answer": "Changes to illustrations are indicated by pointing hands or change bars, as applicable.",
+      "context_length": 6852,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer misses key information from the expected answer. It does not mention shaded or screened areas, vertical lines in the outer margin, and the specific date (7 August 2009) for when these changes were made. Additionally, it omits the context that these visual indicators are used to highlight modifications in technical diagrams according to documentation standards."
+    },
+    {
+      "question": "Ram position on jack when checking oil level.",
+      "expected_answer": "When checking the oil level on a hydraulic jack, ensure that the ram is in the retracted position.",
+      "generated_answer": "The ram should be in the retracted position when checking the level of oil and when filling the hydraulic jack.",
+      "context_length": 2688,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: Both the expected answer and the generated answer convey the same essential information that the ram needs to be in the retracted position for checking or maintaining oil levels on a hydraulic jack. The minor difference in phrasing (\"checking\" vs \"filling\") does not alter the core meaning, which is that the ram must be retracted during these activities."
+    },
+    {
+      "question": "State the position of the attendant from the cabin crew when passengers are on board as per USAF technical manuals and orders.",
+      "expected_answer": "When passengers are on board, one attendant is positioned at each passenger exit according to USAF technical manuals and orders.",
+      "generated_answer": "One attendant positioned at each passenger exit when passengers are on board.",
+      "context_length": 2862,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer conveys the same information as the expected answer. Both mention that there is one attendant positioned at each passenger exit when passengers are on board, which aligns with the details provided in USAF technical manuals and orders."
+    },
+    {
+      "question": "Provide Step A for using a torque wrench.",
+      "expected_answer": "Step A involves selecting the proper size socket wrench (1) and attaching it to the torque wrench square drive (2).",
+      "generated_answer": "Step A for using a torque wrench is to adjust the wrench to its lowest reading.",
+      "context_length": 1843,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer contradicts the expected answer. While adjusting the torque wrench to a specific setting might be part of the process, it does not cover selecting and attaching the proper size socket wrench as required in the expected answer."
+    },
+    {
+      "question": "What element makes up the highest composition range for the 8630 Nickel-Chromium-Molybdenum Alloy?",
+      "expected_answer": "The highest composition range for nickel in the 8630 Nickel-Chromium-Molybdenum Alloy is between 0.4-0.7 percent.",
+      "generated_answer": "The highest composition range for the element in the 8630 Nickel-Chromium-Molybdenum Alloy is Molybdenum, with a range of 2.0-3.0 percent.",
+      "context_length": 8481,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by identifying molybdenum as the element with the highest composition range instead of nickel. Additionally, it provides incorrect percentage ranges for molybdenum that are not aligned with typical specifications for such alloys."
+    },
+    {
+      "question": "Why should hands not be used to check the output of airless spray guns?",
+      "expected_answer": "Hands should not be used to check the output of airless spray guns because they use very high pressure, which can cause injury.",
+      "generated_answer": "Hands should not be used to check the output of airless spray guns because they use very high pressure which can easily penetrate the skin, potentially causing serious injury.",
+      "context_length": 3434,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: Both the expected answer and generated answer convey that hands should not be used due to the high pressure of airless spray guns posing a risk of injury. The generated answer uses slightly different wording (\"potentially causing serious injury\" instead of \"can cause injury\") but still accurately describes the potential danger involved with using one's hands near an airless spray gun output."
+    },
+    {
+      "question": "What causes the formation of galvanic corrosion at joints or dissimilar metal assemblies, and how can filiform corrosion be prevented in aircraft structures?",
+      "expected_answer": "Galvanic corrosion forms at joints or dissimilar metal assemblies due to electrical contact between two or more metals with different electrochemical potentials in an electrolyte. The less corrosion-resistant metal becomes the anode, corroding faster, while the more corrosion-resistant metal acts as the cathode. Filiform corrosion can be prevented by ensuring proper adhesion and integrity of organic coatings on aircraft structures, minimizing exposure to corrosive environments, and maintaining a uniform coating thickness across surfaces.",
+      "generated_answer": "Galvanic corrosion forms when two dissimilar metals are in electrical contact within an electrolyte. The rate of corrosion depends on the difference in their activities; a larger difference leads to faster corrosion.\n\nFiliform corrosion can be prevented by:\n1. Storing equipment and aircraft in an environment with a relative humidity below 70%.\n2. Using coating systems that have a low rate of diffusion for oxygen and water vapors.\n3. Maintaining coatings in good condition.\n4. Washing equipment to remove acidic contaminants from the surface, such as those created by air pollutants.\n\nThese measures help protect against filiform corrosion on steel, magnesium, aluminum surfaces, and prevent more serious corrosion in certain areas.",
+      "context_length": 4151,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both provide explanations for galvanic corrosion formation and methods to prevent filiform corrosion in aircraft structures. However, there's a minor difference in phrasing (\"activities\" vs \"electrochemical potentials\") which could be considered as not strictly equivalent but does not significantly alter the meaning or correctness of the information provided."
+    },
+    {
+      "question": "What is the specification of the Air Force repair kit for the sealant dispensing gun (Pneumatic Type)?",
+      "expected_answer": "The Air Force repair kit for the Pneumatic Sealant Dispensing Gun includes a model with a 2-1/2 OZ capacity, identified by PN = 250255. This model has a total weight of 6 FL OZ and measures an overall length of 8-1/2 IN without the nozzle. Additionally, it features a removable pistol grip handle that can be converted to a lever throttle for use in confined areas.",
+      "generated_answer": "The specification of the Air Force repair kit for the sealant dispensing gun (Pneumatic Type) includes MIL-PRF-81733, SEALING AND COATING COMPOUND, CORROSION INHIBITIVE.",
+      "context_length": 1377,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "REASONING: The generated answer provides a specification related to a sealing and coating compound with corrosion inhibitive properties, which is not semantically equivalent to the expected answer. The expected answer details specific dimensions, weight, and features of a particular model of an Air Force repair kit for a pneumatic sealant dispensing gun, whereas the generated answer refers to a military standard for a different type of product (sealing and coating compound)."
+    },
+    {
+      "question": "Does Column G of AFTO Form 70 require the full name of the person taking action?",
+      "expected_answer": "Yes, Column G of AFTO Form 70 requires the full last name of the person making the tire transaction.",
+      "generated_answer": "Yes, Column G of AFTO Form 70 requires the last name of the person making the tire transaction.",
+      "context_length": 3088,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both answers affirm that Column G of AFTO Form 70 requires the last name of the person making a tire transaction. The minor difference in phrasing (\"full name\" vs \"last name\") does not change the core meaning, and there are no missing facts or contradictions."
+    },
+    {
+      "question": "How do technical manuals balance procedural consistency with operational flexibility across different military domains while maintaining compliance with standardized protocols?",
+      "expected_answer": "Technical manuals balance procedural consistency with operational flexibility by providing a structured set of guidelines that are adaptable to various military domains. They achieve this through modular content organization, allowing specific procedures and standards to be tailored for each domain's unique requirements without compromising the overarching principles and safety protocols outlined in standardized protocols. This is facilitated by categorizing tasks into types such as modifications (T-1 for temporary changes, T-2 for test and evaluation), which can be managed with baseline documentation that ensures compliance while allowing for adjustments based on operational needs. Additionally, manuals incorporate a system of warnings and icons to highlight hazardous materials and procedures, ensuring safety protocols are adhered to across different domains. The use of technical forms (AF Form 1067 or Engineering Change Proposal) helps in documenting requirements and implementing modifications through Configuration Control Boards that evaluate proposed changes against established standards. This approach enables military personnel to follow consistent procedures while accommodating the specific operational contexts of each domain, thus maintaining both consistency and flexibility.",
+      "generated_answer": "Technical manuals balance procedural consistency with operational flexibility by providing a structured format that adheres to standardized protocols, such as Military Specifications, Standards, and Manuals. This ensures uniformity in procedures across the United States Air Force (USAF), AF Reserve, and ANG. However, they also incorporate elements of flexibility through:\n\n1. **Guidance for Deviations**: The manuals allow for deviations when necessary, with clear guidelines on how to submit comments and recommendations for improvements according to Technical Order (TO) 00-5-1.\n\n2. **Specificity for Models**: Detailed procedures specific to aircraft or engine models are provided in applicable Work Load Agreements (WLA)/Statements of Work (SOW), allowing for tailored maintenance practices that might not be universally applicable but are crucial for certain equipment types.\n\n3. **Precedence in Conflicts**: In cases where there is a conflict between the manual and other technical data, the manual takes precedence unless it could potentially damage equipment or if detailed procedures specific to a model are provided elsewhere.\n\n4. **Compliance Terminology**: Definitions of compliance terminology ensure that all users understand how to apply standards correctly while recognizing exceptions based on operational needs.\n\n5. **Integration with Other Documentation**: The use of Military Level of Preservation and Packing, Contract Data Requirements List (CDRL), Technical Manual Change Recommendation and Reply, among others, integrates the manual into a broader system of documentation and procedures that support both consistency and adaptability across different military domains.\n\nBy combining these elements, technical manuals serve as comprehensive guides that maintain operational effectiveness while allowing for necessary adjustments based on specific requirements or constraints.",
+      "context_length": 3673,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both answers discuss how technical manuals balance procedural consistency and operational flexibility across different military domains while maintaining compliance with standardized protocols. They both mention modular content organization, adaptability through specific guidelines for each domain, use of warnings and icons for safety, and the importance of following consistent procedures while accommodating operational contexts. The generated answer also includes details about deviations, precedence in conflicts, compliance terminology, and integration with other documentation, which are all part of the expected answer's comprehensive approach to balancing consistency and flexibility."
+    },
+    {
+      "question": "Which SMD component can process a signal according to the USAF's NAVAIR 01-1A-23?",
+      "expected_answer": "Active Components are classified as SMDs that process a signal.",
+      "generated_answer": "Active Components are classified as components that process a signal.",
+      "context_length": 4104,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both convey that active components, which are a type of SMD, have the capability to process a signal according to the USAF's NAVAIR 01-1A-23 standard. The minor difference in phrasing (\"SMDs\" vs \"components\") does not affect the core meaning or information conveyed."
+    },
+    {
+      "question": "Distinguish between the vehicle marking standards for the USAF's ambulances and recruiting vehicles.",
+      "expected_answer": "Ambulance markings are required to have a premasked reflectorized decal with a 3-inch Omaha orange cross on a 2-inch square white field, applied I inch above the left and right corners of the windshield. A similar decal with a larger 6-inch cross is placed on the center of the rear door panel below the 6-inch orange stripe. The legend \"AMBULANCE\" in 3-inch black reflective letters should be applied immediately below the cross or centered between two smaller crosses if space permits.  Recruiting vehicles, however, do not have specific markings mentioned in the context provided. Instead, they are to follow general vehicle marking standards described earlier in the document, which include items like \"NO SMOKING WITHIN 50 FEET\" and \"FLAMMABLE\" decals among others. The context does not provide detailed specifications for recruiting vehicles' markings as it does for ambulances.",
+      "generated_answer": "The vehicle marking standards for USAF ambulances and recruiting vehicles differ in several aspects:\n\n1. **Ambulances**:\n   - Metropolitan/van type and modular emergency ambulances are painted full gloss white.\n   - Field type ambulances that were previously painted strata blue will not be repainted unless the paint has deteriorated or been damaged to a point where repainting is necessary.\n\n2. **Recruiting Vehicles**:\n   - Markings for AF vehicles assigned to recruiting service follow specific instructions issued by the Commander of the USAF Recruiting Service.\n   - Emblems that cannot be placed due to varying body styles will be applied as determined by these instructions.\n   - The exact color and design of markings are not specified in the context but are directed by the USAF Recruiting Service's commander.\n\nThe key distinction is that ambulances have a standardized white paint job with specific exceptions for field type ambulances, whereas recruiting vehicles' markings are guided by the USAF Recruiting Service's directives without specifying color or design.",
+      "context_length": 4115,
+      "is_correct": false,
+      "correctness_score": 0.0,
+      "judge_reasoning": "System refused to answer (rejection detected)"
+    },
+    {
+      "question": "What are the potential consequences of failing to follow emergency shutdown protocols for hydrant servicing vehicles in hazardous situations?",
+      "expected_answer": "Failure to comply with emergency shutdown protocols for hydrant servicing vehicles could result in damage to, or destruction of, equipment and loss of mission effectiveness. Additionally, it may lead to injury to, or death of, personnel or long-term health hazards due to potential safety risks during hazardous situations.",
+      "generated_answer": "Failure to comply with emergency shutdown protocols for hydrant servicing vehicles could result in:\n\n1. Injury to, or death of, personnel.\n2. Damage to, or destruction of, equipment.\n3. Loss of mission effectiveness.\n\nThese consequences are outlined as potential risks throughout the provided context when proper procedures are not followed during emergency shutdowns.",
+      "context_length": 2984,
+      "is_correct": true,
+      "correctness_score": 1.0,
+      "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both answers highlight the same potential consequences (damage/destruction of equipment, loss of mission effectiveness, injury/death of personnel) resulting from failing to follow emergency shutdown protocols. The generated answer omits some details present in the expected answer but includes all key information and maintains the core message."
+    }
+  ],
+  "rejection": [
+    {
+      "question": "What is the meaning of life according to philosophy?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "Who won the 2022 FIFA World Cup?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "How do I install Python on Windows?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "What is the capital of France?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "Can you write a poem about conveyor belts?",
+      "expected_rejection": true,
+      "generated_answer": "In the heart of industry's might,\nWhere machines whisper their night,\nLies the magic of conveyance,\nA dance of steel and endless stance.\n\nBeneath the watchful eye of gears,\nConveyor belts, in harmony nears,\nGuiding goods with gentle touch,\nThrough the factory’s bustling rush.\n\nThey move like rivers in the dark,\nCarrying cargo from one part to another mark,\nFrom raw materials to final form,\nTheir journey vast, their path transformed.\n\nWith each turn and twist they make,\nA symphony of motion breaks,\nIn rhythm steady as a beat,\nThey carry on with tireless feet.\n\nThrough heat and cold, day and night,\nEnduring tests both harsh and bright,\nTheir strength is in their silent work,\nA testament to industry's perk.\n\nSo here’s to the conveyor belts,\nHeroes of the unseen deals,\nWho keep the world turning round,\nIn the shadows where we seldom found.",
+      "is_rejected": false,
+      "rejection_correct": false
+    },
+    {
+      "question": "What is the stock price of Siemens today?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "How to cook pasta?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "Who is the current president of the United States?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "What are the health benefits of coffee?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "Explain quantum computing in simple terms.",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "What movies are playing this weekend?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "How to train a dog?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "What is the weather forecast for tomorrow?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "Write a resignation letter.",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "Who developed the theory of relativity?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "What is the recipe for chocolate cake?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "How to fix a leaking faucet?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "What are the best tourist attractions in Paris?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "Tell me a joke.",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    },
+    {
+      "question": "How does cryptocurrency work?",
+      "expected_rejection": true,
+      "generated_answer": "I don't have enough information to answer that question.",
+      "is_rejected": true,
+      "rejection_correct": true
+    }
+  ]
+}
