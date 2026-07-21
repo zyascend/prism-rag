@@ -1,25 +1,25 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: **feat/self-rag-gate2**（进行中）| 远程: origin  
-> 更新: **2026-07-21** — Self-RAG Gate2 MVP 实现（默认关闭；待对照评测）
+> 分支: **feat/self-rag-gate2** | 远程: origin  
+> 更新: **2026-07-21** — Self-RAG Gate2 云上 A/B **完成（阴性）**；默认保持关闭
 
 ### Self-RAG Gate2（本分支）
 
 | 项 | 状态 |
 |----|------|
 | 设计 | `docs/self-rag-closed-loop-design-2026-07-09.md` v2 |
-| 实现 | ✅ `src/generation/self_rag.py` + `self_rag_gate2_verdict` / `self_rag_regenerate` prompts |
-| `/ask` | 配置 `generation.self_rag.enabled=true` 时走 `SelfRAGOrchestrator`；响应带 `self_rag` |
-| L4 缓存 | `answer_cache_key` 含 `self_rag_cache_salt()`（开/关不串答案） |
-| 默认 | **`generation.self_rag.enabled: false`** |
-| 单测 | `tests/test_self_rag_gate2.py`（mock judge；含 attempts_detail fail→regen） |
-| Trace | `self_rag.gate2` + 子 span `attempt.N`；`attempts_detail` 回放每轮 score/answer/unsupported |
-| 评测接入 | RAGAS/E2E：`generation.eval_via_generator` 或 self_rag 开时走 `answer_for_eval` |
-| 云上 A/B | `bash scripts/cloud_self_rag_ab.sh` → `runs/YYYYMMDD-self-rag-gate2/{off,on}/` |
-| 待做 | 云上开/关对照；有正 Δ 再写简历 ③ |
+| 实现 | ✅ Gate2 + attempts_detail Trace + `/ask` + L4 salt |
+| 默认 | **`generation.self_rag.enabled: false`**（云上对照后维持） |
+| 云上 A/B | ✅ `runs/20260721-self-rag-gate2/`（SeetaCloud 4090） |
 
-开关示例：`generation.self_rag.enabled: true`；A/B 两臂另设 `eval_via_generator: true`（脚本已写）。  
-云上：`bash scripts/cloud_self_rag_ab.sh`（`MAX_QUERIES=100 RUN_E2E=1`）。
+**A/B 主数字（100q RAGAS + E2E 50/20，eval_via_generator 两臂）：**
+
+| | Faith | Rel | E2E Correct | E2E Reject | latency |
+|--|------:|----:|------------:|-----------:|--------:|
+| off | **0.830** | **0.822** | 0.60 | 0.25 | 2.24s |
+| on | 0.786 | 0.763 | 0.60 | **0.95** | 3.96s |
+
+结论：Gate2 **不抬 Faith**（−4pt）、延迟 ×1.8；拒答准确率大涨但可答有误杀。**简历不写 Faith↑**；口述可讲阴性对照。详情见 run README。
 
 ---
 
