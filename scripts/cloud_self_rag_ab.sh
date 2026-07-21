@@ -79,11 +79,19 @@ vr = data.setdefault("retrieval", {}).setdefault("visual_routing", {})
 vr["enabled"] = False
 # 生成侧保持默认 bge 压缩
 data.setdefault("context_filter", {})["mode"] = data.get("context_filter", {}).get("mode", "bge")
+# 云上 Generator / Gate2 judge 走 Ollama OpenAI 兼容接口（与 RAGAS call_llm 同模型）
+llm = data.setdefault("llm", {})
+llm.setdefault("base_url", os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1"))
+llm.setdefault("api_key", os.environ.get("OPENAI_API_KEY", "ollama"))
+llm.setdefault(
+    "model",
+    os.environ.get("LLM_MODEL", data.get("models", {}).get("llm", "qwen2:7b")),
+)
 
 out = Path(os.environ["DEST_YAML"])
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
-print("wrote", out, "self_rag.enabled=", sr["enabled"])
+print("wrote", out, "self_rag.enabled=", sr["enabled"], "llm.model=", llm.get("model"))
 PY
 }
 
