@@ -1,11 +1,169 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: **main**（合并 `feat/self-rag-gate2` 后）| 远程: origin  
-> 更新: **2026-07-21** — Self-RAG Gate2 MVP + 拒答口径 P0/P1 + 云上干净对照定稿
+> 分支: **feat/crag-failure-clinic**（未合 main）| 远程: origin  
+> 更新: **2026-07-23** — CRAG + Failure Clinic 代码落地；**云上 CRAG ON 100q 阴性结论定稿**
 
 ---
 
-## 0. 本轮交付摘要（feat/self-rag-gate2 → main）
+## 0. 本轮交付摘要（feat/crag-failure-clinic）
+
+### 目标与结果
+
+| 目标 | 结果 |
+|------|------|
+| Corrective RAG（生成前检索纠错） | ✅ `src/retrieval/crag.py`；grade → filter → reformulate → 再检索；**无 web** |
+| 评测路径对齐 `/ask` | ✅ `answer_for_eval(..., retriever=)` 可触发 CRAG |
+| `/ask` + L4 缓存盐 | ✅ `crag` 响应字段 + `crag_cache_salt` |
+| Failure Clinic P01–P12 | ✅ `src/diagnostics/` + `scripts/run_failure_clinic.py` |
+| 云上 CRAG ON 100q 可辩护对照 | ✅ 阴性 → **默认保持关** |
+| 结果归档 | ✅ 本地 `runs/20260722-crag-on/` |
+
+### 配置默认（合入后仍为关）
+
+| 项 | 默认 | 说明 |
+|----|------|------|
+| `retrieval.crag.enabled` | **false** | 总开关；云上阴性后 **禁止默认打开** |
+| `retrieval.crag.grade_top_n` | 10 | 对 top-N chunk 批量 grade |
+| `retrieval.crag.min_relevant` | 1 | 少于则尝试 reformulate |
+| `retrieval.crag.reformulate` | true | 轻量改写（**非 HyDE**） |
+| `retrieval.crag.max_retrieve_attempts` | 2 | 原始 + 最多 1 次再检索 |
+| `retrieval.crag.on_grade_error` | pass_through | judge 挂了放行原结果 |
+
+### 关键代码
+
+- `src/retrieval/crag.py` — `CorrectiveRAG` / `apply_crag_if_enabled`
+- prompts：`crag_grade_documents` / `crag_reformulate_query`
+- `src/generation/self_rag.py` — `answer_for_eval` 接 CRAG
+- `src/evaluation/ragas_metrics.py` · `e2e_qa.py` — 传 `retriever`
+- `src/diagnostics/` + `scripts/run_failure_clinic.py`
+- `src/api/routes.py` — `/ask` 串 CRAG
+- 设计：`docs/self-rag-closed-loop-design-2026-07-09.md` §3.1
+
+---
+
+### 0.1 云上实验协议（CRAG ON-only）
+
+| 项 | 值 |
+|----|-----|
+| 日期 / 机器 | 2026-07-22 · SeetaCloud 4090D · DONE 15:59:50 UTC |
+| 臂 | **仅 ON**（不重跑 OFF） |
+| OFF 基线 | `runs/20260721-self-rag-on-only/comparison_post_p0.json` → **off_recomputed**（无 CRAG / Gate2 关 / post-P0 拒答口径） |
+| 冻结 | colqwen2 · `--skip-index` · ollama `qwen2:7b` · `eval_via_generator=true` · **self_rag=off**（隔离 CRAG） |
+| 任务 | RAGAS `max_queries=100` → E2E 全量（50 可答 + 20 拒答） |
+| 墙钟 | RAGAS ~25.4 min · E2E ~10 min · 合计 ~36 min |
+| 产物 | 本地 **`runs/20260722-crag-on/`**（含 `README.md` · metrics · `crag_on_100.log`） |
+
+---
+
+### 0.2 对照数字
+
+| 指标 | OFF (post-P0) | CRAG ON | Δ |
+|------|-------------:|--------:|--:|
+| Faith @100 | 0.919 | 0.894 | −2.5pt |
+| Answer Rel | 0.816 | 0.822 | +0.7pt |
+| **CtxRel** | 0.255 | **0.369** | **+11.4pt** |
+| RAGAS 拒答数 | 17 | 29 | +12 |
+| RAGAS 生成数 | 83 | 71 | −12 |
+| **E2E Correct** | **0.60** | **0.48** | **−12pt** |
+| E2E Reject accuracy | 0.90 | 0.90 | 0 |
+| 可答题误拒 | 6（post-P0）/ 0（raw 旧口径） | **10** | ↑ |
+| **E2E latency** | 2.24s | **7.04s** | **×3.1** |
+| grade JSON 失败 | — | 3 次 | pass_through |
+
+机器可读 ON：`runs/20260722-crag-on/on/ragas/ragas_metrics_default.json` · `.../e2e/e2e_qa_results.json`
+
+---
+
+### 0.3 实验结论（定稿）
+
+#### 一句话
+
+**当前参数下的 CRAG 不是「免费质量插件」：它让上下文看起来更相关（CtxRel↑），但端到端答对更少、更爱拒答、延迟约 3×——默认必须保持关闭。**
+
+#### 分项解读
+
+1. **CtxRel +11pt 说明 grade/filter 确实在干活**  
+   噪声 chunk 被挡掉后，入模句子与问题的重合度上升。这与设计目标「生成前去假相关」一致，**机制有效，但有效不等于有用**。
+
+2. **E2E Correct −12pt 是否决项**  
+   用户最终感知是答案对不对。可答题 50 条上 Correct 0.60→0.48，且 **可答题误拒 10 条**（系统说「信息不够」而金标可答）。推断：  
+   - grade 过严 → 丢掉关键证据 chunk；  
+   - 或 reformulate 漂查询 → 二次检索更差；  
+   - 证据变少后模型更倾向拒答。  
+   **CtxRel 升、Correct 降** 说明：评测里的「句级相关」优化，不等于「足以答对工业手册题」。
+
+3. **Faith 微降、Rel 持平——生成忠实性不是受益点**  
+   Faith 0.919→0.894；拒答变多会改变均值分母（已排除拒答）。没有证据表明 CRAG 缓解了幻觉；Gate2 才是忠实性门。
+
+4. **延迟 ×3.1 与「LLM 介入」预期一致**  
+   每条路径可多 1～3 次 judge（grade / rewrite / regrade）+ 可选再检索。E2E 2.24s→7.04s。在 Correct 不涨的前提下，**延迟代价无法回本**。
+
+5. **与 Self-RAG Gate2 对照（同一类「加门」实验）**  
+
+   | | Gate2 always（post-P0） | CRAG ON（本次） |
+   |--|------------------------:|----------------:|
+   | 修什么 | 生成后胡写 | 生成前证据 |
+   | Faith | +0.9pt | −2.5pt |
+   | E2E Correct | +0.02 | **−0.12** |
+   | latency | ×1.7 | **×3.1** |
+   | 默认 | 关（可 low_rerank 试） | **关（更硬）** |
+
+   此前 handoff 已写：E2E 主错在 **检索/错 chunk**。CRAG 正是冲这个去的，但 **默认激进 grade+filter+rewrite 实现未打中，反而伤正确率**。说明瓶颈更可能在「chunk 切分 / 融合排序 / 表结构」等**索引与检索质量**，而不是「多一次 LLM 审证据」就能修。
+
+6. **工程可靠性**  
+   3 次 grade JSON 解析失败走了 pass_through，不是 Correct 大跌的主因，但提示 ollama 7B 当 judge 输出不稳，生产若重开需更稳解析/更小约束输出。
+
+#### 决策（写入配置纪律）
+
+| 决策 | 内容 |
+|------|------|
+| **默认** | `retrieval.crag.enabled: **false**` |
+| **简历 / 对外** | 可写「实现了 CRAG 闭环 + 云上 100q 对照」；**禁止**写 Correct/Faith 大涨 |
+| **若再实验** | 必须改协议，禁止重复同一配置：① 关 `reformulate` 只 grade；② 过滤改为软降权不丢 chunk；③ 仅 `max(rerank)<θ` 触发；④ 更强 judge 模型 |
+| **优先主线** | 检索 badcase（错 page/错 chunk）、chunk/表结构、context_filter——比叠 LLM 门更对症 |
+| **Failure Clinic** | 与 CRAG 解耦，可继续用于 badcase 打 P0x 标签（无 GPU） |
+
+#### 失败模式归类（Failure Clinic）
+
+| 现象 | 建议标签 |
+|------|----------|
+| 可答题被误拒 / 证据被滤掉 | **P05**（改写/路由）+ **P01** 边缘（证据不足硬答/硬拒） |
+| CtxRel↑ 但 Correct↓ | **P09** 风险：单一中间指标误导上线决策 |
+| 延迟 ×3 无质量回报 | 成本类；不单开 pattern，记入 run README |
+
+---
+
+### 本地用法
+
+```bash
+# Failure Clinic（无卡）
+.venv/bin/python scripts/run_failure_clinic.py --list-patterns
+.venv/bin/python scripts/run_failure_clinic.py --example p04
+
+# 单测
+.venv/bin/python -m pytest tests/test_crag.py tests/test_failure_clinic.py -q
+
+# 看本次实验
+open runs/20260722-crag-on/README.md   # 或 cat
+```
+
+### 未做 / 下一步
+
+| 项 | 状态 |
+|----|------|
+| CRAG 实现 + 评测接入 | ✅ |
+| 云上 ON 100q + 历史 OFF 对照 | ✅ **阴性，默认关** |
+| 结果本地归档 | ✅ `runs/20260722-crag-on/` |
+| 合入 main（代码可合，默认关） | 可选 |
+| CRAG 参数重试（软过滤 / 无 rewrite） | 低优先级，有预算再开 |
+| 检索 badcase P2（主矛盾） | ⏳ 建议下一主线 |
+| Failure Clinic 写入 badcase 模板 | 可选 |
+| citation verbatim 硬校验 | 未做 |
+| claim 级 Gate2 | ⏳ |
+
+---
+
+## 0b. 上轮交付摘要（feat/self-rag-gate2 → main）
 
 ### 目标与结果
 
@@ -76,7 +234,7 @@ pgrep -x ollama >/dev/null || nohup ollama serve >> /root/autodl-tmp/logs/ollama
 
 ---
 
-## 0b. 上轮交付摘要（feat/bullet-strengthening → main）
+## 0c. 更早交付摘要（feat/bullet-strengthening → main）
 
 ### 目标与结果
 

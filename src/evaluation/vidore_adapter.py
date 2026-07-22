@@ -160,6 +160,7 @@ class PrismRAGRetriever:
         Self-RAG 开关/阈值变化也必须入 key，避免开/关串答案。
         """
         from src.generation.self_rag import self_rag_cache_salt
+        from src.retrieval.crag import crag_cache_salt
 
         norm = unicodedata.normalize("NFKC", query).lower().strip()
         norm = " ".join(norm.split())
@@ -170,6 +171,7 @@ class PrismRAGRetriever:
             f"doc={doc_id or '*'}",
             f"v={self.index_version}",
             self_rag_cache_salt(),
+            crag_cache_salt(),
         ]
         return "|".join(parts)
 

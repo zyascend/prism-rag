@@ -741,6 +741,8 @@ def evaluate_generation(
                 gen_out = answer_for_eval(
                     query_text, [], k_context=k,
                     bge_embedder=getattr(retriever, "bge", None),
+                    retriever=retriever,
+                    use_rerank=use_rerank,
                 )
                 answer = gen_out.get("answer") or ""
                 context = gen_out.get("context") or ""
@@ -775,17 +777,25 @@ def evaluate_generation(
                 context = "\n\n---\n\n".join(context_chunks)
                 ctx_for_eval = context
             elif use_pipeline:
-                # 与 /ask 对齐：Generator ± Self-RAG Gate2
+                # 与 /ask 对齐：可选 CRAG → Generator ± Self-RAG Gate2
                 gen_out = answer_for_eval(
                     query_text,
                     retrieved,
                     k_context=k,
                     bge_embedder=getattr(retriever, "bge", None),
+                    retriever=retriever,
+                    use_rerank=use_rerank,
                 )
                 answer = gen_out.get("answer") or ""
                 context = gen_out.get("context") or ""
                 ctx_for_eval = context
                 pipeline_self_rag = gen_out.get("self_rag")
+                # CRAG 可能过滤/再检索：评测 context 与生成一致
+                if gen_out.get("crag", {}).get("applied"):
+                    pipeline_self_rag = {
+                        **(pipeline_self_rag or {}),
+                        "crag": gen_out.get("crag"),
+                    }
             else:
                 # Legacy：compress_context + ragas generate_answer
                 compress_ratio = cfg.get("retrieval.context_compression_ratio", 1.0)

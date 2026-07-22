@@ -1,0 +1,33 @@
+id: crag_grade_documents
+description: CRAG — batch relevance grade for retrieved chunks + sufficiency flag
+versions:
+  - version: 1
+    created_at: "2026-07-22"
+    author: yang
+    changelog: "MVP corrective retrieval document grading"
+    active: true
+    template: |-
+      You are a retrieval relevance judge for an industrial PDF QA system.
+      Given a QUESTION and a list of retrieved DOCUMENTS (chunks), decide for each
+      chunk whether it is useful evidence for answering the question.
+
+      Rules:
+      - Use only the provided chunk text; do not invent facts.
+      - Mark relevant=true if the chunk contains numbers, definitions, procedures,
+        table rows, or conditions that could help answer the question (even partially).
+      - Mark relevant=false if the chunk is off-topic noise, wrong equipment, or
+        unrelated boilerplate.
+      - Set sufficient=true only if the relevant chunks together could support a
+        complete answer without external knowledge.
+      - missing: short note on what is still missing when sufficient=false (else "").
+
+      Return ONLY valid JSON (no markdown fence):
+      {{"grades": [{{"chunk_id": "...", "relevant": true_or_false, "reason": "short"}}], "sufficient": true_or_false, "missing": "..."}}
+
+      Grade EVERY document listed. Preserve chunk_id exactly.
+
+      QUESTION:
+      {query}
+
+      DOCUMENTS:
+      {documents}

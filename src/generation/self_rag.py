@@ -232,18 +232,38 @@ def answer_for_eval(
     bge_embedder=None,
     client=None,
     generator=None,
+    retriever=None,
+    use_rerank: bool = True,
+    use_visual: bool = True,
 ) -> dict:
-    """评测/对照用统一生成入口：Generator ± Self-RAG Gate2。
+    """评测/对照用统一生成入口：可选 CRAG → Generator ± Self-RAG Gate2。
 
-    返回 ``{answer, citations, context, self_rag}``，与 ``Generator.answer`` /
+    返回 ``{answer, citations, context, self_rag, crag}``，与 ``Generator.answer`` /
     ``SelfRAGOrchestrator.answer`` 一致。空检索返回拒答文案。
+
+    传入 ``retriever`` 时，若 ``retrieval.crag.enabled`` 可改写后再检索（与 /ask 对齐）。
     """
     from src.generation.generator import Generator
+    from src.retrieval.crag import apply_crag_if_enabled
 
     if generator is None:
         generator = Generator(client=client, bge_embedder=bge_embedder)
+
+    retrieved, crag_meta = apply_crag_if_enabled(
+        query,
+        retrieved,
+        retriever=retriever,
+        k=k_context,
+        use_rerank=use_rerank,
+        use_visual=use_visual,
+        client=getattr(generator, "client", None),
+        model=getattr(generator, "model", None),
+    )
+
     orch = SelfRAGOrchestrator(generator)
-    return orch.answer(query, retrieved, k_context=k_context)
+    out = orch.answer(query, retrieved, k_context=k_context)
+    out["crag"] = crag_meta
+    return out
 
 
 class SelfRAGOrchestrator:
