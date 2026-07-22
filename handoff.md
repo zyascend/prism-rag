@@ -101,7 +101,8 @@ pgrep -x ollama >/dev/null || nohup ollama serve >> /root/autodl-tmp/logs/ollama
 | LLM 句过滤 vs BGE 对照 | ⏭ 未测 | 估 +1～5s/query；RAGAS 路径需接 `complete_fn` 才真跑 LLM 过滤 |
 
 计划：`docs/superpowers/plans/2026-07-20-bullet-strengthening-roadmap.md`  
-简历素材（不入库）：`local/resume-prismrag.md`
+简历素材（不入库）：`local/resume-prismrag.md`（**v2 rag-app** 当前；v1 快照与还原见 `local/resume/VERSIONS.md`）  
+模块架构（入库）：`docs/architecture/`（`trace` · `cache` · `ingestion` · `content-pipeline` · `evaluation`；后续 retrieval/…）
 
 ### 配置默认（合并后）
 
