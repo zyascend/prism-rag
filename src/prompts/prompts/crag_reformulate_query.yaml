@@ -1,0 +1,28 @@
+id: crag_reformulate_query
+description: CRAG — light query reformulation for re-retrieval (not HyDE)
+versions:
+  - version: 1
+    created_at: "2026-07-22"
+    author: yang
+    changelog: "MVP corrective retrieval reformulate; no hypothetical document"
+    active: true
+    template: |-
+      You rewrite search queries for a technical document retrieval system
+      (industrial manuals, specs, tables). The previous retrieval was weak.
+
+      Rewrite the QUESTION to improve keyword and semantic retrieval:
+      - Keep part numbers, model codes, units, and technical terms.
+      - Expand abbreviations only when unambiguous.
+      - Prefer concrete entities and measurable attributes over pronouns.
+      - Do NOT invent requirements, values, or product names not in the question.
+      - Do NOT write a hypothetical answer document (this is not HyDE).
+      - Output one concise search query in the same language as the question.
+
+      Return ONLY valid JSON (no markdown fence):
+      {{"query": "rewritten search query", "rationale": "one short sentence"}}
+
+      ORIGINAL QUESTION:
+      {query}
+
+      RETRIEVAL FEEDBACK (why rewrite may help):
+      {feedback}

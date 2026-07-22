@@ -20,6 +20,7 @@ from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
 from src.ingestion.pdf_ingestor import PDFIngestor
 from src.ingestion.text_chunker import TextChunker
 from src.retrieval.bm25_retriever import BM25Retriever
+from src.retrieval.crag import CorrectiveRAG, crag_config
 from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.fusion import RRFFusion
 from src.retrieval.reranker import Reranker
@@ -247,12 +248,26 @@ class SelfRAGInfo(BaseModel):
     attempts_detail: Optional[List[SelfRAGAttemptDetail]] = None
 
 
+class CRAGInfo(BaseModel):
+    """Corrective RAG 检索纠错摘要（默认关闭）。"""
+    enabled: bool = False
+    applied: Optional[bool] = None
+    final_action: Optional[str] = None
+    query_original: Optional[str] = None
+    query_used: Optional[str] = None
+    num_relevant: Optional[int] = None
+    sufficient: Optional[bool] = None
+    skip_reason: Optional[str] = None
+    grade_degraded: Optional[bool] = None
+
+
 class AskResponse(BaseModel):
     query: str
     answer: str
     citations: List[Citation] = []
     retrieval_trace: RetrievalTrace = RetrievalTrace()
     self_rag: Optional[SelfRAGInfo] = None
+    crag: Optional[CRAGInfo] = None
 
 
 UPLOAD_DIR = Path("data/uploads")
@@ -318,11 +333,13 @@ async def ask(request: AskRequest):
             visual_top5=[RouteTraceItem(**t) for t in rt["visual_top5"]],
         )
         sr_info = cached_answer.get("self_rag")
+        crag_info = cached_answer.get("crag")
         return AskResponse(
             query=request.query, answer=cached_answer["answer"],
             citations=[Citation(**c) for c in cached_answer["citations"]],
             retrieval_trace=trace,
             self_rag=SelfRAGInfo(**sr_info) if sr_info else None,
+            crag=CRAGInfo(**crag_info) if crag_info else None,
         )
 
     try:
@@ -337,6 +354,51 @@ async def ask(request: AskRequest):
     retrieval_trace = search_result["retrieval_trace"]
     if request.doc_id:
         results = [r for r in results if r.get("doc_id") == request.doc_id]
+
+    # ── CRAG：检索后 grade / 可选改写再检索（默认关）──
+    crag_public: dict = {"enabled": False, "applied": False}
+    cr_cfg = crag_config()
+    if cr_cfg.get("enabled") and results:
+        def _research(q: str):
+            second = retriever.search(
+                q,
+                k=request.k,
+                use_visual=use_visual,
+                use_rerank=request.use_rerank,
+            )
+            if request.doc_id:
+                second = [r for r in second if r.get("doc_id") == request.doc_id]
+            return second
+
+        crag = CorrectiveRAG(
+            search_fn=_research,
+            client=gen.client,
+            model=cr_cfg.get("judge_model") or gen.model,
+            config=cr_cfg,
+        )
+        corrected = crag.correct(request.query, results, k=request.k)
+        results = corrected.get("results") or results
+        crag_payload = corrected.get("crag") or {}
+        crag_public = {
+            k: crag_payload.get(k)
+            for k in (
+                "enabled",
+                "applied",
+                "final_action",
+                "query_original",
+                "query_used",
+                "num_relevant",
+                "sufficient",
+                "skip_reason",
+                "grade_degraded",
+            )
+            if k in crag_payload or k == "enabled"
+        }
+        crag_public.setdefault("enabled", True)
+        crag_public.setdefault("query_original", request.query)
+        if "query_used" not in crag_public:
+            crag_public["query_used"] = corrected.get("query_used", request.query)
+
     trace = RetrievalTrace(
         bm25_top5=[RouteTraceItem(**t) for t in retrieval_trace["bm25_top5"]],
         dense_top5=[RouteTraceItem(**t) for t in retrieval_trace["dense_top5"]],
@@ -347,6 +409,7 @@ async def ask(request: AskRequest):
             query=request.query,
             answer="I don't have enough information to answer that question.",
             citations=[], retrieval_trace=trace,
+            crag=CRAGInfo(**crag_public),
         )
     try:
         sr_cfg = self_rag_config()
@@ -385,6 +448,7 @@ async def ask(request: AskRequest):
             "citations": gen_out["citations"],
             "retrieval_trace": retrieval_trace,
             "self_rag": sr_public,
+            "crag": crag_public,
         })
         collector.record_cache_event("answer", hit=False, config_label=cache_label)
 
@@ -393,4 +457,5 @@ async def ask(request: AskRequest):
         citations=[Citation(**c) for c in gen_out["citations"]],
         retrieval_trace=trace,
         self_rag=SelfRAGInfo(**sr_public),
+        crag=CRAGInfo(**crag_public),
     )

@@ -1,9 +1,11 @@
 # Self-RAG 闭环设计文档（v2 · MVP）
 
 > **日期**：2026-07-09 初稿 · **2026-07-20 修订为 v2**  
-> **状态**：Draft v2 — **MVP 仅 Gate2（答案忠实性门）**；Gate1 为 Phase 2  
-> **实现状态**：**MVP 代码已实现**（`feat/self-rag-gate2`）：`src/generation/self_rag.py` + prompts + `/ask` 接入；默认 `enabled: false`  
-> **分支**：`feat/self-rag-gate2`
+> **状态**：Draft v2 — **MVP Gate2 已落地**；Gate1 检索侧由 **CRAG** 覆盖（`feat/crag-failure-clinic`）  
+> **实现状态**：  
+> - Gate2：`src/generation/self_rag.py` + prompts + `/ask`；默认 `generation.self_rag.enabled: false`  
+> - Gate1/CRAG：`src/retrieval/crag.py`（文档 grade + 轻量 reformulate + 再检索，**无 web**）；默认 `retrieval.crag.enabled: false`  
+> **分支**：Gate2 已合 main；CRAG 见 `feat/crag-failure-clinic`
 
 ### 关联文档
 
@@ -123,16 +125,21 @@ Generator.answer（压缩 + 生成，现有）
 - Gate2 超时 / 解析失败 → **降级策略**见 §5.4（默认：放行并打 `gate_degraded=true`，或按配置强制 abstain）  
 - **不在 MVP 做重检索**（避免与 Visual 路由、L3 缓存、延迟预算纠缠）
 
-### 3.1 Phase 2 目标形态（仅文档预留，不实现）
+### 3.1 Gate1 / CRAG（已实现检索侧纠错）
+
+工程落地为 **Corrective RAG**（`src/retrieval/crag.py`），挂在 `/ask` 检索之后、生成之前：
 
 ```text
-Retrieve
+Retrieve (+ RRF + Rerank)
    ▼
-[Gate 1: Evidence sufficient?]── no ──► k+=Δ / 轻量 reformulate ──► 再 Retrieve
-   │ yes                                 （禁止默认 HyDE）
-   ▼
-Generate → Gate2 → ...
+[CRAG grade_documents]── filter irrelevant
+   │
+   ├─ sufficient ──► Generate → Gate2 → ...
+   └─ insufficient + reformulate ──► 轻量 rewrite query ──► 再 Retrieve 1 次
+                                      （禁止默认 HyDE / 禁止 web 兜底）
 ```
+
+配置：`retrieval.crag.*`（默认 `enabled: false`）。与本文 §7 充分性语义对齐：grade 返回 `sufficient` + per-chunk `relevant`，**不用 CtxRel 当门**。
 
 ---
 

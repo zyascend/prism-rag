@@ -383,16 +383,20 @@ def evaluate_e2e_qa(
                     retrieved or [],
                     k_context=k,
                     bge_embedder=getattr(retriever, "bge", None),
+                    retriever=retriever,
+                    use_rerank=use_rerank,
                 )
                 generated = gen_out.get("answer") or ""
                 context = gen_out.get("context") or ""
                 sr_meta = gen_out.get("self_rag") or {}
+                crag_meta = gen_out.get("crag") or {}
             else:
                 context = "\n\n---\n\n".join(
                     [r.get("text", "") for r in retrieved]
                 ) if retrieved else ""
                 generated = generate_answer(question, context)
                 sr_meta = {}
+                crag_meta = {}
 
             elapsed = time.time() - start
             latency_total += elapsed
@@ -419,6 +423,11 @@ def evaluate_e2e_qa(
                     "self_rag_score": sr_meta.get("score"),
                     "self_rag_attempts": sr_meta.get("attempts"),
                 } if sr_meta else {}),
+                **({
+                    "crag_action": crag_meta.get("final_action"),
+                    "crag_applied": crag_meta.get("applied"),
+                    "crag_num_relevant": crag_meta.get("num_relevant"),
+                } if crag_meta else {}),
             })
 
             if not correctness_result.is_correct:
@@ -445,6 +454,8 @@ def evaluate_e2e_qa(
                     retrieved or [],
                     k_context=k,
                     bge_embedder=getattr(retriever, "bge", None),
+                    retriever=retriever,
+                    use_rerank=use_rerank,
                 )
                 generated = gen_out.get("answer") or ""
             else:
