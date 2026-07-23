@@ -1,0 +1,5 @@
+chunks_before 21
+type table 2
+type text 19
+section_path_filled 0
+table_summary_filled 2

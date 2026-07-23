@@ -88,7 +88,9 @@ def get_retriever() -> PrismRAGRetriever:
         bge = BGEEmbedder()
         # 本地 dev (use_visual=false) 免 ColPali 3.5B 下载：仅当启用 visual 路才构造
         colpali = ColPaliEmbedder() if use_visual else None
-        chunker = TextChunker()
+        chunker = TextChunker(
+            image_caption_chunks=cfg.get("ingestion.image_caption_chunks", False),
+        )
         bm25 = BM25Retriever()
         dense = DenseRetriever(pg_store, bge)
         visual = VisualRetriever(faiss_store, pg_store, colpali) if use_visual else None

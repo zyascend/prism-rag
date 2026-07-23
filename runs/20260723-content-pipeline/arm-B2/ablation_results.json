@@ -1,0 +1,13 @@
+[
+  {
+    "config": "Full_zerank2",
+    "ndcg@5": 0.3437,
+    "ndcg@10": 0.3575,
+    "recall@5": 0.306,
+    "recall@10": 0.3867,
+    "mrr": 0.4821,
+    "avg_latency_ms": 1068.3,
+    "num_queries": 100,
+    "language": "en"
+  }
+]

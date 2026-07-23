@@ -31,6 +31,15 @@ for word in words: ...   # 表格被切成 "|公司|营收" 这类碎片
 
 两者形成闭环：**摘要负责"找得到"，全表负责"答得准"**。
 
+### 1.1 上下文感知摘要（Phase A1 · 2026-07-23）
+
+| 项 | 说明 |
+|----|------|
+| 开关 | `ingestion.table_summary_context_enabled`（**默认 false**） |
+| 行为 | 开时把同页非表 chunk 文本截断后注入 prompt（`table_summary` v2）；关时仍用 v1 孤表摘要 |
+| 代码 | `TableSummarizer.summarize(..., context=)` · `build_page_context`；`pdf_ingestor` / `vidore_ingestor` 接线 |
+| 路线图 | [content-pipeline-phase-ab-roadmap](./superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md) |
+
 ## 2. 端到端数据流
 
 ```

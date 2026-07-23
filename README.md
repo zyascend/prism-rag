@@ -9,6 +9,7 @@
 | **模块架构** | [docs/architecture/](docs/architecture/)（实现级快照） |
 | **评测协议** | [docs/eval-protocol.md](docs/eval-protocol.md)（NDCG 口径 v1 / Boot-A） |
 | **Agent 规范** | [Agents.md](Agents.md)（本地禁全量、云上 GPU 纪律） |
+| **下一主线** | [Content Pipeline Phase A/B](docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md)（入库语义 → 检索接缝） |
 
 ---
 

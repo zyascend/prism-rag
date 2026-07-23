@@ -1,7 +1,25 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: **feat/crag-failure-clinic**（未合 main）| 远程: origin  
-> 更新: **2026-07-23** — CRAG + Failure Clinic 代码落地；**云上 CRAG ON 100q 阴性结论定稿**
+> 分支: **docs/content-pipeline-phase-ab-roadmap**（文档）· CRAG 代码在 **feat/crag-failure-clinic**（未合 main）| 远程: origin  
+> 更新: **2026-07-23** — 检索主线 Phase A/B roadmap 落档；此前 CRAG ON 100q 阴性定稿
+
+---
+
+## 0′. 下一主线（Content Pipeline Phase A/B · 实施中）
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `feat/content-pipeline-phase-ab` |
+| **路线图** | [`docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md`](docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md) |
+| **已完成** | **A0–A3 + B1–B2 代码**；**Boot-CP skip-index 三臂**（2026-07-23） |
+| **Boot-CP 结论** | 三臂 NDCG@10 **同为 0.3575**（100q）；page 级指标看不到 B1；B2 未动序；默认 expand/boost **仍关** |
+| **产物** | `runs/20260723-content-pipeline/` |
+| **Text re-ingest** | smoke ✅ · smoke-llm ✅ · **full ✅**（8835 chunks · 2305 表摘要 · prev=3796） |
+| **Post 100q** | Full_zerank2 NDCG@10 **0.3575 → 0.3589（+0.14pt）** · `runs/20260723-post-text-reingest/` |
+| **Goal-A 正式（ON 索引）** | **283q NDCG@10 = 0.5337**（vs Boot-A 0.5318）；**E2E Correct 0.66 / Reject 0.95**（误拒 9）· `runs/20260723-on-goalA/` |
+| **默认开 context？** | ON 侧主表/E2E 已可辩护；改 yaml 默认仍建议 OFF 双臂 decide；当前 **默认仍 false 亦可** |
+| **下一步** | 可选 OFF 对照 / Failure Clinic 误拒；**建议关机省钱** |
+| **不做** | LightRAG/全量 KG · 默认 CRAG/Gate2/VLM query |
 
 ---
 
@@ -156,7 +174,7 @@ open runs/20260722-crag-on/README.md   # 或 cat
 | 结果本地归档 | ✅ `runs/20260722-crag-on/` |
 | 合入 main（代码可合，默认关） | 可选 |
 | CRAG 参数重试（软过滤 / 无 rewrite） | 低优先级，有预算再开 |
-| 检索 badcase P2（主矛盾） | ⏳ 建议下一主线 |
+| 检索 badcase P2（主矛盾） | ⏳ **路线图已落** → Phase A/B（见 §0′） |
 | Failure Clinic 写入 badcase 模板 | 可选 |
 | citation verbatim 硬校验 | 未做 |
 | claim 级 Gate2 | ⏳ |

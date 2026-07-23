@@ -1,0 +1,10 @@
+chunks_after 8835
+type table 2305
+type text 6530
+section_path_filled 0
+prev_filled 3796
+table_summary_filled 2305
+samples:
+  ('table', '', 'The table outlines a contents page for a document. It includes two columns: "Cha')
+  ('table', '', 'The table outlines personnel and their locations within an aircraft refueling op')
+  ('table', '', 'The table outlines changes to a document with 12 pages related to an Aircraft Fi')

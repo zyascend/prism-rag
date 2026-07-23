@@ -1,0 +1,102 @@
+cache:
+  enabled: true
+  max_size: 2048
+  ttl_seconds: 0
+context_filter:
+  mode: bge
+embedding:
+  bge_device: auto
+  bge_dim: 1024
+  colpali_batch_size: 4
+  colpali_device: auto
+generation:
+  eval_via_generator: false
+  self_rag:
+    enabled: false
+    faith_threshold: 0.8
+    gate_timeout_ms: 8000
+    judge_model: null
+    low_rerank_threshold: 0.35
+    max_generate_attempts: 2
+    mode: gate2_only
+    on_fail: regenerate_then_abstain
+    on_judge_error: degrade_pass
+    trigger: low_rerank
+    verdict_mode: whole_answer
+ingestion:
+  image_caption_chunks: false
+  parser: simple
+  table_summary_context_enabled: false
+  table_summary_context_max_chars: 1500
+  table_summary_enabled: true
+models:
+  bge_embedding: BAAI/bge-large-en-v1.5
+  bge_reranker: BAAI/bge-reranker-large
+  colpali: vidore/colpali-v1.3
+  colqwen2: vidore/colqwen2-v1.0
+  llm: qwen2:7b
+  zerank_reranker: zeroentropy/zerank-2-reranker
+observability:
+  alerting:
+    context_relevancy_min: 0.05
+    faithfulness_min: 0.6
+    latency_p95_threshold_ms: 5000
+    recall_at_5_min: 0.5
+    rerank_score_min: 0.0
+  dashboard_enabled: true
+  log_file: logs/app.jsonl
+  log_level: INFO
+  trace_enabled: true
+  trace_persist_path: logs/api_traces.jsonl
+retrieval:
+  bm25_k: 20
+  context_compression_ratio: 0.4
+  crag:
+    chunk_text_max_chars: 600
+    enabled: false
+    grade_top_n: 10
+    judge_model: null
+    judge_timeout_ms: 8000
+    max_retrieve_attempts: 2
+    min_relevant: 1
+    on_grade_error: pass_through
+    reformulate: true
+    regrade_after_retrieve: true
+  dense_k: 20
+  modality_boost:
+    enabled: true
+    force_visual_on_visual_intent: false
+    image_score_bonus: 0.02
+    table_score_bonus: 0.02
+  neighbor_expand:
+    enabled: false
+    max_extra: 2
+    mode: page
+    stage: post_rerank
+  rerank_k: 5
+  rerank_score_reject_threshold: 0.0
+  rrf_k: 60
+  visual_k: 20
+  visual_routing:
+    enabled: false
+    mode: heuristic
+storage:
+  faiss:
+    colqwen2_id_map_path: indexes/colqwen2-v1.0-vidore-industrial-ids.npy
+    colqwen2_index_path: indexes/colqwen2-v1.0-vidore-industrial.faiss
+    hnsw_m: 32
+    id_map_path: indexes/colpali-v1.3-vidore-industrial-ids.npy
+    index_path: indexes/colpali-v1.3-vidore-industrial.faiss
+    index_type: flat
+  pgvector:
+    dbname: prismrag
+    host: localhost
+    password: prismrag
+    port: 5432
+    user: prismrag
+vidore:
+  dataset_name: vidore/vidore_v3_industrial
+  num_pages: 5244
+  split_corpus: test
+  split_qrels: test
+  split_queries: test

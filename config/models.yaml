@@ -24,6 +24,18 @@ retrieval:
   visual_routing:
     enabled: false                    # true 时对 use_visual=True 的请求再按 mode 决策
     mode: heuristic                   # heuristic | always | never
+  # Phase B1：命中后邻居 expand（默认关；Boot-CP 再开）
+  neighbor_expand:
+    enabled: false
+    mode: page                        # page | prev_next
+    max_extra: 2                      # 每个 hit 最多扩几块
+    stage: post_rerank                # post_rerank | pre_rerank
+  # Phase B2：查询意图 → table/visual chunk 轻 boost（默认关）
+  modality_boost:
+    enabled: false
+    table_score_bonus: 0.02           # 加在 RRF score 上
+    image_score_bonus: 0.02
+    force_visual_on_visual_intent: false  # true 时 visual 意图强制开 visual 路
   # Corrective RAG（检索后 grade + 可选改写再检索）；默认关，不联网
   crag:
     enabled: false
@@ -76,6 +88,16 @@ storage:
     colqwen2_id_map_path: "indexes/colqwen2-v1.0-vidore-industrial-ids.npy"
     index_type: "flat"  # "flat" 精确 | "hnsw" HNSW 预筛加速 (macOS FAISS bug, Linux OK)
     hnsw_m: 32
+
+# 入库侧（Content Pipeline Phase A）
+ingestion:
+  parser: simple                          # simple | mineru（生产 PDF 用 mineru）
+  table_summary_enabled: true
+  # 表摘要时注入同页邻段上下文（章节/工况消歧）；默认关，Boot-CP 阳性后再开
+  table_summary_context_enabled: false
+  table_summary_context_max_chars: 1500
+  # MinerU image 块：有 caption 时写入 Dense/BM25 可检索锚点 chunk
+  image_caption_chunks: false
 
 vidore:
   dataset_name: "vidore/vidore_v3_industrial"

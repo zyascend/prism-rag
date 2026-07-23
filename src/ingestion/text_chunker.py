@@ -6,13 +6,18 @@
 2. 段落 ≤ 512 tokens → 直接作为一块
 3. 段落 > 512 tokens → 按句号/换行边界切到 ≤ 512
 4. 空段落跳过
+
+Phase A2：``chunk_blocks`` 消费 MinerU typed ContentBlock；无 blocks 时走 ``chunk_page``。
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import List
+from typing import TYPE_CHECKING, List, Sequence
+
+if TYPE_CHECKING:
+    from src.ingestion.parser import ContentBlock
 
 
 @dataclass
@@ -22,9 +27,13 @@ class Chunk:
     doc_id: str
     page_number: int
     text: str
-    chunk_type: str = "text"  # text | table
+    chunk_type: str = "text"  # text | table | image
     doc_ref: str = ""         # TO 文档编号，用于 LLM grounding（不进 CtxRel 评估）
     table_summary: str = ""   # 表格自然语言摘要（仅 chunk_type=table 时由 TableSummarizer 填充）
+    caption: str = ""         # 图/表 caption（A2/A3；可空）
+    section_path: str = ""    # 章节路径 e.g. "3.2 Cooling > Limits"
+    prev_chunk_id: str = ""
+    next_chunk_id: str = ""
 
     def __repr__(self) -> str:
         return f"Chunk(id={self.chunk_id}, page={self.page_id}, type={self.chunk_type})"
@@ -59,9 +68,249 @@ class TextChunker:
     # 表格分隔行（形如 |---|---| 或 :--: | :--:）
     _SEP_RE = re.compile(r"^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$")
 
-    def __init__(self, max_tokens: int = MAX_TOKENS):
+    def __init__(
+        self,
+        max_tokens: int = MAX_TOKENS,
+        image_caption_chunks: bool = False,
+    ):
         self.max_tokens = max_tokens
         self.max_chars = max_tokens * self.TOKEN_EST_RATIO
+        self.image_caption_chunks = image_caption_chunks
+
+        self._heading_stack: list = []
+
+    def reset_headings(self) -> None:
+        """跨文档入库前清空标题栈。"""
+        self._heading_stack: list = []
+
+    def current_section_path(self) -> str:
+        stack = getattr(self, "_heading_stack", None) or []
+        return " > ".join(title for _, title in stack)
+
+    def _note_heading(self, text: str, text_level: int = 0) -> str:
+        """根据 markdown 标题或 text_level 更新栈，返回当前 section_path。"""
+        if not hasattr(self, "_heading_stack"):
+            self._heading_stack = []
+        level = 0
+        title = ""
+        m = re.match(r"^(#{1,6})\s+(.+)$", (text or "").strip())
+        if m:
+            level = len(m.group(1))
+            title = m.group(2).strip()
+        elif text_level and text_level > 0:
+            level = int(text_level)
+            title = re.sub(r"^#{1,6}\s*", "", (text or "").strip())
+        if level and title:
+            while self._heading_stack and self._heading_stack[-1][0] >= level:
+                self._heading_stack.pop()
+            self._heading_stack.append((level, title))
+        return self.current_section_path()
+
+    @staticmethod
+    def link_neighbors(chunks: List[Chunk]) -> None:
+        """按列表顺序写 prev/next_chunk_id（同页或同批）。"""
+        for i, c in enumerate(chunks):
+            c.prev_chunk_id = chunks[i - 1].chunk_id if i > 0 else ""
+            c.next_chunk_id = chunks[i + 1].chunk_id if i + 1 < len(chunks) else ""
+
+
+    def chunk_blocks(
+        self,
+        page_id: int,
+        doc_id: str,
+        page_number: int,
+        blocks: Sequence["ContentBlock"],
+        doc_ref: str = "",
+    ) -> List[Chunk]:
+        """按 typed ContentBlock 分块（MinerU content_list 路径）。
+
+        - table：caption 前缀 + table body，走大表按行切分
+        - text / equation：清洗后按段落/长度切
+        - image：仅当 ``image_caption_chunks`` 且有 caption 时生成可检索锚点 chunk
+        """
+        if not blocks:
+            return []
+
+        # 从块中尽量补 doc_ref
+        if not doc_ref:
+            for b in blocks:
+                if b.type == "text" and b.text:
+                    _, ref = self.clean_to_markdown(b.text)
+                    if ref:
+                        doc_ref = ref
+                        break
+
+        chunks: List[Chunk] = []
+        chunk_idx = 0
+
+        def _push(c: Chunk) -> None:
+            nonlocal chunk_idx
+            chunk_idx += 1
+            c.chunk_id = f"pg{page_id:05d}_ch{chunk_idx:03d}"
+            if not getattr(c, "section_path", ""):
+                c.section_path = self.current_section_path()
+            chunks.append(c)
+
+        for block in blocks:
+            btype = (block.type or "text").lower()
+
+            if btype == "table":
+                body = (block.text or "").strip()
+                cap = (block.caption or "").strip()
+                if not body and not cap:
+                    continue
+                table_md = body
+                if cap and cap not in table_md[: max(len(cap) + 20, 80)]:
+                    table_md = f"{cap}\n{table_md}" if table_md else cap
+                if not table_md.strip():
+                    continue
+                # 表体仍做轻量清洗（不去掉管道结构为主）
+                cleaned, _ = self.clean_to_markdown(table_md)
+                table_md = cleaned or table_md
+                table_md = self._normalize_separator_row(table_md)
+                for t in self._split_table(
+                    table_md, page_id, doc_id, page_number, doc_ref
+                ):
+                    t.caption = cap
+                    _push(t)
+                continue
+
+            if btype == "image":
+                cap = (block.caption or "").strip()
+                if self.image_caption_chunks and cap:
+                    _push(
+                        Chunk(
+                            chunk_id="",
+                            page_id=page_id,
+                            doc_id=doc_id,
+                            page_number=page_number,
+                            text=f"[Image] {cap}",
+                            chunk_type="image",
+                            doc_ref=doc_ref,
+                            caption=cap,
+                        )
+                    )
+                continue
+
+            # text / equation / other
+            text = (block.text or "").strip()
+            if not text:
+                continue
+            # 标题块先更新 section 栈（保留 heading 自身为 chunk）
+            self._note_heading(text, getattr(block, "text_level", 0) or 0)
+            cleaned, _ = self.clean_to_markdown(text)
+            text = cleaned or text
+            if not text.strip():
+                continue
+            for c in self._chunk_plain_text(
+                text, page_id, doc_id, page_number, doc_ref
+            ):
+                _push(c)
+
+        self.link_neighbors(chunks)
+        return chunks
+
+    def _chunk_plain_text(
+        self,
+        text: str,
+        page_id: int,
+        doc_id: str,
+        page_number: int,
+        doc_ref: str,
+    ) -> List[Chunk]:
+        """将已清洗的纯文本切成 text chunk（不赋 chunk_id）。"""
+        out: List[Chunk] = []
+        if len(text) <= self.max_chars:
+            out.append(
+                Chunk(
+                    chunk_id="",
+                    page_id=page_id,
+                    doc_id=doc_id,
+                    page_number=page_number,
+                    text=text,
+                    chunk_type="text",
+                    doc_ref=doc_ref,
+                )
+            )
+            return out
+
+        sentences = re.split(r"(?<=[.?!])\s+", text)
+        buffer = ""
+        for sent in sentences:
+            if len(sent) > self.max_chars:
+                if buffer:
+                    out.append(
+                        Chunk(
+                            chunk_id="",
+                            page_id=page_id,
+                            doc_id=doc_id,
+                            page_number=page_number,
+                            text=buffer,
+                            chunk_type="text",
+                            doc_ref=doc_ref,
+                        )
+                    )
+                    buffer = ""
+                words = sent.split()
+                word_buffer = ""
+                for word in words:
+                    if len(word_buffer) + len(word) + 1 <= self.max_chars:
+                        word_buffer = (word_buffer + " " + word).strip()
+                    else:
+                        if word_buffer:
+                            out.append(
+                                Chunk(
+                                    chunk_id="",
+                                    page_id=page_id,
+                                    doc_id=doc_id,
+                                    page_number=page_number,
+                                    text=word_buffer,
+                                    chunk_type="text",
+                                    doc_ref=doc_ref,
+                                )
+                            )
+                        word_buffer = word
+                if word_buffer:
+                    out.append(
+                        Chunk(
+                            chunk_id="",
+                            page_id=page_id,
+                            doc_id=doc_id,
+                            page_number=page_number,
+                            text=word_buffer,
+                            chunk_type="text",
+                            doc_ref=doc_ref,
+                        )
+                    )
+            elif len(buffer) + len(sent) + 1 <= self.max_chars:
+                buffer = (buffer + " " + sent).strip()
+            else:
+                if buffer:
+                    out.append(
+                        Chunk(
+                            chunk_id="",
+                            page_id=page_id,
+                            doc_id=doc_id,
+                            page_number=page_number,
+                            text=buffer,
+                            chunk_type="text",
+                            doc_ref=doc_ref,
+                        )
+                    )
+                buffer = sent
+        if buffer:
+            out.append(
+                Chunk(
+                    chunk_id="",
+                    page_id=page_id,
+                    doc_id=doc_id,
+                    page_number=page_number,
+                    text=buffer,
+                    chunk_type="text",
+                    doc_ref=doc_ref,
+                )
+            )
+        return out
 
     @classmethod
     def clean_to_markdown(cls, text: str | None) -> tuple[str, str]:
@@ -130,12 +379,17 @@ class TextChunker:
             if not para:
                 continue
 
+            # markdown 标题更新 section 栈（表格跳过）
+            if not self._looks_like_table(para):
+                self._note_heading(para)
+
             if self._looks_like_table(para):
                 # 表格：先归一化分隔行（无 |---|---| 时注入），再按"行"切分
                 para = self._normalize_separator_row(para)
                 for t in self._split_table(para, page_id, doc_id, page_number, doc_ref):
                     chunk_idx += 1
                     t.chunk_id = f"pg{page_id:05d}_ch{chunk_idx:03d}"
+                    t.section_path = self.current_section_path()
                     chunks.append(t)
                 continue
 
@@ -150,6 +404,7 @@ class TextChunker:
                     text=para,
                     chunk_type="text",
                     doc_ref=doc_ref,
+                section_path=self.current_section_path(),
                 ))
             else:
                 # 长段落：按句子边界切
@@ -168,6 +423,7 @@ class TextChunker:
                                 text=buffer,
                                 chunk_type="text",
                             doc_ref=doc_ref,
+                            section_path=self.current_section_path(),
                             ))
                             buffer = ""
                         words = sent.split()
@@ -186,6 +442,7 @@ class TextChunker:
                                         text=word_buffer,
                                         chunk_type="text",
                             doc_ref=doc_ref,
+                                    section_path=self.current_section_path(),
                                     ))
                                 word_buffer = word
                         if word_buffer:
@@ -198,6 +455,7 @@ class TextChunker:
                                 text=word_buffer,
                                 chunk_type="text",
                             doc_ref=doc_ref,
+                            section_path=self.current_section_path(),
                             ))
                     elif len(buffer) + len(sent) + 1 <= self.max_chars:
                         buffer = (buffer + " " + sent).strip()
@@ -212,6 +470,7 @@ class TextChunker:
                                 text=buffer,
                                 chunk_type="text",
                             doc_ref=doc_ref,
+                            section_path=self.current_section_path(),
                             ))
                         buffer = sent
                 if buffer:
@@ -224,8 +483,10 @@ class TextChunker:
                         text=buffer,
                         chunk_type="text",
                             doc_ref=doc_ref,
+                    section_path=self.current_section_path(),
                     ))
 
+        self.link_neighbors(chunks)
         return chunks
 
     @staticmethod

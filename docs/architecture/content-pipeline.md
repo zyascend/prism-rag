@@ -1,9 +1,9 @@
 # Content Pipeline — PDF / 图表 / 表格入库与分块
 
 > 状态：与当前实现对齐（`parser` · `text_chunker` · `table_summarizer` · `pdf_ingestor._ingest_pages`）  
-> 更新：2026-07-22  
-> 配套：索引生命周期与三路一致见 [ingestion.md](./ingestion.md)；表摘要设计见 `docs/table-summary-large-table-design-2026-07-09.md`  
-> 本文回答面试题：**PDF/图表/表格如何入库？chunk 怎么切？整条链路怎么串？**
+> 更新：2026-07-23  
+> 配套：索引生命周期与三路一致见 [ingestion.md](./ingestion.md)；表摘要设计见 `docs/table-summary-large-table-design-2026-07-09.md`；表摘要 context 默认开关决策见 `docs/table-context-default-decision-protocol.md`  
+> 本文回答面试题：**PDF/图表/表格如何入库？chunk 怎么切？整条链路怎么串？演进踩过哪些坑？**
 
 ---
 
@@ -16,7 +16,8 @@
 | **文本/表格 chunk** | 页内 markdown | chunk | BGE → pgvector + BM25（原文） |
 | **整页视觉向量** | 页截图 `image` | page | ColPali/ColQwen2 → FAISS |
 
-图表主要靠 **整页 Visual**（不单独抠图建库）；表格靠 **markdown 表结构 chunk + 可选 NL 摘要 embed**。
+图表主要靠 **整页 Visual**（不单独抠图建库）；表格靠 **markdown 表结构 chunk + 可选 NL 摘要 embed**。  
+表摘要可选 **同页邻段上下文**（`ingestion.table_summary_context_enabled`，默认关；见 Phase A1 路线图）。
 
 ---
 
@@ -40,31 +41,36 @@ flowchart TB
 
   subgraph Parse["① 解析 Parser"]
     direction TB
-    SP["simple: PyMuPDF<br/>text + 150DPI 截图"]
-    MU["mineru: CLI<br/>md + 页图"]
-    Page["Page<br/>page_number · markdown · image"]
+    SP["simple: PyMuPDF<br/>text + 150DPI 截图<br/>blocks=None"]
+    MU["mineru: CLI<br/>优先 content_list → ContentBlock<br/>缺失则 md 切页降级"]
+    Page["Page<br/>page_number · markdown · image · blocks?"]
     SP --> Page
     MU --> Page
   end
 
-  subgraph Chunk["② 分块 TextChunker.chunk_page"]
+  subgraph Chunk["② 分块 TextChunker"]
     direction TB
+    Path{"Page.blocks?"}
+    CB["chunk_blocks<br/>type→table/text/image"]
+    CP["chunk_page（启发式）"]
     Clean["clean_to_markdown<br/>噪音清洗 + doc_ref"]
     Split["双换行切段<br/>+ 相邻表块合并"]
     Branch{"_looks_like_table?"}
     TSplit["表：归一化分隔行<br/>按行切，保留表头"]
     XSplit["文：≤512 tok 一段<br/>长段按句/词切"]
-    Chunks["Chunk 列表<br/>text 或 table"]
-    Clean --> Split --> Branch
+    Chunks["Chunk 列表<br/>text | table | image"]
+    Path -->|yes MinerU list| CB --> Chunks
+    Path -->|no / simple| CP --> Clean --> Split --> Branch
     Branch -->|yes| TSplit --> Chunks
     Branch -->|no| XSplit --> Chunks
   end
 
   subgraph Enrich["③ 表格增强 TableSummarizer"]
     direction LR
+    Ctx["可选同页邻段 context<br/>table_summary_context_enabled"]
     Sum["LLM 1–3 句摘要<br/>lru_cache 去重"]
     Dual["存: text=完整 md<br/>embed 用 summary 若有"]
-    Sum --> Dual
+    Ctx --> Sum --> Dual
   end
 
   subgraph Encode["④ 编码 + 写入"]
@@ -215,17 +221,30 @@ flowchart TD
 | 去全大写短行 | 章节标题类 |
 | 压缩 ≥3 空行 | → 双换行 |
 
-### 5.4 Chunk 对象
+### 5.4 Chunk 对象（当前）
 
 ```text
 Chunk
-  ├── chunk_id      # pg{page_id:05d}_ch{idx:03d}
+  ├── chunk_id       # pg{page_id:05d}_ch{idx:03d}
   ├── page_id / doc_id / page_number
-  ├── text          # 原文（表=完整 markdown 片段）
-  ├── chunk_type    # "text" | "table"
-  ├── doc_ref       # 页级 TO 编号（可空）
-  └── table_summary # 入库时由 Summarizer 填；chunk 初建可为空
+  ├── text           # 原文（表=完整 markdown 片段）
+  ├── chunk_type     # "text" | "table" | "image"（image 仅 content_list 锚点）
+  ├── doc_ref        # 页级 TO 编号（可空）
+  ├── table_summary  # 入库时 Summarizer 填；初建可空
+  ├── caption        # 图/表题注（A2/A3；可空）
+  ├── section_path   # 标题栈路径（A3；语料无 # 时可全空）
+  ├── prev_chunk_id  # 同批邻居（A3）
+  └── next_chunk_id
 ```
+
+入口双路径：
+
+| 入口 | 何时 | 类型从哪来 |
+|------|------|------------|
+| `chunk_page(markdown)` | simple / 无 content_list / ViDoRe | 启发式 `_looks_like_table` |
+| `chunk_blocks(blocks)` | MinerU content_list | 解析器 `type` 字段 |
+
+演进脉络见 **§15**。
 
 ---
 
@@ -276,10 +295,11 @@ flowchart LR
 
 `TableSummarizer`：
 
-- Prompt：`src/prompts/prompts/table_summary.yaml`  
-- `lru_cache(maxsize=2048)` 相同表不重复打 LLM  
+- Prompt：`src/prompts/prompts/table_summary.yaml`（v1 孤表；v2 带 Surrounding context，默认不 active）  
+- `lru_cache` 键含 `(table, context)`，相同表不同语境可分缓存  
 - 任意异常 → `""`，**不阻塞入库**  
-- 开关：`ingestion.table_summary_enabled`（默认 True）
+- 开关：`ingestion.table_summary_enabled`（默认 True）  
+- 上下文：`ingestion.table_summary_context_enabled`（默认 **false**；同页非表 chunk 截断注入）
 
 ### 6.4 生成侧呼应（入库时埋下的约定）
 
@@ -421,6 +441,9 @@ flowchart TB
 |----|------|
 | `ingestion.parser` | `simple` \| `mineru` |
 | `ingestion.table_summary_enabled` | 是否打表摘要 LLM（默认 True） |
+| `ingestion.table_summary_context_enabled` | 摘要是否带同页邻段（默认 **false**） |
+| `ingestion.table_summary_context_max_chars` | 邻段截断（默认 1500） |
+| `ingestion.image_caption_chunks` | content_list 图 caption 是否落 text 锚点（默认 false） |
 | `retrieval.use_visual` | 是否编码/写入 FAISS |
 | `embedding.colpali_batch_size` | 页图编码 batch |
 | `TextChunker(max_tokens=512)` | 构造参数可改上限 |
@@ -447,19 +470,152 @@ flowchart TB
 | 项 | 说明 |
 |----|------|
 | Token 用字符近似 | `chars/4`，非真实 tokenizer |
-| 表识别启发式 | 管道符计数，非版面模型 |
+| 表识别启发式 | 管道符计数（`chunk_page`）；`chunk_blocks` 依赖解析器 type |
 | 图不单独建库 | 复杂多图页依赖整页 Visual + 页内文字 |
-| simple 解析弱表结构 | 生产表质量依赖 MinerU md |
-| 摘要成本 | 入库 LLM；靠 lru 与可关闭缓解 |
+| simple 解析弱表结构 | 生产表质量依赖 MinerU md / content_list |
+| 摘要成本 | 入库 LLM；靠 lru 与可关闭缓解；context 默认关 |
+| section_path | 依赖 markdown `#` / text_level；ViDoRe 页上可全空 |
 | 跨页表 | 不合并，各页各自切 |
 
 ---
 
-## 14. 20～40 秒口述（面试）
+## 14. 20～40 秒口述（面试 · 现状）
 
 > PDF 先解析成 **页**：一边 markdown 文本，一边整页截图。  
 > 文本侧：清洗手册噪音 → 按段切块，上限大约 512 token；**表格单独识别**，按行切并保留表头，再可选生成自然语言摘要——**向量用摘要、BM25 和生成用完整 markdown**。  
 > 图表不做单独抠图库，整页进 ColPali/ColQwen2 走 Visual；命中页后用 **page_id 回查** 该页 text/table chunk 做 grounding。  
 > 一页写完：BGE→pgvector，原文→BM25，页图→FAISS，三路共享 doc/page 标识。
 
-**深读：** 增量/删除/三路一致 → [ingestion.md](./ingestion.md)。
+**深读：** 增量/删除/三路一致 → [ingestion.md](./ingestion.md)。  
+**演进叙事：** 见下节 §15（面试「你怎么一步步做厚 chunk 的」）。
+
+---
+
+## 15. Chunk 切分技术迭代历程（面试叙事）
+
+> 目的：用 **问题驱动** 讲清「为什么改、改了什么、怎么验收」，避免背版本号。  
+> 证据：`git log -- src/ingestion/text_chunker.py` + 设计/run 文档；数字以 `runs/` 与 handoff 为准。
+
+### 15.1 总时间线（一图）
+
+```text
+2026-06-30  P0  通用段落切分（512 tok 近似）
+     │
+2026-07-06  P1  TO 手册正则清洗
+     │
+2026-07-07  P2  doc_ref 元数据（grounding ≠ CtxRel）
+     │
+2026-07-09  P3  大表保护 + 表 NL 摘要（双表示）
+     │         同日：GFM 分隔行归一化
+     │
+2026-07-18  P4  表摘要 prompt 进版本库
+     │
+2026-07-23  P5  上下文表摘要（可选）
+     │         MinerU content_list 类型化分块
+     │         section / caption / 邻居链
+     ▼
+  云上 Text re-ingest + Goal-A 正式评测
+```
+
+### 15.2 分阶段：问题 → 改动 → 面试一句
+
+#### P0 · 检索 MVP 基线（2026-06-30 · `3d9fff3`）
+
+| | |
+|--|--|
+| **问题** | 需要可消融的文本 chunk 进 BM25/Dense，服务 ViDoRe 三路检索。 |
+| **做法** | `TextChunker`：双换行切段 → ≤512 token（`chars/4`）整段落盘 → 过长按句/词切；`chunk_id` 绑定 `page_id`。 |
+| **局限** | 表与正文同一套「按词切」；工业手册噪音未处理；无类型字段。 |
+| **口述** | 「先保证有稳定 chunk 粒度，能跑通三路和 NDCG，再针对坏 case 特化。」 |
+
+#### P1 · TO 军事手册清洗（2026-07-06 · `424534c`）
+
+| | |
+|--|--|
+| **问题** | ViDoRe/TO 类语料：断词、空单元格表碎片、TO 引用行、全大写短行污染 embedding 与 BM25。 |
+| **做法** | `clean_to_markdown`：断词修复 → 去碎片表行（**保留**正常 `\| col \|` 表）→ 去 TO/编号行 → 去全大写短标题行 → 压空行。 |
+| **口述** | 「不是通用 NLP 清洗，是 **领域噪音表**；误伤正常表是红线，所以空单元格碎片和正常管道表分开。」 |
+
+#### P2 · `doc_ref` 元数据（2026-07-07 · `d867ae8`）
+
+| | |
+|--|--|
+| **问题** | 生成需要 TO 文档编号做 grounding；若把编号塞进参与 CtxRel 的正文，会 **抬高/污染** 上下文相关性口径。 |
+| **做法** | 清洗时抽出首个 TO 引用 → `Chunk.doc_ref`；正文仍去掉引用行。评测 CtxRel 不看 `doc_ref`。 |
+| **口述** | 「**元数据通道 vs 可评估正文** 拆开——产品要引用，尺子要干净。」 |
+
+#### P3 · 大表保护 + 表摘要双表示（2026-07-09 · `fe9ceba` + `7db8595`）
+
+| | |
+|--|--|
+| **问题 A** | 长表走「按词切」→ `\|---\|` 碎成 token，LLM 无法还原表结构，表题答不出。 |
+| **问题 B** | 整表 md 直接 BGE：噪声大、语义定位弱（「这张表讲什么」）。 |
+| **做法** | ① `_looks_like_table` 分流；② `_merge_table_blocks` 拼回被空行拆开的表；③ `_split_table` **按数据行切、每块复制表头+分隔行**；④ `TableSummarizer` 1–3 句 NL；⑤ **Dense embed=summary（失败则原文），BM25+生成=完整 md**；⑥ 生成侧 `chunk_type==table` 不做句级硬压碎。 |
+| **加固** | `_normalize_separator_row`：ViDoRe 大量「有管道无 `\|---\|`」→ 注入 GFM 分隔行，并处理 caption 贴表头。 |
+| **设计档** | `docs/table-summary-large-table-design-2026-07-09.md`；复盘 `#25`。 |
+| **口述** | 「表的矛盾是 **结构保真 vs 语义可检索**：所以检索用摘要、生成用原表，切分永不按词砍列。」 |
+
+#### P4 · Prompt 版本化（2026-07-18 · `aeb7d1c`）
+
+| | |
+|--|--|
+| **问题** | 摘要模板散落代码，难审计、难回滚。 |
+| **做法** | `table_summary.yaml` 进 `PromptRegistry`；运行时 `get_active`。 |
+| **口述** | 「入库 LLM 也是 prompt 资产，和生成侧同一套版本纪律。」 |
+
+#### P5 · Content Pipeline Phase A（2026-07-23 · `06d4510` → `4044ddb`）
+
+灵感：RAG-Anything 的 ContextExtractor / typed content_list——**只借鉴入库语义，不迁知识图谱**。
+
+| 子项 | 问题 | 做法 |
+|------|------|------|
+| **A1 上下文摘要** | 孤表摘要丢章节/工况 → Dense 错表/miss | `summarize(..., context=)`；同页非表 chunk 截断注入；prompt **v2**；**默认关** |
+| **A2 类型化分块** | 仅靠管道符猜表，复杂/OCR 脏 md 易错 | MinerU `content_list` → `ContentBlock` → `chunk_blocks`；无 list **降级** `chunk_page` |
+| **A3 轻量层级** | 缺「在哪一节 / 邻居是谁」 | `section_path` 标题栈；`prev/next_chunk_id`；pg 列可迁移 |
+| **运维** | `ON CONFLICT DO NOTHING` 无法更新旧 chunk | `truncate_chunks` + `--replace-text` Text re-ingest（FAISS 不动） |
+
+**云上验收（可讲数字）：**
+
+| 实验 | 结果 |
+|------|------|
+| Boot-CP 三臂 expand/boost @100q | NDCG **无差**（page 指标 + 插件默认关）→ **插件不背锅** |
+| Text re-ingest context ON | 8835 chunk、2305 表摘要齐全；`section_path` 在本语料近 0（无 `#` 标题） |
+| Goal-A 正式 | Full_zerank2 **283q NDCG@10 = 0.5337**（Boot-A 黄金 **0.5318**，**+0.19pt**）；E2E Correct **0.66** / Reject **0.95**（可答误拒 9） |
+
+**口述：**  
+「主收益来自 **表语义重灌**，不是再叠检索门。默认 context 仍可关——100q 只是弱阳性；正式 283 显示不降略升；是否 yaml 默认 true 要用 OFF 双臂 decide 协议。」
+
+### 15.3 设计原则（贯穿始终 · 面试收束）
+
+| 原则 | 在 chunk 上的体现 |
+|------|-------------------|
+| **问题驱动迭代** | 先 MVP 通，再清洗 → 表结构 → 摘要 → 上下文/类型化 |
+| **双表示** | 检索语义通道 vs 生成结构通道（表最典型） |
+| **尺子干净** | `doc_ref` / 拒答口径 / 压缩前后 context 不混比 |
+| **失败可降级** | 摘要失败空串；MinerU 无 list 回退启发式；默认关新开关 |
+| **可辩护评测** | 改分块要能指到 run（Boot-A / Goal-A），禁止无对照吹涨点 |
+
+### 15.4 1～2 分钟口述稿（演进版）
+
+> 我们 chunk 不是一次设计定终身。最早是通用段落切，保证三路 RAG 能跑。上 ViDoRe 工业手册后，先加 **领域清洗**，再把 **文档编号做成元数据**，避免污染 CtxRel。  
+> 真正分水岭是 **表**：发现按词切碎了 markdown 表，就做了 **按行切 + 表头复用**，并加 **NL 摘要双表示**——Dense 找表、生成读表结构。  
+> 最近一轮对照多模态开源实践，补了 **可选上下文摘要**、MinerU **类型化块** 和轻量邻居元数据；云上 Text re-ingest 后 **283 NDCG@10 到 0.5337**，相对原黄金表略升，E2E Correct 0.66。  
+> 原则始终是：**结构保真、语义可检索、开关默认可回滚、数字可指到 run。**
+
+### 15.5 关键 commit / 文档索引
+
+| 阶段 | Commit（短） | 文档 / run |
+|------|--------------|------------|
+| P0 MVP | `3d9fff3` | — |
+| P1 清洗 | `424534c` | — |
+| P2 doc_ref | `d867ae8` | — |
+| P3 表保护+摘要 | `fe9ceba` · `7db8595` | `docs/table-summary-large-table-design-2026-07-09.md` · PR #25 |
+| P4 prompt | `aeb7d1c` | `src/prompts/prompts/table_summary.yaml` |
+| P5 Phase A | `06d4510` · `a2dfd17` · `4044ddb` | `docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md` |
+| 云验收 | Goal-A | `runs/20260723-on-goalA/` · `runs/20260723-text-reingest-full/` |
+| 默认开关决策（未改 yaml） | — | `docs/table-context-default-decision-protocol.md` |
+
+```bash
+# 本地复盘
+git log --oneline -- src/ingestion/text_chunker.py src/ingestion/table_summarizer.py
+```
