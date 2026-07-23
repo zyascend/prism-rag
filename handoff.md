@@ -16,7 +16,8 @@
 | **产物** | `runs/20260723-content-pipeline/` |
 | **Text re-ingest** | smoke ✅ · smoke-llm ✅ · **full ✅**（8835 chunks · 2305 表摘要 · prev=3796） |
 | **Post 100q** | Full_zerank2 NDCG@10 **0.3575 → 0.3589（+0.14pt）** · 见 `runs/20260723-post-text-reingest/` |
-| **下一步** | 可选 283q/E2E；**建议关机省钱** |
+| **默认开 context？** | 协议已备：`docs/table-context-default-decision-protocol.md` · `scripts/cloud_decide_table_context.sh`（283+E2E 双臂） |
+| **下一步** | 云上跑 decide 脚本 → 按 M1/M2/M3 改/不改 yaml 默认；**否则关机** |
 | **不做** | LightRAG/全量 KG · 默认 CRAG/Gate2/VLM query |
 
 ---
