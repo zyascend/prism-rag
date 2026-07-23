@@ -42,7 +42,7 @@
 | Trace / 可观测请求链路 | [trace.md](./trace.md) | `src/observability/`、`src/api/routes.py` | ✅ 初版 |
 | Cache（L3/L4） | [cache.md](./cache.md) | `src/cache/`、`vidore_adapter`、`routes.py` | ✅ 初版 |
 | Ingestion / 索引与增量更新 | [ingestion.md](./ingestion.md) | `src/ingestion/`、`src/store/`、`vidore_adapter.delete_document` | ✅ 初版 |
-| Content Pipeline / 解析分块入库 | [content-pipeline.md](./content-pipeline.md) | `parser` · `text_chunker` · `table_summarizer` · `_ingest_pages` | ✅ 初版 |
+| Content Pipeline / 解析分块入库 | [content-pipeline.md](./content-pipeline.md) | `parser` · `text_chunker` · `table_summarizer` · `_ingest_pages` | ✅ 含 chunk 迭代历程 §15 |
 | Retrieval（三路 + 融合精排） | — | `src/retrieval/`、`vidore_adapter` | ⏳ 待写 |
 | Generation / Context filter | — | `src/generation/` | ⏳ 待写 |
 | Self-RAG Gate2 | — | `src/generation/self_rag.py` | ⏳ 待写 |
