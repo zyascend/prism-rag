@@ -502,8 +502,8 @@ Boot-CP（同一进程环境 / 同一索引 · 中途不关机）
 | A2 | done | content_list typed blocks + chunk_blocks；无 list 降级 |
 | A3 | done | section_path/caption/prev/next + pg 列 |
 | B1 | done | neighbor_expand 默认关；page/prev_next |
-| B2 | pending | 本地；与 A 同迭代 |
-| Boot-CP | pending | **云 ×1**（Arm-A + Arm-B\*） |
+| B2 | done | modality_boost 默认关；规则意图 + score bonus |
+| Boot-CP | pending | **云 ×1**（Arm-A + Arm-B\*）；代码已齐 |
 
 状态枚举：`pending` → `in_progress` → `done` / `blocked` / `wontfix`。
 

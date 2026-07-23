@@ -19,6 +19,7 @@ from src.retrieval.dense_retriever import DenseRetriever
 from src.retrieval.expand import expand_neighbors
 from src.retrieval.fusion import RRFFusion
 from src.retrieval.hyde import HyDEGenerator
+from src.retrieval.query_intent import apply_modality_boost, detect_query_intent
 from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
 from src.retrieval.visual_router import VisualRouter, build_visual_router_from_config
@@ -118,23 +119,42 @@ class PrismRAGRetriever:
         if self._answer_cache is not None:
             self._answer_cache.clear()
 
-    def _expand_cfg(self) -> dict:
-        """读取 neighbor_expand 配置；测试 stub 无 .get 时视为关闭。"""
+    def _safe_cfg(self, path: str) -> dict:
+        """读取嵌套 dict 配置；测试 stub 无 .get 时返回 {}。"""
         try:
-            ex = cfg.get("retrieval.neighbor_expand")
+            val = cfg.get(path)
         except Exception:
             return {}
-        return ex if isinstance(ex, dict) else {}
+        return val if isinstance(val, dict) else {}
+
+    def _expand_cfg(self) -> dict:
+        """读取 neighbor_expand 配置；测试 stub 无 .get 时视为关闭。"""
+        return self._safe_cfg("retrieval.neighbor_expand")
+
+    def _boost_cfg(self) -> dict:
+        return self._safe_cfg("retrieval.modality_boost")
 
     def _expand_cache_salt(self) -> str:
-        """neighbor_expand 配置盐；关闭时固定 expand=off，避免无谓 key 膨胀。"""
+        """neighbor_expand + modality_boost 配置盐。"""
+        parts = []
         ex = self._expand_cfg()
         if not ex.get("enabled"):
-            return "expand=off"
-        return (
-            f"expand=on:{ex.get('mode', 'page')}:"
-            f"{ex.get('max_extra', 2)}:{ex.get('stage', 'post_rerank')}"
-        )
+            parts.append("expand=off")
+        else:
+            parts.append(
+                f"expand=on:{ex.get('mode', 'page')}:"
+                f"{ex.get('max_extra', 2)}:{ex.get('stage', 'post_rerank')}"
+            )
+        mb = self._boost_cfg()
+        if not mb.get("enabled"):
+            parts.append("boost=off")
+        else:
+            parts.append(
+                f"boost=on:{mb.get('table_score_bonus', 0.02)}:"
+                f"{mb.get('image_score_bonus', 0.02)}:"
+                f"{mb.get('force_visual_on_visual_intent', False)}"
+            )
+        return "|".join(parts)
 
     def _cache_key(
         self, query: str, k: int,
@@ -295,12 +315,24 @@ class PrismRAGRetriever:
             tracer.start_trace(query=query, config_label=config_label)
             owns_trace = True
 
+        # ── 查询意图（B2，纯规则；默认不改变路径）──
+        intent = detect_query_intent(query)
+        boost_cfg = self._boost_cfg()
+        force_visual = bool(
+            boost_cfg.get("enabled")
+            and boost_cfg.get("force_visual_on_visual_intent")
+            and intent.visual
+        )
+
         # ── Visual 按需路由（在缓存 key 之前解析 effective_visual）──
         effective_visual = use_visual
         visual_routed: bool | None = None
         if use_visual and self.visual_router is not None:
             effective_visual = self.visual_router.should_use_visual(query)
             visual_routed = effective_visual
+        if force_visual:
+            effective_visual = True
+            visual_routed = True
 
         # ── L3 Retrieval Cache ───────────────────────────────
         cache_on = cfg.cache.enabled
@@ -418,6 +450,16 @@ class PrismRAGRetriever:
             return result
 
         fused = self.fusion.fuse(routes, k=min(k * 2, 40))
+        # Phase B2：融合后、精排前按意图轻推 table/image chunk
+        if boost_cfg.get("enabled"):
+            fused = apply_modality_boost(
+                fused,
+                intent,
+                table_bonus=float(boost_cfg.get("table_score_bonus") or 0.0),
+                image_bonus=float(boost_cfg.get("image_score_bonus") or 0.0),
+            )
+            trace["query_intent"] = intent.label
+            trace["modality_boost"] = True
         fused = self._maybe_expand(fused, stage="pre_rerank", k=k, trace=trace)
 
         # ── Rerank（支持双 reranker）────────────────────────

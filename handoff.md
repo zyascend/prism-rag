@@ -11,9 +11,8 @@
 |----|------|
 | **分支** | `feat/content-pipeline-phase-ab` |
 | **路线图** | [`docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md`](docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md) |
-| **已完成** | **A0–A3**：探针集 · 上下文表摘要 · content_list 类型化 · section/caption/neighbors 元数据 |
-| **已完成+** | **B1** neighbor expand（默认关） |
-| **进行中** | B2 modality boost |
+| **已完成** | **A0–A3 + B1–B2 代码**：入库语义 + expand + modality boost（**默认关**） |
+| **下一步** | 本地单测绿已齐 → **云 1× Boot-CP** 多臂验收（见路线图） |
 | **云验收** | **默认 1× Boot-CP**（A+B 代码齐再开机） |
 | **不做** | LightRAG/全量 KG · 默认 CRAG/Gate2/VLM query |
 

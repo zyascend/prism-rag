@@ -30,6 +30,12 @@ retrieval:
     mode: page                        # page | prev_next
     max_extra: 2                      # 每个 hit 最多扩几块
     stage: post_rerank                # post_rerank | pre_rerank
+  # Phase B2：查询意图 → table/visual chunk 轻 boost（默认关）
+  modality_boost:
+    enabled: false
+    table_score_bonus: 0.02           # 加在 RRF score 上
+    image_score_bonus: 0.02
+    force_visual_on_visual_intent: false  # true 时 visual 意图强制开 visual 路
   # Corrective RAG（检索后 grade + 可选改写再检索）；默认关，不联网
   crag:
     enabled: false
