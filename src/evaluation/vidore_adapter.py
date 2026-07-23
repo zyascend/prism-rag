@@ -209,11 +209,12 @@ class PrismRAGRetriever:
         )
         trace["neighbor_expand"] = info
         if stage == "post_rerank" and k:
-            # 主 hits 优先保留，扩块填尾
+            # 主 hits 优先，再附扩块；cap 必须 >k 否则 expand 永远被裁掉（Boot-CP 教训）
             primary_ids = {h.get("chunk_id") for h in hits}
             primary = [r for r in expanded if r.get("chunk_id") in primary_ids]
             extra = [r for r in expanded if r.get("chunk_id") not in primary_ids]
-            expanded = (primary + extra)[: max(k, len(primary))]
+            total_cap = max(k + max_extra * min(len(primary), 5), k)
+            expanded = (primary + extra)[:total_cap]
         return expanded
 
     def answer_cache_key(

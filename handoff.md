@@ -11,9 +11,10 @@
 |----|------|
 | **分支** | `feat/content-pipeline-phase-ab` |
 | **路线图** | [`docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md`](docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md) |
-| **已完成** | **A0–A3 + B1–B2 代码**：入库语义 + expand + modality boost（**默认关**） |
-| **下一步** | 本地单测绿已齐 → **云 1× Boot-CP** 多臂验收（见路线图） |
-| **云验收** | **默认 1× Boot-CP**（A+B 代码齐再开机） |
+| **已完成** | **A0–A3 + B1–B2 代码**；**Boot-CP skip-index 三臂**（2026-07-23） |
+| **Boot-CP 结论** | 三臂 NDCG@10 **同为 0.3575**（100q）；page 级指标看不到 B1；B2 未动序；默认 expand/boost **仍关** |
+| **产物** | `runs/20260723-content-pipeline/` |
+| **下一步** | 可选 Text re-ingest 测 A1；E2E/表子集；关机省钱 |
 | **不做** | LightRAG/全量 KG · 默认 CRAG/Gate2/VLM query |
 
 ---

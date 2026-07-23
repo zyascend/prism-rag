@@ -503,7 +503,7 @@ Boot-CP（同一进程环境 / 同一索引 · 中途不关机）
 | A3 | done | section_path/caption/prev/next + pg 列 |
 | B1 | done | neighbor_expand 默认关；page/prev_next |
 | B2 | done | modality_boost 默认关；规则意图 + score bonus |
-| Boot-CP | pending | **云 ×1**（Arm-A + Arm-B\*）；代码已齐 |
+| Boot-CP | done | skip-index 三臂 100q；NDCG 三臂相同 0.3575；expand/boost 默认仍关 |
 
 状态枚举：`pending` → `in_progress` → `done` / `blocked` / `wontfix`。
 
