@@ -60,7 +60,15 @@ class ViDoReIngestor:
         max_pages: Optional[int] = None,
         skip_faiss: bool = False,
         resume: bool = False,
+        replace_text: bool = False,
     ):
+        """导入 ViDoRe。
+
+        Args:
+            replace_text: True 时先 TRUNCATE chunks 再写文本路（Text re-ingest）。
+                必须配合全新文本写入；否则 ON CONFLICT DO NOTHING 不会更新旧行。
+                不删除 FAISS。与 resume 文本跳过互斥（replace 时强制重跑文本路）。
+        """
         logger.info(f"加载数据集: {dataset_path}")
         ds = load_dataset(dataset_path, "corpus", split="test")
         if max_pages:
@@ -72,12 +80,21 @@ class ViDoReIngestor:
         text_phase_done = state.get("text_phase_done", False)
         completed_count = state.get("completed_count", 0)
 
+        if replace_text:
+            # 强制重跑文本路，避免 resume 跳过
+            text_phase_done = False
+            logger.info(
+                "replace_text=True: TRUNCATE chunks 后重灌文本路 "
+                "(FAISS 不动; table_summary_context=%s)",
+                cfg.get("ingestion.table_summary_context_enabled", False),
+            )
+
         if resume and text_phase_done:
             logger.info(f"🔄 恢复模式: 文本路已跳过, 视觉路 {completed_count}/{total_pages} 页已完成")
 
         # 1. 文本路
         if not (resume and text_phase_done):
-            self._ingest_text(ds)
+            self._ingest_text(ds, replace=replace_text)
             save_state(text_phase_done=True, completed_count=0)
         else:
             logger.info("⏭️  文本路已就绪，跳过")
@@ -90,9 +107,12 @@ class ViDoReIngestor:
 
         logger.info("✅ 导入完成")
 
-    def _ingest_text(self, ds):
+    def _ingest_text(self, ds, replace: bool = False):
         logger.info("=== [1/2] 文本路: 分块 + BGE 编码 + pgvector 入库 ===")
         self.pg.create_schema()
+        if replace:
+            n = self.pg.truncate_chunks()
+            logger.info("  TRUNCATE chunks: 删除旧行 %d", n)
 
         all_chunk_rows: List[tuple] = []
         all_texts: List[str] = []

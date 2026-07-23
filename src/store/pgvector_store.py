@@ -233,6 +233,19 @@ class PgVectorStore:
         self.conn.commit()
         return deleted
 
+    def truncate_chunks(self) -> int:
+        """清空 chunks 表（Text re-ingest 用；不碰 FAISS / documents）。
+
+        Returns:
+            清空前的行数。
+        """
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM chunks")
+            n = int(cur.fetchone()[0])
+            cur.execute("TRUNCATE TABLE chunks")
+        self.conn.commit()
+        return n
+
     def get_chunk_ids_by_doc_id(self, doc_id: str) -> List[str]:
         """删除前先取该 doc 的全部 chunk_id（避免先删行后丢引用，修复 D4）"""
         with self.conn.cursor() as cur:
