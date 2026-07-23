@@ -14,7 +14,9 @@
 | **已完成** | **A0–A3 + B1–B2 代码**；**Boot-CP skip-index 三臂**（2026-07-23） |
 | **Boot-CP 结论** | 三臂 NDCG@10 **同为 0.3575**（100q）；page 级指标看不到 B1；B2 未动序；默认 expand/boost **仍关** |
 | **产物** | `runs/20260723-content-pipeline/` |
-| **下一步** | **Text re-ingest 已备好**（`docs/text-reingest-runbook.md` · `scripts/cloud_text_reingest.sh`）；先 smoke 再 full |
+| **Text re-ingest** | smoke ✅ · smoke-llm ✅ · **full ✅**（8835 chunks · 2305 表摘要 · prev=3796） |
+| **Post 100q** | Full_zerank2 NDCG@10 **0.3575 → 0.3589（+0.14pt）** · 见 `runs/20260723-post-text-reingest/` |
+| **下一步** | 可选 283q/E2E；**建议关机省钱** |
 | **不做** | LightRAG/全量 KG · 默认 CRAG/Gate2/VLM query |
 
 ---
