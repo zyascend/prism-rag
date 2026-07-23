@@ -16,6 +16,7 @@ from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
 from src.ingestion.text_chunker import TextChunker
 from src.retrieval.bm25_retriever import BM25Retriever
 from src.retrieval.dense_retriever import DenseRetriever
+from src.retrieval.expand import expand_neighbors
 from src.retrieval.fusion import RRFFusion
 from src.retrieval.hyde import HyDEGenerator
 from src.retrieval.reranker import Reranker
@@ -117,10 +118,29 @@ class PrismRAGRetriever:
         if self._answer_cache is not None:
             self._answer_cache.clear()
 
+    def _expand_cfg(self) -> dict:
+        """读取 neighbor_expand 配置；测试 stub 无 .get 时视为关闭。"""
+        try:
+            ex = cfg.get("retrieval.neighbor_expand")
+        except Exception:
+            return {}
+        return ex if isinstance(ex, dict) else {}
+
+    def _expand_cache_salt(self) -> str:
+        """neighbor_expand 配置盐；关闭时固定 expand=off，避免无谓 key 膨胀。"""
+        ex = self._expand_cfg()
+        if not ex.get("enabled"):
+            return "expand=off"
+        return (
+            f"expand=on:{ex.get('mode', 'page')}:"
+            f"{ex.get('max_extra', 2)}:{ex.get('stage', 'post_rerank')}"
+        )
+
     def _cache_key(
         self, query: str, k: int,
         use_bm25: bool, use_dense: bool, use_visual: bool, use_rerank: bool,
         visual_query_embedding: Optional[torch.Tensor], use_hyde: bool, reranker_type: str,
+        expand_salt: str = "expand=off",
     ) -> str:
         """构造检索缓存 key：归一化 query + 全部检索开关 + reranker + index_version 盐。
 
@@ -138,6 +158,7 @@ class PrismRAGRetriever:
             f"bm25={use_bm25}", f"dense={use_dense}", f"visual={use_visual}",
             f"rerank={use_rerank}", f"hyde={use_hyde}", f"rt={reranker_type}",
             f"vr={vr_mode}",
+            expand_salt,
             f"v={self.index_version}",
         ]
         if visual_query_embedding is not None:
@@ -149,6 +170,31 @@ class PrismRAGRetriever:
         else:
             parts.append("ve=none")
         return "|".join(parts)
+
+    def _maybe_expand(
+        self, hits: list, *, stage: str, k: int, trace: dict
+    ) -> list:
+        """按配置在 pre/post_rerank 阶段做邻居 expand。"""
+        ex = self._expand_cfg()
+        if not ex.get("enabled"):
+            return hits
+        if (ex.get("stage") or "post_rerank") != stage:
+            return hits
+        mode = ex.get("mode") or "page"
+        max_extra = int(ex.get("max_extra") or 2)
+        # post：可略高于 k；pre：给 rerank 更多候选
+        cap = max(k + max_extra * max(len(hits), 1), k) if stage == "post_rerank" else None
+        expanded, info = expand_neighbors(
+            hits, self.pg, mode=mode, max_extra=max_extra, cap=cap,
+        )
+        trace["neighbor_expand"] = info
+        if stage == "post_rerank" and k:
+            # 主 hits 优先保留，扩块填尾
+            primary_ids = {h.get("chunk_id") for h in hits}
+            primary = [r for r in expanded if r.get("chunk_id") in primary_ids]
+            extra = [r for r in expanded if r.get("chunk_id") not in primary_ids]
+            expanded = (primary + extra)[: max(k, len(primary))]
+        return expanded
 
     def answer_cache_key(
         self, query: str, model: str, k_context: int, doc_id: Optional[str]
@@ -266,6 +312,7 @@ class PrismRAGRetriever:
             cache_key = self._cache_key(
                 query, k, use_bm25, use_dense, effective_visual, use_rerank,
                 visual_query_embedding, use_hyde, reranker_type,
+                expand_salt=self._expand_cache_salt(),
             )
             cached = self._cache.get(cache_key)
         if cached is not None:
@@ -371,6 +418,7 @@ class PrismRAGRetriever:
             return result
 
         fused = self.fusion.fuse(routes, k=min(k * 2, 40))
+        fused = self._maybe_expand(fused, stage="pre_rerank", k=k, trace=trace)
 
         # ── Rerank（支持双 reranker）────────────────────────
         if use_rerank and fused:
@@ -388,6 +436,7 @@ class PrismRAGRetriever:
                     "min_rerank_score": round(min(rerank_scores), 4) if rerank_scores else 0.0,
                     "mean_rerank_score": round(sum(rerank_scores) / len(rerank_scores), 4) if rerank_scores else 0.0,
                 })
+            reranked = self._maybe_expand(reranked, stage="post_rerank", k=k, trace=trace)
             if owns_trace:
                 obs_trace = tracer.finish_trace()
                 if obs_trace:
@@ -398,11 +447,12 @@ class PrismRAGRetriever:
                 collector.record_cache_event("retrieval", hit=False, config_label=config_label)
             return result
 
+        final = self._maybe_expand(fused[:k], stage="post_rerank", k=k, trace=trace)
         if owns_trace:
             obs_trace = tracer.finish_trace()
             if obs_trace:
                 collector.ingest_trace(obs_trace)
-        result = {"results": fused[:k], "retrieval_trace": trace}
+        result = {"results": final, "retrieval_trace": trace}
         if cache_on and self._cache is not None and cache_key is not None:
             self._cache.put(cache_key, result)
             collector.record_cache_event("retrieval", hit=False, config_label=config_label)

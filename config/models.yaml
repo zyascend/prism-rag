@@ -24,6 +24,12 @@ retrieval:
   visual_routing:
     enabled: false                    # true 时对 use_visual=True 的请求再按 mode 决策
     mode: heuristic                   # heuristic | always | never
+  # Phase B1：命中后邻居 expand（默认关；Boot-CP 再开）
+  neighbor_expand:
+    enabled: false
+    mode: page                        # page | prev_next
+    max_extra: 2                      # 每个 hit 最多扩几块
+    stage: post_rerank                # post_rerank | pre_rerank
   # Corrective RAG（检索后 grade + 可选改写再检索）；默认关，不联网
   crag:
     enabled: false
