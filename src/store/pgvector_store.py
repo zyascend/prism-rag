@@ -11,7 +11,11 @@ Schema:
     bge_vector vector(1024) NOT NULL,
     doc_ref TEXT NOT NULL DEFAULT '',
     table_summary TEXT NOT NULL DEFAULT '',
-    page_hash TEXT NOT NULL DEFAULT ''   -- 页面内容哈希（P2 page diff 用，未变页复用）
+    page_hash TEXT NOT NULL DEFAULT '',  -- 页面内容哈希（P2 page diff 用，未变页复用）
+    section_path TEXT NOT NULL DEFAULT '',
+    caption TEXT NOT NULL DEFAULT '',
+    prev_chunk_id TEXT NOT NULL DEFAULT '',
+    next_chunk_id TEXT NOT NULL DEFAULT ''
   );
   CREATE INDEX idx_chunks_page_id ON chunks(page_id);
   CREATE INDEX idx_chunks_doc_id ON chunks(doc_id);
@@ -73,7 +77,11 @@ class PgVectorStore:
                     bge_vector vector(1024) NOT NULL,
                     doc_ref TEXT NOT NULL DEFAULT '',
                     table_summary TEXT NOT NULL DEFAULT '',
-                    page_hash TEXT NOT NULL DEFAULT ''
+                    page_hash TEXT NOT NULL DEFAULT '',
+                    section_path TEXT NOT NULL DEFAULT '',
+                    caption TEXT NOT NULL DEFAULT '',
+                    prev_chunk_id TEXT NOT NULL DEFAULT '',
+                    next_chunk_id TEXT NOT NULL DEFAULT ''
                 )
             """)
             # 兼容旧库：新增列（已在 CREATE 中的新库此句为 no-op）
@@ -83,6 +91,10 @@ class PgVectorStore:
             cur.execute(
                 "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS page_hash TEXT NOT NULL DEFAULT ''"
             )
+            for col in ("section_path", "caption", "prev_chunk_id", "next_chunk_id"):
+                cur.execute(
+                    f"ALTER TABLE chunks ADD COLUMN IF NOT EXISTS {col} TEXT NOT NULL DEFAULT ''"
+                )
             cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_page_id ON chunks(page_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_doc_id ON chunks(doc_id)")
             # HNSW 索引
@@ -108,20 +120,38 @@ class PgVectorStore:
 
         Args:
             chunks: [(chunk_id, page_id, doc_id, page_number, chunk_type, text,
-                      bge_vector, doc_ref, table_summary, page_hash), ...]
+                      bge_vector, doc_ref, table_summary, page_hash,
+                      section_path, caption, prev_chunk_id, next_chunk_id), ...]
+            后 4 项可省略（兼容旧调用方，空串填充）。
         """
+        rows = [self._normalize_chunk_row(c) for c in chunks]
         with self.conn.cursor() as cur:
             psycopg2.extras.execute_values(
                 cur,
                 """
-                INSERT INTO chunks (chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector, doc_ref, table_summary, page_hash)
+                INSERT INTO chunks (
+                    chunk_id, page_id, doc_id, page_number, chunk_type, text,
+                    bge_vector, doc_ref, table_summary, page_hash,
+                    section_path, caption, prev_chunk_id, next_chunk_id
+                )
                 VALUES %s
                 ON CONFLICT (chunk_id) DO NOTHING
                 """,
-                chunks,
-                template="(%s, %s, %s, %s, %s, %s, %s::vector, %s, %s, %s)",
+                rows,
+                template="(%s, %s, %s, %s, %s, %s, %s::vector, %s, %s, %s, %s, %s, %s, %s)",
             )
         self.conn.commit()
+
+    @staticmethod
+    def _normalize_chunk_row(row: Tuple) -> Tuple:
+        """将 9–14 元组规范为 14 列插入行。"""
+        r = list(row)
+        # 历史：9 元组无 page_hash；10 元组无 A3 元数据
+        if len(r) == 9:
+            r.append("")  # page_hash
+        while len(r) < 14:
+            r.append("")
+        return tuple(r[:14])
 
     def search_by_vector(self, query_vector: np.ndarray, k: int = 20) -> List[dict]:
         """余弦相似度搜索，返回 Top-k chunk"""
@@ -129,6 +159,7 @@ class PgVectorStore:
             cur.execute(
                 """
                 SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref, table_summary,
+                       section_path, caption, prev_chunk_id, next_chunk_id,
                        1 - (bge_vector <=> %s::vector) AS score
                 FROM chunks
                 ORDER BY bge_vector <=> %s::vector
@@ -147,7 +178,11 @@ class PgVectorStore:
                     "text": r[5],
                     "doc_ref": r[6],
                     "table_summary": r[7],
-                    "score": float(r[8]),
+                    "section_path": r[8] or "",
+                    "caption": r[9] or "",
+                    "prev_chunk_id": r[10] or "",
+                    "next_chunk_id": r[11] or "",
+                    "score": float(r[12]),
                 }
                 for r in rows
             ]
@@ -159,7 +194,8 @@ class PgVectorStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref, table_summary
+                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text, doc_ref, table_summary,
+                       section_path, caption, prev_chunk_id, next_chunk_id
                 FROM chunks
                 WHERE page_id = ANY(%s)
                 """,
@@ -176,6 +212,10 @@ class PgVectorStore:
                     "text": r[5],
                     "doc_ref": r[6],
                     "table_summary": r[7],
+                    "section_path": r[8] or "",
+                    "caption": r[9] or "",
+                    "prev_chunk_id": r[10] or "",
+                    "next_chunk_id": r[11] or "",
                 }
                 for r in rows
             ]
@@ -226,7 +266,8 @@ class PgVectorStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text
+                SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text,
+                       section_path, caption, prev_chunk_id, next_chunk_id
                 FROM chunks WHERE chunk_id = ANY(%s)
                 """,
                 (chunk_ids,),
@@ -235,6 +276,8 @@ class PgVectorStore:
                 {
                     "chunk_id": r[0], "page_id": r[1], "doc_id": r[2],
                     "page_number": r[3], "chunk_type": r[4], "text": r[5],
+                    "section_path": r[6] or "", "caption": r[7] or "",
+                    "prev_chunk_id": r[8] or "", "next_chunk_id": r[9] or "",
                 }
                 for r in cur.fetchall()
             ]
@@ -340,14 +383,19 @@ class PgVectorStore:
 
     def _insert_chunks_on(self, cur, chunks: List[Tuple]):
         """在指定 cursor 上批量插入 chunk（供原子 swap 复用当前事务连接）。"""
+        rows = [self._normalize_chunk_row(c) for c in chunks]
         psycopg2.extras.execute_values(
             cur,
             """
-            INSERT INTO chunks (chunk_id, page_id, doc_id, page_number, chunk_type, text, bge_vector, doc_ref, table_summary, page_hash)
+            INSERT INTO chunks (
+                chunk_id, page_id, doc_id, page_number, chunk_type, text,
+                bge_vector, doc_ref, table_summary, page_hash,
+                section_path, caption, prev_chunk_id, next_chunk_id
+            )
             VALUES %s
             """,
-            chunks,
-            template="(%s, %s, %s, %s, %s, %s, %s::vector, %s, %s, %s)",
+            rows,
+            template="(%s, %s, %s, %s, %s, %s, %s::vector, %s, %s, %s, %s, %s, %s, %s)",
         )
 
     def atomic_swap_chunks(

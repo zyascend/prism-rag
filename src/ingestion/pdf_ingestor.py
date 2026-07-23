@@ -145,6 +145,8 @@ class PDFIngestor:
         all_rows, all_texts = [], []
         page_images, page_id_for_image = [], []
         faiss_page_hashes: Dict[int, str] = {}
+        if hasattr(self.chunker, "reset_headings"):
+            self.chunker.reset_headings()
 
         for p in pages:
             if p.page_number not in pn_set:
@@ -174,6 +176,10 @@ class PDFIngestor:
                 all_rows.append((
                     c.chunk_id, page_id, doc_id, c.page_number,
                     c.chunk_type, c.text, None, c.doc_ref, summary, phash,
+                    getattr(c, "section_path", "") or "",
+                    getattr(c, "caption", "") or "",
+                    getattr(c, "prev_chunk_id", "") or "",
+                    getattr(c, "next_chunk_id", "") or "",
                 ))
                 all_texts.append(embed_text)
             if use_visual:
@@ -187,7 +193,8 @@ class PDFIngestor:
                 batch = all_rows[i:i + 100]
                 vecs = embs[i:i + 100].cpu().numpy().tolist()
                 self.pg.insert_chunks([
-                    (r[0], r[1], r[2], r[3], r[4], r[5], v, r[7], r[8], r[9])
+                    (r[0], r[1], r[2], r[3], r[4], r[5], v, r[7], r[8], r[9],
+                     r[10], r[11], r[12], r[13])
                     for r, v in zip(batch, vecs)
                 ])
 

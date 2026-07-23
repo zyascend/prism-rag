@@ -96,6 +96,8 @@ class ViDoReIngestor:
 
         all_chunk_rows: List[tuple] = []
         all_texts: List[str] = []
+        if hasattr(self.chunker, "reset_headings"):
+            self.chunker.reset_headings()
 
         for idx in tqdm(range(len(ds)), desc="分块"):
             row = ds[idx]
@@ -114,7 +116,14 @@ class ViDoReIngestor:
                     if summary:
                         embed_text = summary
                 all_chunk_rows.append(
-                    (c.chunk_id, c.page_id, c.doc_id, c.page_number, c.chunk_type, c.text, None, c.doc_ref, summary)
+                    (
+                        c.chunk_id, c.page_id, c.doc_id, c.page_number, c.chunk_type,
+                        c.text, None, c.doc_ref, summary, "",
+                        getattr(c, "section_path", "") or "",
+                        getattr(c, "caption", "") or "",
+                        getattr(c, "prev_chunk_id", "") or "",
+                        getattr(c, "next_chunk_id", "") or "",
+                    )
                 )
                 all_texts.append(embed_text)
 
@@ -126,7 +135,11 @@ class ViDoReIngestor:
             for j in range(i, min(i + 100, len(all_chunk_rows))):
                 vec = bge_embs[j].cpu().numpy().tolist()
                 entry = all_chunk_rows[j]
-                batch.append((entry[0], entry[1], entry[2], entry[3], entry[4], entry[5], vec, entry[7], entry[8]))
+                batch.append((
+                    entry[0], entry[1], entry[2], entry[3], entry[4], entry[5],
+                    vec, entry[7], entry[8], entry[9],
+                    entry[10], entry[11], entry[12], entry[13],
+                ))
             self.pg.insert_chunks(batch)
 
         logger.info(f"✅ pgvector 入库完成, 共 {self.pg.count()} 条 chunk")
