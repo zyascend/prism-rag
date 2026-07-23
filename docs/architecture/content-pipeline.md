@@ -16,7 +16,8 @@
 | **文本/表格 chunk** | 页内 markdown | chunk | BGE → pgvector + BM25（原文） |
 | **整页视觉向量** | 页截图 `image` | page | ColPali/ColQwen2 → FAISS |
 
-图表主要靠 **整页 Visual**（不单独抠图建库）；表格靠 **markdown 表结构 chunk + 可选 NL 摘要 embed**。
+图表主要靠 **整页 Visual**（不单独抠图建库）；表格靠 **markdown 表结构 chunk + 可选 NL 摘要 embed**。  
+表摘要可选 **同页邻段上下文**（`ingestion.table_summary_context_enabled`，默认关；见 Phase A1 路线图）。
 
 ---
 
@@ -62,9 +63,10 @@ flowchart TB
 
   subgraph Enrich["③ 表格增强 TableSummarizer"]
     direction LR
+    Ctx["可选同页邻段 context<br/>table_summary_context_enabled"]
     Sum["LLM 1–3 句摘要<br/>lru_cache 去重"]
     Dual["存: text=完整 md<br/>embed 用 summary 若有"]
-    Sum --> Dual
+    Ctx --> Sum --> Dual
   end
 
   subgraph Encode["④ 编码 + 写入"]

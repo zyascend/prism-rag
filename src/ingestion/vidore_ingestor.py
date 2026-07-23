@@ -49,7 +49,9 @@ class ViDoReIngestor:
         self.colpali = colpali_embedder
         self.chunker = chunker
         self.summarizer = TableSummarizer(
-            enabled=cfg.get("ingestion.table_summary_enabled", True)
+            enabled=cfg.get("ingestion.table_summary_enabled", True),
+            context_enabled=cfg.get("ingestion.table_summary_context_enabled", False),
+            context_max_chars=cfg.get("ingestion.table_summary_context_max_chars", 1500),
         )
 
     def ingest(
@@ -103,11 +105,12 @@ class ViDoReIngestor:
                 page_number=int(row.get("page_number_in_doc", 0)),
                 markdown_text=row.get("markdown", None),
             )
+            page_ctx = self.summarizer.build_page_context(chunks)
             for c in chunks:
                 summary = ""
                 embed_text = c.text
                 if c.chunk_type == "table":
-                    summary = self.summarizer.summarize(c.text)
+                    summary = self.summarizer.summarize(c.text, context=page_ctx)
                     if summary:
                         embed_text = summary
                 all_chunk_rows.append(

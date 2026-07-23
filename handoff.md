@@ -1,7 +1,20 @@
 # Handoff — PrismRAG 当前状态
 
-> 分支: **feat/crag-failure-clinic**（未合 main）| 远程: origin  
-> 更新: **2026-07-23** — CRAG + Failure Clinic 代码落地；**云上 CRAG ON 100q 阴性结论定稿**
+> 分支: **docs/content-pipeline-phase-ab-roadmap**（文档）· CRAG 代码在 **feat/crag-failure-clinic**（未合 main）| 远程: origin  
+> 更新: **2026-07-23** — 检索主线 Phase A/B roadmap 落档；此前 CRAG ON 100q 阴性定稿
+
+---
+
+## 0′. 下一主线（Content Pipeline Phase A/B · 实施中）
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `feat/content-pipeline-phase-ab` |
+| **路线图** | [`docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md`](docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md) |
+| **已完成** | **A0** 表/规格探针集 `data/table_subset_queries.json`（30）；**A1** 上下文表摘要（默认关） |
+| **进行中** | A2 content_list · A3 元数据 · B1 expand · B2 modality boost |
+| **云验收** | **默认 1× Boot-CP**（A+B 代码齐再开机） |
+| **不做** | LightRAG/全量 KG · 默认 CRAG/Gate2/VLM query |
 
 ---
 
@@ -156,7 +169,7 @@ open runs/20260722-crag-on/README.md   # 或 cat
 | 结果本地归档 | ✅ `runs/20260722-crag-on/` |
 | 合入 main（代码可合，默认关） | 可选 |
 | CRAG 参数重试（软过滤 / 无 rewrite） | 低优先级，有预算再开 |
-| 检索 badcase P2（主矛盾） | ⏳ 建议下一主线 |
+| 检索 badcase P2（主矛盾） | ⏳ **路线图已落** → Phase A/B（见 §0′） |
 | Failure Clinic 写入 badcase 模板 | 可选 |
 | citation verbatim 硬校验 | 未做 |
 | claim 级 Gate2 | ⏳ |

@@ -48,6 +48,12 @@
 | Self-RAG Gate2 | — | `src/generation/self_rag.py` | ⏳ 待写 |
 | Evaluation / 三层评测 | [evaluation.md](./evaluation.md) | `src/evaluation/`、`scripts/run_eval|ragas|e2e_qa.py` | ✅ 初版 |
 
+### 进行中路线图
+
+| 路线 | 文档 | 主线 |
+|------|------|------|
+| Content Pipeline Phase A/B | [plans/2026-07-23-content-pipeline-phase-ab-roadmap.md](../superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md) | 上下文表摘要 · content_list 类型化 · 元数据 · expand / modality boost（检索 badcase P2） |
+
 > 新增模块：按上表补一行 + 新建对应 md；复杂模块可建子目录（如 `architecture/retrieval/README.md` + 分篇）。
 
 ---

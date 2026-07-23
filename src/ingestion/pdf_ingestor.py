@@ -44,7 +44,9 @@ class PDFIngestor:
         # P2-A：可选 BM25 引用，ingest 时增量维护（消除 U1 全量重建）
         self.bm25 = bm25
         self.summarizer = TableSummarizer(
-            enabled=cfg.get("ingestion.table_summary_enabled", True)
+            enabled=cfg.get("ingestion.table_summary_enabled", True),
+            context_enabled=cfg.get("ingestion.table_summary_context_enabled", False),
+            context_max_chars=cfg.get("ingestion.table_summary_context_max_chars", 1500),
         )
 
     def ingest(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict:
@@ -153,11 +155,12 @@ class PDFIngestor:
                 page_id=page_id, doc_id=doc_id,
                 page_number=p.page_number, markdown_text=p.markdown,
             )
+            page_ctx = self.summarizer.build_page_context(chunks)
             for c in chunks:
                 summary = ""
                 embed_text = c.text
                 if c.chunk_type == "table":
-                    summary = self.summarizer.summarize(c.text)
+                    summary = self.summarizer.summarize(c.text, context=page_ctx)
                     if summary:
                         embed_text = summary
                 all_rows.append((
