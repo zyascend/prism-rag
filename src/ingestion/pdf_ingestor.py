@@ -151,10 +151,18 @@ class PDFIngestor:
                 continue
             page_id = _rand_page_id()
             phash = hash_by_pn[p.page_number]
-            chunks = self.chunker.chunk_page(
-                page_id=page_id, doc_id=doc_id,
-                page_number=p.page_number, markdown_text=p.markdown,
-            )
+            if getattr(p, "blocks", None):
+                chunks = self.chunker.chunk_blocks(
+                    page_id=page_id,
+                    doc_id=doc_id,
+                    page_number=p.page_number,
+                    blocks=p.blocks,
+                )
+            else:
+                chunks = self.chunker.chunk_page(
+                    page_id=page_id, doc_id=doc_id,
+                    page_number=p.page_number, markdown_text=p.markdown,
+                )
             page_ctx = self.summarizer.build_page_context(chunks)
             for c in chunks:
                 summary = ""

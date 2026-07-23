@@ -24,7 +24,9 @@ def main():
     bge = BGEEmbedder()
     # 本地 dev (use_visual=false) 免 ColPali 3.5B 下载：仅当启用 visual 路才构造
     colpali = ColPaliEmbedder() if use_visual else None
-    chunker = TextChunker()
+    chunker = TextChunker(
+        image_caption_chunks=cfg.get("ingestion.image_caption_chunks", False),
+    )
     bm25 = BM25Retriever()
     # 先入库（会 create_schema + 写入 chunks），再拟合 BM25 内存索引
     faiss.load()

@@ -41,22 +41,26 @@ flowchart TB
 
   subgraph Parse["① 解析 Parser"]
     direction TB
-    SP["simple: PyMuPDF<br/>text + 150DPI 截图"]
-    MU["mineru: CLI<br/>md + 页图"]
-    Page["Page<br/>page_number · markdown · image"]
+    SP["simple: PyMuPDF<br/>text + 150DPI 截图<br/>blocks=None"]
+    MU["mineru: CLI<br/>优先 content_list → ContentBlock<br/>缺失则 md 切页降级"]
+    Page["Page<br/>page_number · markdown · image · blocks?"]
     SP --> Page
     MU --> Page
   end
 
-  subgraph Chunk["② 分块 TextChunker.chunk_page"]
+  subgraph Chunk["② 分块 TextChunker"]
     direction TB
+    Path{"Page.blocks?"}
+    CB["chunk_blocks<br/>type→table/text/image"]
+    CP["chunk_page（启发式）"]
     Clean["clean_to_markdown<br/>噪音清洗 + doc_ref"]
     Split["双换行切段<br/>+ 相邻表块合并"]
     Branch{"_looks_like_table?"}
     TSplit["表：归一化分隔行<br/>按行切，保留表头"]
     XSplit["文：≤512 tok 一段<br/>长段按句/词切"]
-    Chunks["Chunk 列表<br/>text 或 table"]
-    Clean --> Split --> Branch
+    Chunks["Chunk 列表<br/>text | table | image"]
+    Path -->|yes MinerU list| CB --> Chunks
+    Path -->|no / simple| CP --> Clean --> Split --> Branch
     Branch -->|yes| TSplit --> Chunks
     Branch -->|no| XSplit --> Chunks
   end

@@ -499,7 +499,7 @@ Boot-CP（同一进程环境 / 同一索引 · 中途不关机）
 |----|------|------|
 | A0 | done | `data/table_subset_queries.json`（30 条 spec/numeric 探针） |
 | A1 | done | context 摘要 + 默认关；单测 `test_table_summary_context.py` |
-| A2 | pending | 本地 |
+| A2 | done | content_list typed blocks + chunk_blocks；无 list 降级 |
 | A3 | pending | 本地 |
 | B1 | pending | 本地；与 A 同迭代 |
 | B2 | pending | 本地；与 A 同迭代 |

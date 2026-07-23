@@ -11,8 +11,8 @@
 |----|------|
 | **分支** | `feat/content-pipeline-phase-ab` |
 | **路线图** | [`docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md`](docs/superpowers/plans/2026-07-23-content-pipeline-phase-ab-roadmap.md) |
-| **已完成** | **A0** 表/规格探针集 `data/table_subset_queries.json`（30）；**A1** 上下文表摘要（默认关） |
-| **进行中** | A2 content_list · A3 元数据 · B1 expand · B2 modality boost |
+| **已完成** | **A0** 探针集；**A1** 上下文表摘要（默认关）；**A2** MinerU content_list typed blocks + `chunk_blocks` |
+| **进行中** | A3 元数据 · B1 expand · B2 modality boost |
 | **云验收** | **默认 1× Boot-CP**（A+B 代码齐再开机） |
 | **不做** | LightRAG/全量 KG · 默认 CRAG/Gate2/VLM query |
 

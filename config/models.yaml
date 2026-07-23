@@ -79,10 +79,13 @@ storage:
 
 # 入库侧（Content Pipeline Phase A）
 ingestion:
+  parser: simple                          # simple | mineru（生产 PDF 用 mineru）
   table_summary_enabled: true
   # 表摘要时注入同页邻段上下文（章节/工况消歧）；默认关，Boot-CP 阳性后再开
   table_summary_context_enabled: false
   table_summary_context_max_chars: 1500
+  # MinerU image 块：有 caption 时写入 Dense/BM25 可检索锚点 chunk
+  image_caption_chunks: false
 
 vidore:
   dataset_name: "vidore/vidore_v3_industrial"
