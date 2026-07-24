@@ -68,3 +68,20 @@ def test_ask_returns_answer_and_citations():
     body = r.json()
     assert body["answer"] == "ok"
     assert body["citations"][0]["chunk_id"] == "c1"
+
+
+def test_demo_static_index_served():
+    """Demo 静态页由 StaticFiles 挂载；不依赖真实 retriever 重模型。"""
+    routes.set_retriever(_fake_retriever())
+    c = TestClient(routes.app)
+    r = c.get("/demo/")
+    # StaticFiles html=True 可能 200 于 /demo/ 或需 /demo/index.html
+    if r.status_code == 404:
+        r = c.get("/demo/index.html")
+    assert r.status_code == 200
+    assert "PrismRAG" in r.text
+    # 附属资源
+    r2 = c.get("/demo/app.js")
+    assert r2.status_code == 200
+    r3 = c.get("/demo/fixtures.json")
+    assert r3.status_code == 200

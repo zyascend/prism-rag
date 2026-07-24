@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from src.cache.store import InMemoryLRUCache
 
@@ -461,3 +462,26 @@ async def ask(request: AskRequest):
         self_rag=SelfRAGInfo(**sr_public),
         crag=CRAGInfo(**crag_public),
     )
+
+
+def _demo_static_dir() -> Path:
+    """static/demo：优先仓库根（与 scripts/run_api.py cwd 一致），否则相对本文件回溯。"""
+    candidates = [
+        Path.cwd() / "static" / "demo",
+        Path(__file__).resolve().parents[2] / "static" / "demo",
+    ]
+    for p in candidates:
+        if p.is_dir():
+            return p
+    return candidates[0]
+
+
+_DEMO_DIR = _demo_static_dir()
+if _DEMO_DIR.is_dir():
+    app.mount(
+        "/demo",
+        StaticFiles(directory=str(_DEMO_DIR), html=True),
+        name="demo",
+    )
+else:
+    logger.warning("Demo static dir missing: %s", _DEMO_DIR)
