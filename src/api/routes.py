@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import threading
+import time
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
@@ -290,6 +292,183 @@ class AskResponse(BaseModel):
 UPLOAD_DIR = Path("data/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# ── 异步入库任务（demo 嵌入页轮询）──
+_ingest_jobs: Dict[str, Dict[str, Any]] = {}
+_ingest_jobs_lock = threading.Lock()
+_INGEST_JOB_TTL_SEC = 3600
+
+
+class DocumentInfo(BaseModel):
+    doc_id: str
+    content_hash: str = ""
+    source_path: str = ""
+    created_at: Optional[str] = None
+    num_chunks: int = 0
+    num_pages: int = 0
+    num_tables: int = 0
+    num_text: int = 0
+    page_from: Optional[int] = None
+    page_to: Optional[int] = None
+
+
+class CorpusStats(BaseModel):
+    num_documents: int = 0
+    num_document_rows: int = 0
+    num_pages: int = 0
+    num_chunks: int = 0
+    num_table_chunks: int = 0
+    index_pages: int = 0
+    index_size_mb: float = 0.0
+    use_visual: bool = True
+    bm25_ready: bool = False
+
+
+class DocumentsResponse(BaseModel):
+    stats: CorpusStats
+    documents: List[DocumentInfo] = []
+
+
+class IngestJobCreateResponse(BaseModel):
+    job_id: str
+    doc_id: str
+    filename: str
+    status: str = "queued"
+
+
+class IngestJobStatus(BaseModel):
+    job_id: str
+    doc_id: str
+    filename: str = ""
+    status: str  # queued | running | done | error
+    phase: str = "queued"
+    pct: float = 0.0
+    message: str = ""
+    events: List[dict] = []
+    result: Optional[IngestResponse] = None
+    error: Optional[str] = None
+    created_at: float = 0.0
+    updated_at: float = 0.0
+
+
+def _job_update(job_id: str, **kwargs) -> None:
+    with _ingest_jobs_lock:
+        job = _ingest_jobs.get(job_id)
+        if not job:
+            return
+        job.update(kwargs)
+        job["updated_at"] = time.time()
+        if "phase" in kwargs or "message" in kwargs:
+            job.setdefault("events", []).append(
+                {
+                    "t": time.time(),
+                    "phase": job.get("phase"),
+                    "pct": job.get("pct"),
+                    "message": job.get("message"),
+                }
+            )
+            # 限制事件长度
+            if len(job["events"]) > 80:
+                job["events"] = job["events"][-80:]
+
+
+def _run_ingest_job(job_id: str, pdf_path: Path, doc_id: str) -> None:
+    """后台线程：解析 → 分块 → 编码 → 写库，并推进 job 进度。"""
+    _job_update(job_id, status="running", phase="start", pct=1, message="启动入库…")
+    retriever = get_retriever()
+
+    def progress(phase: str, pct: float, message: str) -> None:
+        _job_update(job_id, phase=phase, pct=pct, message=message, status="running")
+
+    try:
+        ingestor = PDFIngestor(
+            retriever.pg, retriever.faiss, retriever.bge,
+            retriever.colpali, retriever.chunker, bm25=retriever.bm25,
+        )
+        ingestor.set_progress_fn(progress)
+        result = ingestor.ingest(pdf_path, doc_id=doc_id)
+        if not retriever.bm25.ready:
+            progress("bm25", 96, "BM25 全量 fit…")
+            retriever.bm25.fit_from_pgvector(retriever.pg)
+        if cfg.get("retrieval.use_visual", True):
+            progress("faiss", 98, "保存 FAISS…")
+            retriever.faiss.save()
+        try:
+            retriever.invalidate_cache()
+        except Exception as e:
+            logger.warning("post-ingest cache invalidate failed: %s", e)
+        payload = IngestResponse(
+            doc_id=result["doc_id"],
+            num_pages=int(result.get("num_pages") or 0),
+            num_chunks=int(result.get("num_chunks") or 0),
+        )
+        _job_update(
+            job_id,
+            status="done",
+            phase="done",
+            pct=100,
+            message=f"完成 · status={result.get('status', 'ok')}",
+            result=payload.model_dump(),
+        )
+    except Exception as e:
+        logger.exception("ingest job %s failed: %s", job_id, e)
+        try:
+            retriever.pg.delete_by_doc_id(doc_id)
+        except Exception:
+            pass
+        pdf_path.unlink(missing_ok=True)
+        if cfg.get("ingestion.parser") == "mineru":
+            try:
+                shutil.rmtree(Path("data/mineru_output") / doc_id, ignore_errors=True)
+            except Exception:
+                pass
+        _job_update(
+            job_id,
+            status="error",
+            phase="error",
+            pct=100,
+            message=str(e),
+            error=str(e),
+        )
+
+
+def _finalize_sync_ingest(retriever, result: dict) -> IngestResponse:
+    if not retriever.bm25.ready:
+        retriever.bm25.fit_from_pgvector(retriever.pg)
+    if cfg.get("retrieval.use_visual", True):
+        retriever.faiss.save()
+    try:
+        retriever.invalidate_cache()
+    except Exception as e:
+        logger.warning("post-ingest cache invalidate failed: %s", e)
+    return IngestResponse(
+        doc_id=result["doc_id"],
+        num_pages=int(result.get("num_pages") or 0),
+        num_chunks=int(result.get("num_chunks") or 0),
+    )
+
+
+@app.get("/documents", response_model=DocumentsResponse)
+async def list_documents():
+    """当前知识库文档列表 + 全库统计（demo 文档页）。"""
+    retriever = get_retriever()
+    try:
+        docs = retriever.pg.list_documents()
+        stats = retriever.pg.corpus_stats()
+    except Exception as e:
+        logger.exception("list_documents failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"list documents failed: {e}")
+    stats_out = CorpusStats(
+        **stats,
+        index_pages=getattr(retriever.faiss, "num_pages", 0) or 0,
+        index_size_mb=round(float(getattr(retriever.faiss, "index_size_mb", 0) or 0), 2),
+        use_visual=bool(cfg.get("retrieval.use_visual", True)),
+        bm25_ready=bool(getattr(retriever.bm25, "ready", False)),
+    )
+    return DocumentsResponse(
+        stats=stats_out,
+        documents=[DocumentInfo(**d) for d in docs],
+    )
+
 
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest(file: UploadFile = File(...)):
@@ -315,21 +494,76 @@ async def ingest(file: UploadFile = File(...)):
         logger.exception("ingest failed: %s", e)
         # 本地 demo 需要可读错误（PG 未起 / 模型未下 / 解析失败），勿只回笼统文案
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
-    # P2-A：BM25 已通过 ingestor 增量维护；仅当为空（首篇/重启未加载）才全量 refit
-    if not retriever.bm25.ready:
-        retriever.bm25.fit_from_pgvector(retriever.pg)
-    if cfg.get("retrieval.use_visual", True):
-        retriever.faiss.save()
-    # 语料变更 → 抬 index_version，避免 L3/L4 旧缓存挡住「刚上传立刻问」
-    try:
-        retriever.invalidate_cache()
-    except Exception as e:
-        logger.warning("post-ingest cache invalidate failed: %s", e)
-    # ingestor 可能多返回 status 等字段；只取响应模型字段
-    return IngestResponse(
-        doc_id=result["doc_id"],
-        num_pages=int(result.get("num_pages") or 0),
-        num_chunks=int(result.get("num_chunks") or 0),
+    return _finalize_sync_ingest(retriever, result)
+
+
+@app.post("/ingest/jobs", response_model=IngestJobCreateResponse)
+async def create_ingest_job(file: UploadFile = File(...)):
+    """异步入库：立刻返回 job_id，前端轮询 GET /ingest/jobs/{id} 看进度。
+
+    编码在独立 daemon 线程执行，避免阻塞 uvicorn 事件循环，便于实时轮询。
+    """
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=422, detail="仅支持 PDF 文件")
+    job_id = uuid.uuid4().hex[:16]
+    doc_id = uuid.uuid4().hex[:12]
+    filename = file.filename or f"{doc_id}.pdf"
+    pdf_path = UPLOAD_DIR / f"{doc_id}.pdf"
+    pdf_path.write_bytes(await file.read())
+    now = time.time()
+    with _ingest_jobs_lock:
+        # 清理过期 job
+        dead = [k for k, v in _ingest_jobs.items() if now - v.get("created_at", now) > _INGEST_JOB_TTL_SEC]
+        for k in dead:
+            _ingest_jobs.pop(k, None)
+        _ingest_jobs[job_id] = {
+            "job_id": job_id,
+            "doc_id": doc_id,
+            "filename": filename,
+            "status": "queued",
+            "phase": "queued",
+            "pct": 0.0,
+            "message": "已接收文件，排队中…",
+            "events": [{"t": now, "phase": "queued", "pct": 0, "message": "queued"}],
+            "result": None,
+            "error": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+    t = threading.Thread(
+        target=_run_ingest_job,
+        args=(job_id, pdf_path, doc_id),
+        name=f"ingest-{job_id}",
+        daemon=True,
+    )
+    t.start()
+    return IngestJobCreateResponse(
+        job_id=job_id, doc_id=doc_id, filename=filename, status="queued",
+    )
+
+
+@app.get("/ingest/jobs/{job_id}", response_model=IngestJobStatus)
+async def get_ingest_job(job_id: str):
+    with _ingest_jobs_lock:
+        job = _ingest_jobs.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="job not found")
+        # 浅拷贝，避免持锁序列化
+        data = dict(job)
+    result = data.get("result")
+    return IngestJobStatus(
+        job_id=data["job_id"],
+        doc_id=data["doc_id"],
+        filename=data.get("filename") or "",
+        status=data["status"],
+        phase=data.get("phase") or "",
+        pct=float(data.get("pct") or 0),
+        message=data.get("message") or "",
+        events=list(data.get("events") or []),
+        result=IngestResponse(**result) if result else None,
+        error=data.get("error"),
+        created_at=float(data.get("created_at") or 0),
+        updated_at=float(data.get("updated_at") or 0),
     )
 
 

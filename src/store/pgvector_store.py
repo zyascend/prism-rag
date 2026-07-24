@@ -381,6 +381,76 @@ class PgVectorStore:
             )
         self.conn.commit()
 
+    def list_documents(self) -> List[dict]:
+        """列出库内文档及 chunk/page 统计（documents 表 + chunks 聚合）。
+
+        兼容仅有 chunks、documents 行缺失的旧数据：以 chunks.doc_id 为底表 LEFT JOIN documents。
+        """
+        self.create_schema()
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    c.doc_id,
+                    COALESCE(d.content_hash, '') AS content_hash,
+                    COALESCE(d.source_path, '') AS source_path,
+                    d.created_at,
+                    COUNT(c.chunk_id)::int AS num_chunks,
+                    COUNT(DISTINCT c.page_id)::int AS num_pages,
+                    COUNT(*) FILTER (WHERE c.chunk_type = 'table')::int AS num_tables,
+                    COUNT(*) FILTER (WHERE c.chunk_type = 'text')::int AS num_text,
+                    MIN(c.page_number)::int AS page_from,
+                    MAX(c.page_number)::int AS page_to
+                FROM chunks c
+                LEFT JOIN documents d ON d.doc_id = c.doc_id
+                GROUP BY c.doc_id, d.content_hash, d.source_path, d.created_at
+                ORDER BY d.created_at DESC NULLS LAST, c.doc_id
+                """
+            )
+            rows = cur.fetchall()
+        out = []
+        for r in rows:
+            out.append(
+                {
+                    "doc_id": r[0],
+                    "content_hash": r[1] or "",
+                    "source_path": r[2] or "",
+                    "created_at": r[3].isoformat() if r[3] is not None else None,
+                    "num_chunks": int(r[4] or 0),
+                    "num_pages": int(r[5] or 0),
+                    "num_tables": int(r[6] or 0),
+                    "num_text": int(r[7] or 0),
+                    "page_from": r[8],
+                    "page_to": r[9],
+                }
+            )
+        return out
+
+    def corpus_stats(self) -> dict:
+        """全库汇总：文档数、页数、chunk 数、表 chunk 数。"""
+        self.create_schema()
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COUNT(DISTINCT doc_id)::int,
+                    COUNT(DISTINCT page_id)::int,
+                    COUNT(*)::int,
+                    COUNT(*) FILTER (WHERE chunk_type = 'table')::int
+                FROM chunks
+                """
+            )
+            n_docs, n_pages, n_chunks, n_tables = cur.fetchone()
+            cur.execute("SELECT COUNT(*)::int FROM documents")
+            n_doc_rows = cur.fetchone()[0]
+        return {
+            "num_documents": int(n_docs or 0),
+            "num_document_rows": int(n_doc_rows or 0),
+            "num_pages": int(n_pages or 0),
+            "num_chunks": int(n_chunks or 0),
+            "num_table_chunks": int(n_tables or 0),
+        }
+
     def close(self):
         if self._conn and not self._conn.closed:
             self._conn.close()

@@ -596,8 +596,24 @@
     });
   }
 
+  function applyQueryParams() {
+    // 从文档库/嵌入页跳转：?doc_id=xxx 自动 Live + 过滤
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const docId = params.get("doc_id");
+      if (docId) {
+        bindDocFilter(docId, true);
+        $("upload-status").textContent =
+          `已锁定 doc_id=${docId}（来自链接）· 提问将只检索该文档`;
+      }
+    } catch (_) { /* ignore */ }
+  }
+
   async function main() {
     wire();
+    if (window.PrismDemo && window.PrismDemo.bootNav) {
+      window.PrismDemo.bootNav("ask");
+    }
     // 上传控件始终可用（不再 disabled）
     $("pdf-file").disabled = false;
     $("btn-upload").disabled = false;
@@ -606,15 +622,19 @@
     } catch (e) {
       showError("加载 fixtures/metrics 失败: " + (e.message || e));
     }
+    applyQueryParams();
     // 优先 Live：本机 API 起来就能上传；失败再回退 Demo fixtures
     setMode("live", { skipHealth: true });
     const ok = await checkHealth();
     if (!ok) {
       setMode("demo");
+      if (!$("upload-status").textContent.includes("doc_id=")) {
+        $("upload-status").textContent =
+          "API 未就绪：chips 用 Demo；或到「嵌入」页等 API 启动后再入库";
+      }
+    } else if (!$("upload-status").textContent.includes("doc_id=")) {
       $("upload-status").textContent =
-        "API 未就绪：chips 用 Demo；启动 local-dev API 后可上传 PDF";
-    } else {
-      $("upload-status").textContent = "Live 就绪：选择 PDF → Upload → 立刻提问";
+        "Live 就绪：也可在「嵌入」页看编码进度 · 或本页快速 Upload";
     }
   }
 

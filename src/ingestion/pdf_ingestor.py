@@ -48,18 +48,34 @@ class PDFIngestor:
             context_enabled=cfg.get("ingestion.table_summary_context_enabled", False),
             context_max_chars=cfg.get("ingestion.table_summary_context_max_chars", 1500),
         )
+        # progress_fn(phase: str, pct: float 0-100, message: str) — 可选，供 demo 实时追踪
+        self.progress_fn: Optional[Callable[[str, float, str], None]] = None
+
+    def set_progress_fn(self, fn: Optional[Callable[[str, float, str], None]]) -> None:
+        self.progress_fn = fn
+
+    def _progress(self, phase: str, pct: float, message: str) -> None:
+        if self.progress_fn is None:
+            return
+        try:
+            self.progress_fn(phase, float(pct), message)
+        except Exception as e:
+            logger.debug("progress_fn error: %s", e)
 
     def ingest(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict:
         pdf_path = Path(pdf_path)
+        self._progress("hash", 2, "计算内容哈希…")
         content_hash = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
 
         # 空库/首次本地 demo：必须先建表，再查 content_hash（否则 documents 不存在 → 500）
+        self._progress("schema", 5, "确保数据库 schema…")
         self.pg.create_schema()
 
         # P1：同内容已入库 → 幂等 no-op（不再整篇重编码，避免浪费 GPU）
         existing = self.pg.get_doc_id_by_content_hash(content_hash)
         if existing is not None:
             logger.info("内容哈希命中，幂等跳过 doc_id=%s", existing)
+            self._progress("done", 100, f"内容已存在，跳过编码 doc_id={existing}")
             return {"doc_id": existing, "num_pages": 0, "num_chunks": 0, "status": "noop_identical"}
 
         doc_id = doc_id or _rand_doc_id()
@@ -72,20 +88,26 @@ class PDFIngestor:
     # ── 全新增 ──────────────────────────────────────────────
 
     def _ingest_fresh(self, pdf_path: Path, doc_id: str, content_hash: str) -> Dict:
+        self._progress("parse", 10, f"解析 PDF：{pdf_path.name}")
         pages = self.parser.parse(pdf_path)
         if not pages:
             raise RuntimeError("解析未产出任何页面")
+        self._progress("parse", 20, f"解析完成 · {len(pages)} 页")
         hash_by_pn = {p.page_number: self._page_hash_of(p) for p in pages}
         num_chunks = self._ingest_pages(pages, doc_id, [p.page_number for p in pages], hash_by_pn)
+        self._progress("index", 95, "写入 documents 元数据…")
         self.pg.upsert_document(doc_id, content_hash, str(pdf_path))
+        self._progress("done", 100, f"入库完成 · {len(pages)} 页 · {num_chunks} chunks")
         return {"doc_id": doc_id, "num_pages": len(pages), "num_chunks": num_chunks, "status": "inserted"}
 
     # ── 修改版更新（page diff，省 GPU）──────────────────────
 
     def _ingest_update(self, pdf_path: Path, doc_id: str, content_hash: str) -> Dict:
+        self._progress("parse", 10, f"解析 PDF（更新）· {pdf_path.name}")
         pages = self.parser.parse(pdf_path)
         if not pages:
             raise RuntimeError("解析未产出任何页面")
+        self._progress("parse", 18, f"解析完成 · {len(pages)} 页 · page-diff")
 
         old_pages = {pn: pid for (pid, pn) in self.pg.get_pages_by_doc_id(doc_id)}
         old_hashes = self.pg.get_page_hashes_by_doc_id(doc_id)
@@ -127,6 +149,10 @@ class PDFIngestor:
             "page diff 更新 doc_id=%s：unchanged=%d changed=%d new=%d deleted=%d",
             doc_id, len(unchanged), len(changed), len(new_pns), len(deleted_pns),
         )
+        self._progress(
+            "done", 100,
+            f"更新完成 · unchanged={len(unchanged)} changed={len(changed)} new={len(new_pns)}",
+        )
         return {
             "doc_id": doc_id, "num_pages": len(pages), "num_chunks": num_chunks,
             "unchanged": len(unchanged), "changed": len(changed),
@@ -150,9 +176,11 @@ class PDFIngestor:
         if hasattr(self.chunker, "reset_headings"):
             self.chunker.reset_headings()
 
-        for p in pages:
-            if p.page_number not in pn_set:
-                continue
+        work_pages = [p for p in pages if p.page_number in pn_set]
+        n_work = max(len(work_pages), 1)
+        self._progress("chunk", 25, f"分块 · 处理 {len(work_pages)} 页…")
+
+        for i, p in enumerate(work_pages):
             page_id = _rand_page_id()
             phash = hash_by_pn[p.page_number]
             if getattr(p, "blocks", None):
@@ -188,9 +216,18 @@ class PDFIngestor:
                 page_images.append(p.image)
                 page_id_for_image.append(page_id)
                 faiss_page_hashes[page_id] = phash
+            # 25% → 45% 分块进度
+            pct = 25 + 20 * (i + 1) / n_work
+            if (i + 1) % max(1, n_work // 10) == 0 or i + 1 == n_work:
+                self._progress(
+                    "chunk", pct,
+                    f"分块中 · 页 {p.page_number} · chunks 累计 {len(all_rows)}",
+                )
 
         if all_texts:
+            self._progress("embed_text", 50, f"BGE 编码 {len(all_texts)} 个 chunk…")
             embs = self.bge.encode(all_texts, batch_size=32)
+            self._progress("write_pg", 70, "写入 pgvector…")
             for i in range(0, len(all_rows), 100):
                 batch = all_rows[i:i + 100]
                 vecs = embs[i:i + 100].cpu().numpy().tolist()
@@ -199,8 +236,14 @@ class PDFIngestor:
                      r[10], r[11], r[12], r[13])
                     for r, v in zip(batch, vecs)
                 ])
+                done = min(i + 100, len(all_rows))
+                self._progress(
+                    "write_pg", 70 + 10 * done / max(len(all_rows), 1),
+                    f"pgvector {done}/{len(all_rows)}",
+                )
 
         if use_visual and page_images:
+            self._progress("embed_visual", 82, f"Visual 编码 {len(page_images)} 页…")
             page_embs = self.colpali.encode_pages(page_images)
             page_doc_map = {pid: doc_id for pid in page_id_for_image}
             self.faiss.add_pages(
@@ -209,8 +252,12 @@ class PDFIngestor:
                 page_hashes=faiss_page_hashes,
             )
             self.faiss.save()
+            self._progress("embed_visual", 90, "FAISS 已保存")
+        elif not use_visual:
+            self._progress("embed_visual", 90, "跳过 Visual（use_visual=false）")
 
         # P2-A：BM25 增量维护（仅本次新增/变更页），无需全量重建
+        self._progress("bm25", 92, "更新 BM25…")
         if self.bm25 is not None:
             bm25_dicts = [
                 {

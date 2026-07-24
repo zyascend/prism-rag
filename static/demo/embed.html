@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>嵌入 · PrismRAG Demo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>PrismRAG</strong>
+      <span>PDF 嵌入</span>
+    </div>
+    <nav id="main-nav" class="main-nav" aria-label="Demo pages"></nav>
+    <div class="top-right">
+      <input id="api-base" class="api-base" type="text" placeholder="API base" value="" title="Empty = same origin" aria-label="API base" />
+      <span id="health" class="health">health: —</span>
+    </div>
+  </header>
+  <div id="error" class="error-bar" role="alert"></div>
+
+  <main class="page layout-embed">
+    <section class="panel">
+      <h2>上传并编码</h2>
+      <p class="panel-hint">
+        走异步 <code>POST /ingest/jobs</code>，本页每 500ms 轮询进度：
+        解析 → 分块 → BGE 编码 → 写 pgvector →（可选 Visual）→ BM25。
+      </p>
+      <div class="upload-row">
+        <input type="file" id="pdf-file" accept="application/pdf,.pdf" aria-label="PDF" />
+        <button type="button" class="primary" id="btn-start">开始嵌入</button>
+      </div>
+      <p id="file-hint" class="muted">选择 PDF 后点击开始。local-dev 下 Visual 通常关闭，编码更快。</p>
+
+      <div class="phase-track" id="phase-track" aria-label="ingest phases">
+        <div class="phase" data-phase="queued">排队</div>
+        <div class="phase" data-phase="parse">解析</div>
+        <div class="phase" data-phase="chunk">分块</div>
+        <div class="phase" data-phase="embed_text">BGE</div>
+        <div class="phase" data-phase="write_pg">写库</div>
+        <div class="phase" data-phase="embed_visual">Visual</div>
+        <div class="phase" data-phase="bm25">BM25</div>
+        <div class="phase" data-phase="done">完成</div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-bar"><i id="progress-fill" style="width:0%"></i></div>
+        <div class="progress-meta">
+          <span id="progress-pct">0%</span>
+          <span id="progress-phase" class="muted">idle</span>
+        </div>
+        <p id="progress-msg" class="progress-msg">等待上传…</p>
+      </div>
+
+      <div class="job-meta meta-row" id="job-meta"></div>
+      <div class="row-between" id="done-actions" hidden>
+        <span class="ok-text" id="done-summary"></span>
+        <span>
+          <a id="link-ask" href="index.html">去问答</a>
+          ·
+          <a href="documents.html">看文档库</a>
+        </span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>事件流</h2>
+      <p class="panel-hint">服务端上报的 phase / pct / message（最近事件）。</p>
+      <ol class="event-log" id="event-log">
+        <li class="muted">尚无任务</li>
+      </ol>
+    </section>
+  </main>
+  <script src="common.js"></script>
+  <script src="embed.js"></script>
+</body>
+</html>

@@ -200,13 +200,16 @@ make db                                          # pgvector
 export CONFIG_PROFILE=local-dev                  # simple parser · 关 Visual（免 Col*）
 # 需本机已有 BGE 编码 + LLM（local-dev 指向 models.local-dev.yaml）
 python scripts/run_api.py
-# 打开 http://127.0.0.1:8000/demo/
-# 选 PDF → Upload（会自动切 Live、勾选「仅当前文档」）→ 直接 Ask
+# 打开
+#   http://127.0.0.1:8000/demo/              问答 + 链路透视
+#   http://127.0.0.1:8000/demo/documents.html 文档库概况
+#   http://127.0.0.1:8000/demo/embed.html     上传 PDF + 实时嵌入进度
 ```
 
-- API 未起时页面回退 **Demo fixtures**（预设 chips，无上传入库）。
-- 上传成功后默认按 `doc_id` 过滤检索；后端会对带 `doc_id` 的请求 **over-fetch 再过滤**，避免新文档被大库挤出 top-k。
-- 跨域静态页打 Live：`PRISMRAG_CORS_ORIGINS=http://127.0.0.1:8765`
+- **文档页** `GET /documents`：库内 doc 列表、页/chunk 统计、FAISS/BM25 状态。  
+- **嵌入页** `POST /ingest/jobs` + 轮询 `GET /ingest/jobs/{id}`：解析→分块→BGE→写库进度条。  
+- 问答页上传成功后默认按 `doc_id` 过滤；带 `doc_id` 时后端 **over-fetch 再过滤**。  
+- API 未起时问答页回退 **Demo fixtures**。跨域：`PRISMRAG_CORS_ORIGINS=…`
 
 常用 Make：`make help` · `make test` · `make fetch-indexes` · `make ingest-pdf PDF=...` · `make demo`
 

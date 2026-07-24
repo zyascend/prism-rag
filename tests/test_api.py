@@ -139,3 +139,54 @@ def test_demo_static_index_served():
     assert r2.status_code == 200
     r3 = c.get("/demo/fixtures.json")
     assert r3.status_code == 200
+    for path in ("/demo/documents.html", "/demo/embed.html", "/demo/common.js"):
+        assert c.get(path).status_code == 200, path
+
+
+def test_list_documents_endpoint():
+    class R:
+        faiss = type("F", (), {"num_pages": 3, "index_size_mb": 1.2})()
+        bm25 = type("B", (), {"ready": True})()
+        pg = type(
+            "PG",
+            (),
+            {
+                "list_documents": lambda self: [
+                    {
+                        "doc_id": "abc",
+                        "content_hash": "h",
+                        "source_path": "data/uploads/abc.pdf",
+                        "created_at": "2026-07-24T00:00:00",
+                        "num_chunks": 2,
+                        "num_pages": 1,
+                        "num_tables": 0,
+                        "num_text": 2,
+                        "page_from": 1,
+                        "page_to": 1,
+                    }
+                ],
+                "corpus_stats": lambda self: {
+                    "num_documents": 1,
+                    "num_document_rows": 1,
+                    "num_pages": 1,
+                    "num_chunks": 2,
+                    "num_table_chunks": 0,
+                },
+            },
+        )()
+
+    routes.set_retriever(R())
+    c = TestClient(routes.app)
+    r = c.get("/documents")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["stats"]["num_documents"] == 1
+    assert body["stats"]["bm25_ready"] is True
+    assert body["documents"][0]["doc_id"] == "abc"
+
+
+def test_ingest_job_not_found():
+    routes.set_retriever(_fake_retriever())
+    c = TestClient(routes.app)
+    r = c.get("/ingest/jobs/does-not-exist")
+    assert r.status_code == 404
