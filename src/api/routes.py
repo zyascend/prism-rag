@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -35,6 +36,19 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="PrismRAG API", version="0.1.0")
 app.add_middleware(ObservabilityMiddleware)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+_cors = os.environ.get("PRISMRAG_CORS_ORIGINS", "").strip()
+if _cors:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[o.strip() for o in _cors.split(",") if o.strip()],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-Trace-Id"],
+    )
 _retriever: Optional[PrismRAGRetriever] = None
 
 

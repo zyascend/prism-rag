@@ -191,7 +191,17 @@ python scripts/run_api.py
 # GET  /trace/{trace_id}
 ```
 
-常用 Make：`make help` · `make test` · `make fetch-indexes` · `make ingest-pdf PDF=...`
+### Web Demo（Hybrid）
+
+```bash
+# 仓库根启动 API 后打开
+python scripts/run_api.py
+# 浏览器: http://127.0.0.1:8000/demo/
+# 默认 Demo 模式（fixtures，无 GPU）；Live 需索引 + 模型就绪
+# 跨域 Live: PRISMRAG_CORS_ORIGINS=http://127.0.0.1:8765
+```
+
+常用 Make：`make help` · `make test` · `make fetch-indexes` · `make ingest-pdf PDF=...` · `make demo`
 
 ---
 

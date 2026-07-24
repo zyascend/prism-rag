@@ -1,4 +1,4 @@
-.PHONY: help install ingest-vidore eval-vidore eval-full eval-ragas clean lint test db up e2e-local ingest-pdf eval-smoke
+.PHONY: help install ingest-vidore eval-vidore eval-full eval-ragas clean lint test db up e2e-local ingest-pdf eval-smoke demo
 
 help: ## 显示帮助
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -66,3 +66,6 @@ ingest-pdf: ## 入库本地 PDF: make ingest-pdf PDF=path/to.pdf
 
 clean: ## 清理索引和评测结果
 	rm -rf indexes/ results/
+demo: ## 启动 API 并提示 Demo URL（需依赖与索引按需准备）
+	@echo "Open http://127.0.0.1:8000/demo/ after server starts"
+	python scripts/run_api.py
