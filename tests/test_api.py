@@ -47,8 +47,14 @@ def _fake_generator():
         model = "fake-model"
 
         def answer(self, q, retrieved, k_context=5):
-            return {"answer": "ok", "citations": [{"chunk_id": "c1", "page_id": 1,
-                    "doc_id": "d", "page_number": 1, "snippet": "s"}], "context": ""}
+            return {
+                "answer": "ok",
+                "citations": [{
+                    "chunk_id": "c1", "page_id": 1,
+                    "doc_id": "d", "page_number": 1, "snippet": "s",
+                }],
+                "context": "ctx-for-llm",
+            }
     return G()
 
 
@@ -68,6 +74,9 @@ def test_ask_returns_answer_and_citations():
     body = r.json()
     assert body["answer"] == "ok"
     assert body["citations"][0]["chunk_id"] == "c1"
+    # demo 链路透视依赖入模 context 字段
+    assert "context" in body
+    assert body["context"] == "ctx-for-llm"
 
 
 def test_ask_with_doc_id_overfetches_then_filters():

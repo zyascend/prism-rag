@@ -263,10 +263,15 @@
 
     const ans = (resp.answer || "").trim();
     const rejected = /enough information|cannot answer|not enough/i.test(ans);
+    const ctxLen = ((resp && resp.context) || "").length;
     setPipeStep(
       "answer",
       rejected ? "warn" : ans ? "done" : "warn",
-      rejected ? "拒答/信息不足" : ans ? `${ans.length} chars · ${cites.length} cite` : "空答案"
+      rejected
+        ? "拒答/信息不足"
+        : ans
+          ? `答案 ${ans.length}c · ctx ${ctxLen}c · ${cites.length} cite`
+          : "空答案"
     );
   }
 
@@ -338,10 +343,33 @@
     });
   }
 
+  function renderContext(resp) {
+    const body = $("context-body");
+    const summary = $("context-summary");
+    const panel = $("context-panel");
+    if (!body || !summary) return;
+    const ctx = (resp && resp.context) || "";
+    if (!ctx) {
+      body.textContent = "（空 context：拒答 / 无检索结果 / 或旧缓存未存 context）";
+      summary.textContent = "context 为空 · 0 chars";
+      return;
+    }
+    body.textContent = ctx;
+    const nChars = ctx.length;
+    const nLines = ctx.split("\n").length;
+    // 粗估：按空行分段看证据块数
+    const blocks = ctx.split(/\n\s*\n/).filter((s) => s.trim()).length;
+    summary.textContent =
+      `入模 context · ${nChars} chars · ~${nLines} lines · ~${blocks} blocks` +
+      ` · 此即 prompt 里 {{context}} 的最终内容（经 BGE 句级压缩 / 表完整保留）`;
+    if (panel) panel.open = true;
+  }
+
   function renderResponse(resp, traceId) {
     state.response = resp;
     state.traceId = traceId || (resp && resp._demo_trace_id) || null;
     $("answer").textContent = (resp && resp.answer) || "(empty answer)";
+    renderContext(resp);
     renderCitations(resp && resp.citations);
     const rt = (resp && resp.retrieval_trace) || {};
     renderRouteList(

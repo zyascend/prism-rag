@@ -306,6 +306,8 @@ class AskResponse(BaseModel):
     retrieval_trace: RetrievalTrace = RetrievalTrace()
     self_rag: Optional[SelfRAGInfo] = None
     crag: Optional[CRAGInfo] = None
+    # 入模上下文（压缩/表保护后的最终 prompt context）；demo 链路透视用
+    context: str = ""
 
 
 UPLOAD_DIR = Path("data/uploads")
@@ -621,6 +623,7 @@ async def ask(request: AskRequest):
             retrieval_trace=trace,
             self_rag=SelfRAGInfo(**sr_info) if sr_info else None,
             crag=CRAGInfo(**crag_info) if crag_info else None,
+            context=cached_answer.get("context") or "",
         )
 
     # doc_id 过滤在检索后做：若只取 top-k，新上传小文档容易被大库挤掉。
@@ -703,6 +706,7 @@ async def ask(request: AskRequest):
             answer="I don't have enough information to answer that question.",
             citations=[], retrieval_trace=trace,
             crag=CRAGInfo(**crag_public),
+            context="",
         )
     try:
         sr_cfg = self_rag_config()
@@ -734,6 +738,8 @@ async def ask(request: AskRequest):
     }
     sr_public.setdefault("enabled", bool(sr_payload.get("enabled", False)))
 
+    context_out = gen_out.get("context") or ""
+
     # 写入 L4 Answer 缓存（受全局开关 + 确定性守卫；命中率经 cache_label 聚合）
     if cfg.cache.enabled and gen.cacheable and answer_key is not None and retriever._answer_cache is not None:
         retriever._answer_cache.put(answer_key, {
@@ -742,6 +748,7 @@ async def ask(request: AskRequest):
             "retrieval_trace": retrieval_trace,
             "self_rag": sr_public,
             "crag": crag_public,
+            "context": context_out,
         })
         collector.record_cache_event("answer", hit=False, config_label=cache_label)
 
@@ -751,6 +758,7 @@ async def ask(request: AskRequest):
         retrieval_trace=trace,
         self_rag=SelfRAGInfo(**sr_public),
         crag=CRAGInfo(**crag_public),
+        context=context_out,
     )
 
 

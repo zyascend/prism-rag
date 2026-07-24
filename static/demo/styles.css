@@ -168,6 +168,40 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
   white-space: pre-wrap;
   background: #f8fafc;
 }
+.context-panel {
+  border: 1px solid #93c5fd;
+  border-radius: 10px;
+  background: #f0f9ff;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+.context-panel summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e3a8a;
+  list-style: none;
+}
+.context-panel summary::-webkit-details-marker { display: none; }
+.context-panel summary::before {
+  content: "▸ ";
+  color: #2563eb;
+}
+.context-panel[open] summary::before { content: "▾ "; }
+.context-body {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  max-height: 320px;
+  overflow: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 .citation {
   border-left: 3px solid var(--accent);
   background: #f8fafc;

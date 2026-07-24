@@ -41,23 +41,61 @@
       ],
       "retrieval_trace": {
         "bm25_top5": [
-          {"chunk_id": "demo-doc:p12:c0", "page_id": 12, "score": 12.4},
-          {"chunk_id": "demo-doc:p12:c1", "page_id": 12, "score": 8.1},
-          {"chunk_id": "demo-doc:p3:c0", "page_id": 3, "score": 5.2}
+          {
+            "chunk_id": "demo-doc:p12:c0",
+            "page_id": 12,
+            "score": 12.4
+          },
+          {
+            "chunk_id": "demo-doc:p12:c1",
+            "page_id": 12,
+            "score": 8.1
+          },
+          {
+            "chunk_id": "demo-doc:p3:c0",
+            "page_id": 3,
+            "score": 5.2
+          }
         ],
         "dense_top5": [
-          {"chunk_id": "demo-doc:p12:c0", "page_id": 12, "score": 0.87},
-          {"chunk_id": "demo-doc:p14:c2", "page_id": 14, "score": 0.71},
-          {"chunk_id": "demo-doc:p3:c0", "page_id": 3, "score": 0.64}
+          {
+            "chunk_id": "demo-doc:p12:c0",
+            "page_id": 12,
+            "score": 0.87
+          },
+          {
+            "chunk_id": "demo-doc:p14:c2",
+            "page_id": 14,
+            "score": 0.71
+          },
+          {
+            "chunk_id": "demo-doc:p3:c0",
+            "page_id": 3,
+            "score": 0.64
+          }
         ],
         "visual_top5": [
-          {"chunk_id": "page:12", "page_id": 12, "score": 0.66},
-          {"chunk_id": "page:14", "page_id": 14, "score": 0.51}
+          {
+            "chunk_id": "page:12",
+            "page_id": 12,
+            "score": 0.66
+          },
+          {
+            "chunk_id": "page:14",
+            "page_id": 14,
+            "score": 0.51
+          }
         ]
       },
-      "self_rag": {"enabled": false},
-      "crag": {"enabled": false, "applied": false},
-      "_demo_trace_id": "fixture-voltage-001"
+      "self_rag": {
+        "enabled": false
+      },
+      "crag": {
+        "enabled": false,
+        "applied": false
+      },
+      "_demo_trace_id": "fixture-voltage-001",
+      "context": "[evidence 1 | page 12]\nMain control panel rated supply: 480 VAC, 3-phase, 60 Hz. Do not connect to 208 VAC service without the step-up transformer kit."
     },
     "List the pre-operation checks before starting pressurized fuel transfer.": {
       "query": "List the pre-operation checks before starting pressurized fuel transfer.",
@@ -80,20 +118,46 @@
       ],
       "retrieval_trace": {
         "bm25_top5": [
-          {"chunk_id": "demo-doc:p40:c1", "page_id": 40, "score": 14.0},
-          {"chunk_id": "demo-doc:p41:c0", "page_id": 41, "score": 11.2}
+          {
+            "chunk_id": "demo-doc:p40:c1",
+            "page_id": 40,
+            "score": 14.0
+          },
+          {
+            "chunk_id": "demo-doc:p41:c0",
+            "page_id": 41,
+            "score": 11.2
+          }
         ],
         "dense_top5": [
-          {"chunk_id": "demo-doc:p40:c1", "page_id": 40, "score": 0.84},
-          {"chunk_id": "demo-doc:p41:c0", "page_id": 41, "score": 0.79}
+          {
+            "chunk_id": "demo-doc:p40:c1",
+            "page_id": 40,
+            "score": 0.84
+          },
+          {
+            "chunk_id": "demo-doc:p41:c0",
+            "page_id": 41,
+            "score": 0.79
+          }
         ],
         "visual_top5": [
-          {"chunk_id": "page:40", "page_id": 40, "score": 0.58}
+          {
+            "chunk_id": "page:40",
+            "page_id": 40,
+            "score": 0.58
+          }
         ]
       },
-      "self_rag": {"enabled": false},
-      "crag": {"enabled": false, "applied": false},
-      "_demo_trace_id": "fixture-precheck-002"
+      "self_rag": {
+        "enabled": false
+      },
+      "crag": {
+        "enabled": false,
+        "applied": false
+      },
+      "_demo_trace_id": "fixture-precheck-002",
+      "context": "[evidence 1 | page 40]\nPre-operation checklist — pressurized transfer: high-level shutoff pretest; bonding; strainer position; wet/dry indicators GREEN.\n\n[evidence 2 | page 41]\nDo not initiate fuel flow until all trucks on that aircraft side are bonded and the panel pretest completes without fault codes."
     },
     "What is the maximum water pressure allowed for manual rinsing?": {
       "query": "What is the maximum water pressure allowed for manual rinsing?",
@@ -116,22 +180,56 @@
       ],
       "retrieval_trace": {
         "bm25_top5": [
-          {"chunk_id": "demo-doc:p88:c0", "page_id": 88, "score": 15.1},
-          {"chunk_id": "demo-doc:p89:c1", "page_id": 89, "score": 13.0},
-          {"chunk_id": "demo-doc:p90:c0", "page_id": 90, "score": 6.4}
+          {
+            "chunk_id": "demo-doc:p88:c0",
+            "page_id": 88,
+            "score": 15.1
+          },
+          {
+            "chunk_id": "demo-doc:p89:c1",
+            "page_id": 89,
+            "score": 13.0
+          },
+          {
+            "chunk_id": "demo-doc:p90:c0",
+            "page_id": 90,
+            "score": 6.4
+          }
         ],
         "dense_top5": [
-          {"chunk_id": "demo-doc:p89:c1", "page_id": 89, "score": 0.91},
-          {"chunk_id": "demo-doc:p88:c0", "page_id": 88, "score": 0.89}
+          {
+            "chunk_id": "demo-doc:p89:c1",
+            "page_id": 89,
+            "score": 0.91
+          },
+          {
+            "chunk_id": "demo-doc:p88:c0",
+            "page_id": 88,
+            "score": 0.89
+          }
         ],
         "visual_top5": [
-          {"chunk_id": "page:89", "page_id": 89, "score": 0.72},
-          {"chunk_id": "page:88", "page_id": 88, "score": 0.70}
+          {
+            "chunk_id": "page:89",
+            "page_id": 89,
+            "score": 0.72
+          },
+          {
+            "chunk_id": "page:88",
+            "page_id": 88,
+            "score": 0.7
+          }
         ]
       },
-      "self_rag": {"enabled": false},
-      "crag": {"enabled": false, "applied": false},
-      "_demo_trace_id": "fixture-psi-003"
+      "self_rag": {
+        "enabled": false
+      },
+      "crag": {
+        "enabled": false,
+        "applied": false
+      },
+      "_demo_trace_id": "fixture-psi-003",
+      "context": "[evidence 1 | page 88]\nManual rinse: maximum water pressure 175 PSI (1206 kPa). Do not use fire-main pressure without a reducing valve.\n\n[evidence 2 | page 89]\nTable 7-2 Wash limits — rinse wand 175 PSI max; foam lance 100 PSI max."
     },
     "What is the stock price of the equipment manufacturer next quarter?": {
       "query": "What is the stock price of the equipment manufacturer next quarter?",
@@ -139,16 +237,30 @@
       "citations": [],
       "retrieval_trace": {
         "bm25_top5": [
-          {"chunk_id": "demo-doc:p1:c0", "page_id": 1, "score": 2.1}
+          {
+            "chunk_id": "demo-doc:p1:c0",
+            "page_id": 1,
+            "score": 2.1
+          }
         ],
         "dense_top5": [
-          {"chunk_id": "demo-doc:p2:c0", "page_id": 2, "score": 0.21}
+          {
+            "chunk_id": "demo-doc:p2:c0",
+            "page_id": 2,
+            "score": 0.21
+          }
         ],
         "visual_top5": []
       },
-      "self_rag": {"enabled": false},
-      "crag": {"enabled": false, "applied": false},
-      "_demo_trace_id": "fixture-reject-004"
+      "self_rag": {
+        "enabled": false
+      },
+      "crag": {
+        "enabled": false,
+        "applied": false
+      },
+      "_demo_trace_id": "fixture-reject-004",
+      "context": "(no citations — abstain path)"
     },
     "What torque is specified for the braid clamp fasteners?": {
       "query": "What torque is specified for the braid clamp fasteners?",
@@ -164,13 +276,25 @@
       ],
       "retrieval_trace": {
         "bm25_top5": [
-          {"chunk_id": "demo-doc:p55:c2", "page_id": 55, "score": 11.0}
+          {
+            "chunk_id": "demo-doc:p55:c2",
+            "page_id": 55,
+            "score": 11.0
+          }
         ],
         "dense_top5": [
-          {"chunk_id": "demo-doc:p55:c2", "page_id": 55, "score": 0.86}
+          {
+            "chunk_id": "demo-doc:p55:c2",
+            "page_id": 55,
+            "score": 0.86
+          }
         ],
         "visual_top5": [
-          {"chunk_id": "page:55", "page_id": 55, "score": 0.61}
+          {
+            "chunk_id": "page:55",
+            "page_id": 55,
+            "score": 0.61
+          }
         ]
       },
       "self_rag": {
@@ -195,8 +319,12 @@
           }
         ]
       },
-      "crag": {"enabled": false, "applied": false},
-      "_demo_trace_id": "fixture-gate2-005"
+      "crag": {
+        "enabled": false,
+        "applied": false
+      },
+      "_demo_trace_id": "fixture-gate2-005",
+      "context": "[evidence 1 | page 55]\nBraid clamp fastener torque: 25 in-lb (2.8 N·m), tolerance ±2 in-lb. Recheck after thermal cycle."
     }
   }
 }
