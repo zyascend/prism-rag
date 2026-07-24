@@ -58,16 +58,21 @@
       btn.className = "chip";
       btn.textContent = `${c.label} ${c.value}`;
       btn.title = c.detail;
+      btn.setAttribute("aria-expanded", "false");
       btn.addEventListener("click", () => {
         const box = $("chip-detail");
         const open = box.classList.contains("open") && box.dataset.label === c.label;
         if (open) {
           box.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
           return;
         }
+        // reset expanded state on all metric chips before opening this one
+        root.querySelectorAll(".chip").forEach((b) => b.setAttribute("aria-expanded", "false"));
         box.dataset.label = c.label;
         box.textContent = c.detail;
         box.classList.add("open");
+        btn.setAttribute("aria-expanded", "true");
       });
       root.appendChild(btn);
     });
