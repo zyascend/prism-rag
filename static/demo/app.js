@@ -331,11 +331,6 @@
     $("api-base").addEventListener("change", () => {
       if (state.mode === "live") checkHealth();
     });
-    document.addEventListener("click", (ev) => {
-      if (!ev.target.classList.contains("chip")) {
-        /* keep detail until chip click toggles */
-      }
-    });
   }
 
   async function main() {
