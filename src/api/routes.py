@@ -312,14 +312,25 @@ async def ingest(file: UploadFile = File(...)):
                 shutil.rmtree(Path("data/mineru_output") / doc_id, ignore_errors=True)
             except Exception:
                 pass
-        logger.error(f"ingest failed: {e}")
-        raise HTTPException(status_code=500, detail="Ingestion failed")
+        logger.exception("ingest failed: %s", e)
+        # 本地 demo 需要可读错误（PG 未起 / 模型未下 / 解析失败），勿只回笼统文案
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
     # P2-A：BM25 已通过 ingestor 增量维护；仅当为空（首篇/重启未加载）才全量 refit
     if not retriever.bm25.ready:
         retriever.bm25.fit_from_pgvector(retriever.pg)
     if cfg.get("retrieval.use_visual", True):
         retriever.faiss.save()
-    return IngestResponse(**result)
+    # 语料变更 → 抬 index_version，避免 L3/L4 旧缓存挡住「刚上传立刻问」
+    try:
+        retriever.invalidate_cache()
+    except Exception as e:
+        logger.warning("post-ingest cache invalidate failed: %s", e)
+    # ingestor 可能多返回 status 等字段；只取响应模型字段
+    return IngestResponse(
+        doc_id=result["doc_id"],
+        num_pages=int(result.get("num_pages") or 0),
+        num_chunks=int(result.get("num_chunks") or 0),
+    )
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -359,32 +370,44 @@ async def ask(request: AskRequest):
             crag=CRAGInfo(**crag_info) if crag_info else None,
         )
 
+    # doc_id 过滤在检索后做：若只取 top-k，新上传小文档容易被大库挤掉。
+    # 有 doc_id 时先多取再过滤，保证「上传后立刻问本篇」可用。
+    search_k = request.k
+    if request.doc_id:
+        search_k = max(request.k * 10, 50)
     try:
         search_result = retriever.search_with_trace(
-            request.query, k=request.k,
+            request.query, k=search_k,
             use_visual=use_visual, use_rerank=request.use_rerank,
         )
     except Exception as e:
         logger.error(f"search error: {e}")
-        raise HTTPException(status_code=500, detail="Internal search error")
+        raise HTTPException(status_code=500, detail=f"Internal search error: {e}")
     results = search_result["results"]
     retrieval_trace = search_result["retrieval_trace"]
     if request.doc_id:
-        results = [r for r in results if r.get("doc_id") == request.doc_id]
+        results = [r for r in results if r.get("doc_id") == request.doc_id][: request.k]
+        # RouteTraceItem 无 doc_id 字段，仅截断 top5 展示
+        retrieval_trace = {
+            "bm25_top5": retrieval_trace.get("bm25_top5", [])[:5],
+            "dense_top5": retrieval_trace.get("dense_top5", [])[:5],
+            "visual_top5": retrieval_trace.get("visual_top5", [])[:5],
+        }
 
     # ── CRAG：检索后 grade / 可选改写再检索（默认关）──
     crag_public: dict = {"enabled": False, "applied": False}
     cr_cfg = crag_config()
     if cr_cfg.get("enabled") and results:
         def _research(q: str):
+            rk = max(request.k * 10, 50) if request.doc_id else request.k
             second = retriever.search(
                 q,
-                k=request.k,
+                k=rk,
                 use_visual=use_visual,
                 use_rerank=request.use_rerank,
             )
             if request.doc_id:
-                second = [r for r in second if r.get("doc_id") == request.doc_id]
+                second = [r for r in second if r.get("doc_id") == request.doc_id][: request.k]
             return second
 
         crag = CorrectiveRAG(

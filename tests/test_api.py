@@ -70,6 +70,60 @@ def test_ask_returns_answer_and_citations():
     assert body["citations"][0]["chunk_id"] == "c1"
 
 
+def test_ask_with_doc_id_overfetches_then_filters():
+    """有 doc_id 时应放大 k 再过滤，避免新上传文档被大库挤出 top-k。"""
+    seen = {}
+
+    class R:
+        pg = type("PG", (), {"delete_by_doc_id": lambda self, d: 0})()
+        faiss = type("F", (), {"save": lambda self: None})()
+        bge = None
+        colpali = None
+        chunker = None
+        bm25 = type("B", (), {"ready": True, "fit_from_pgvector": lambda self, pg: None})()
+        _answer_cache = None
+        index_version = 0
+
+        def answer_cache_key(self, query, model, k, doc_id):
+            return f"{query}|{model}|{k}|{doc_id}|v{self.index_version}"
+
+        def invalidate_cache(self):
+            self.index_version += 1
+
+        def search_with_trace(self, query, k=10, use_visual=True, use_rerank=True):
+            seen["k"] = k
+            hits = [
+                {
+                    "chunk_id": "other", "page_id": 1, "doc_id": "other-doc",
+                    "page_number": 1, "text": "noise", "score": 0.99,
+                    "retrieval_type": "dense", "rerank_score": 0.99,
+                },
+                {
+                    "chunk_id": "mine", "page_id": 2, "doc_id": "mine-doc",
+                    "page_number": 2, "text": "pump interval", "score": 0.5,
+                    "retrieval_type": "dense", "rerank_score": 0.5,
+                },
+            ]
+            item = {"chunk_id": "c1", "page_id": 1, "score": 0.9}
+            return {
+                "results": hits,
+                "retrieval_trace": {
+                    "bm25_top5": [item],
+                    "dense_top5": [item],
+                    "visual_top5": [],
+                },
+            }
+
+    routes.set_retriever(R())
+    routes.set_generator(_fake_generator())
+    c = TestClient(routes.app)
+    r = c.post("/ask", json={"query": "pump?", "k": 5, "doc_id": "mine-doc"})
+    assert r.status_code == 200
+    assert seen["k"] >= 50  # over-fetch
+    # generator 仍被调用；若过滤后非空即可
+    assert r.json()["answer"] == "ok"
+
+
 def test_demo_static_index_served():
     """Demo 静态页由 StaticFiles 挂载；不依赖真实 retriever 重模型。"""
     routes.set_retriever(_fake_retriever())

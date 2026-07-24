@@ -1,4 +1,5 @@
 // static/demo/app.js
+// Hybrid: Demo fixtures OR Live API. Upload always available → forces Live + doc-scoped ask.
 (function () {
   "use strict";
 
@@ -67,7 +68,6 @@
           btn.setAttribute("aria-expanded", "false");
           return;
         }
-        // reset expanded state on all metric chips before opening this one
         root.querySelectorAll(".chip").forEach((b) => b.setAttribute("aria-expanded", "false"));
         box.dataset.label = c.label;
         box.textContent = c.detail;
@@ -90,6 +90,9 @@
       if ((p.id || "").includes("reject") || (p.label || "").toLowerCase().includes("out")) {
         btn.classList.add("reject");
       }
+      btn.title = state.mode === "live"
+        ? "Live 模式：会向 API 发真实问题（非 fixture）"
+        : "Demo 模式：回放预录答案";
       btn.addEventListener("click", () => {
         $("query").value = p.query;
         ask();
@@ -157,6 +160,7 @@
         ? ` · <a href="${apiUrl("/trace/" + state.traceId)}" target="_blank" rel="noopener">open /trace</a>`
         : "") +
       `</div>` +
+      `<div>doc_id filter: ${state.filterByDoc && state.lastDocId ? escapeHtml(state.lastDocId) : "off"}</div>` +
       `<div>self_rag.enabled=${sr.enabled}` +
       (sr.passed != null ? ` passed=${sr.passed}` : "") +
       (sr.score != null ? ` score=${sr.score}` : "") +
@@ -171,20 +175,30 @@
     $("eng-json").textContent = JSON.stringify(dump, null, 2);
   }
 
-  function setMode(mode) {
+  function setMode(mode, opts) {
+    opts = opts || {};
     state.mode = mode;
     $("mode-demo").classList.toggle("active", mode === "demo");
     $("mode-live").classList.toggle("active", mode === "live");
-    const live = mode === "live";
-    $("pdf-file").disabled = !live;
-    $("btn-upload").disabled = !live;
-    $("filter-doc").disabled = !live || !state.lastDocId;
-    if (live) {
-      checkHealth();
+    // 上传始终可点；仅 Demo 时提示会自动切 Live
+    $("pdf-file").disabled = false;
+    $("btn-upload").disabled = false;
+    $("filter-doc").disabled = !state.lastDocId;
+    if (mode === "live") {
+      if (!opts.skipHealth) checkHealth();
     } else {
-      $("health").textContent = "health: (demo)";
+      $("health").textContent = "health: (demo fixtures)";
       $("health").className = "health";
     }
+    renderPresets();
+  }
+
+  function bindDocFilter(docId, enable) {
+    state.lastDocId = docId || null;
+    state.filterByDoc = !!enable && !!docId;
+    const cb = $("filter-doc");
+    cb.disabled = !docId;
+    cb.checked = state.filterByDoc;
   }
 
   async function loadData() {
@@ -207,9 +221,8 @@
   async function askDemo(query) {
     const resp = state.fixtures.responses[query];
     if (!resp) {
-      throw new Error("Demo 模式仅支持预设问句（请点上方 chips，或切换 Live）");
+      throw new Error("Demo 模式仅支持预设 chips。上传 PDF 或切换 Live 可真实检索。");
     }
-    // 深拷贝避免后续污染
     return JSON.parse(JSON.stringify(resp));
   }
 
@@ -219,6 +232,7 @@
       k: 5,
       use_rerank: true,
     };
+    // 有上传文档时默认带 doc_id（filter 勾选）—— 上传后立刻问本篇
     if (state.filterByDoc && state.lastDocId) {
       body.doc_id = state.lastDocId;
     }
@@ -275,19 +289,34 @@
       state.health = j;
       el.textContent = `health: ok · pages=${j.index_pages ?? "—"}`;
       el.classList.add("ok");
+      return true;
     } catch (e) {
       state.health = null;
       el.textContent = "health: fail (" + (e.message || e) + ")";
       el.classList.add("bad");
+      return false;
+    }
+  }
+
+  async function ensureLiveForUpload() {
+    if (state.mode !== "live") {
+      setMode("live", { skipHealth: true });
+    }
+    const ok = await checkHealth();
+    if (!ok) {
+      throw new Error(
+        "API 不可达：请在仓库根启动 " +
+          "`CONFIG_PROFILE=local-dev python scripts/run_api.py`，" +
+          "并确保 `make db`（pgvector）已起。当前页面需同源 /demo 或填 API base。"
+      );
     }
   }
 
   async function uploadPdf() {
-    if (state.mode !== "live") return;
     const fileInput = $("pdf-file");
     const file = fileInput.files && fileInput.files[0];
     if (!file) {
-      showError("请选择 PDF 文件");
+      showError("请先选择 PDF 文件");
       return;
     }
     if (!/\.pdf$/i.test(file.name)) {
@@ -296,9 +325,11 @@
     }
     showError(null);
     $("btn-upload").disabled = true;
-    $("upload-status").textContent = "uploading…";
+    $("upload-status").textContent = "上传并编码中…（本地 BGE / 解析，请稍候）";
     try {
+      await ensureLiveForUpload();
       const fd = new FormData();
+      // 字段名必须是 file，与 FastAPI UploadFile 参数一致
       fd.append("file", file, file.name);
       const r = await fetch(apiUrl("/ingest"), { method: "POST", body: fd });
       let data;
@@ -308,12 +339,21 @@
         throw new Error("ingest 非 JSON HTTP " + r.status);
       }
       if (!r.ok) {
-        throw new Error("ingest " + r.status + ": " + (data.detail || JSON.stringify(data)));
+        const detail = data.detail || JSON.stringify(data);
+        throw new Error("ingest " + r.status + ": " + detail);
       }
-      state.lastDocId = data.doc_id;
-      $("filter-doc").disabled = false;
+      // 上传成功 → 立刻绑定本篇，勾选过滤，可直接提问
+      bindDocFilter(data.doc_id, true);
+      const pages = data.num_pages;
+      const chunks = data.num_chunks;
+      const note =
+        pages === 0 && chunks === 0
+          ? "（内容哈希命中，已有索引，可直接问）"
+          : "";
       $("upload-status").textContent =
-        `doc_id=${data.doc_id} · pages=${data.num_pages} · chunks=${data.num_chunks}`;
+        `✓ 已入库 doc_id=${data.doc_id} · pages=${pages} · chunks=${chunks} ${note} → 直接提问即可`;
+      $("query").placeholder = "文档已就绪，输入问题后点 Ask（已限当前 doc）";
+      $("query").focus();
     } catch (e) {
       showError(e.message || String(e));
       $("upload-status").textContent = "upload failed";
@@ -330,8 +370,20 @@
       if (ev.key === "Enter") ask();
     });
     $("btn-upload").addEventListener("click", uploadPdf);
+    // 选文件后若仍在 Demo，轻提示
+    $("pdf-file").addEventListener("change", () => {
+      const f = $("pdf-file").files && $("pdf-file").files[0];
+      if (f) {
+        $("upload-status").textContent = `已选 ${f.name} — 点 Upload 入库后即可检索`;
+      }
+    });
     $("filter-doc").addEventListener("change", (ev) => {
       state.filterByDoc = !!ev.target.checked;
+      if (state.filterByDoc && !state.lastDocId) {
+        showError("尚无上传文档，无法按 doc 过滤");
+        ev.target.checked = false;
+        state.filterByDoc = false;
+      }
     });
     $("api-base").addEventListener("change", () => {
       if (state.mode === "live") checkHealth();
@@ -340,11 +392,23 @@
 
   async function main() {
     wire();
-    setMode("demo");
+    // 上传控件始终可用（不再 disabled）
+    $("pdf-file").disabled = false;
+    $("btn-upload").disabled = false;
     try {
       await loadData();
     } catch (e) {
       showError("加载 fixtures/metrics 失败: " + (e.message || e));
+    }
+    // 优先 Live：本机 API 起来就能上传；失败再回退 Demo fixtures
+    setMode("live", { skipHealth: true });
+    const ok = await checkHealth();
+    if (!ok) {
+      setMode("demo");
+      $("upload-status").textContent =
+        "API 未就绪：chips 用 Demo；启动 local-dev API 后可上传 PDF";
+    } else {
+      $("upload-status").textContent = "Live 就绪：选择 PDF → Upload → 立刻提问";
     }
   }
 

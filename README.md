@@ -193,13 +193,20 @@ python scripts/run_api.py
 
 ### Web Demo（Hybrid）
 
+**上传 PDF → 立刻提问（本机小文档推荐）**
+
 ```bash
-# 仓库根启动 API 后打开
+make db                                          # pgvector
+export CONFIG_PROFILE=local-dev                  # simple parser · 关 Visual（免 Col*）
+# 需本机已有 BGE 编码 + LLM（local-dev 指向 models.local-dev.yaml）
 python scripts/run_api.py
-# 浏览器: http://127.0.0.1:8000/demo/
-# 默认 Demo 模式（fixtures，无 GPU）；Live 需索引 + 模型就绪
-# 跨域 Live: PRISMRAG_CORS_ORIGINS=http://127.0.0.1:8765
+# 打开 http://127.0.0.1:8000/demo/
+# 选 PDF → Upload（会自动切 Live、勾选「仅当前文档」）→ 直接 Ask
 ```
+
+- API 未起时页面回退 **Demo fixtures**（预设 chips，无上传入库）。
+- 上传成功后默认按 `doc_id` 过滤检索；后端会对带 `doc_id` 的请求 **over-fetch 再过滤**，避免新文档被大库挤出 top-k。
+- 跨域静态页打 Live：`PRISMRAG_CORS_ORIGINS=http://127.0.0.1:8765`
 
 常用 Make：`make help` · `make test` · `make fetch-indexes` · `make ingest-pdf PDF=...` · `make demo`
 
