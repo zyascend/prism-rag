@@ -1,3 +1,13 @@
+## 0″. Demo 页（feat/demo-page）
+
+| 项 | 内容 |
+|----|------|
+| **入口** | `http://host:8000/demo/` |
+| **模式** | Demo fixtures 默认 · Live `/ask`+`/ingest` |
+| **代码** | `static/demo/*` · mount in `src/api/routes.py` |
+| **Spec/Plan** | `docs/superpowers/specs/2026-07-24-demo-page-design.md` · `plans/2026-07-24-demo-page.md` |
+| **测** | `tests/test_demo_fixtures.py` · `test_demo_static_index_served` |
+
 # Handoff — PrismRAG 当前状态
 
 > 分支: **docs/content-pipeline-phase-ab-roadmap**（文档）· CRAG 代码在 **feat/crag-failure-clinic**（未合 main）| 远程: origin  
