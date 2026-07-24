@@ -60,11 +60,38 @@ class PromptRegistry:
             self.init()
 
     def get_active(self, prompt_id: str) -> PromptVersion:
-        """返回指定 prompt 的生效版本。"""
+        """返回指定 prompt 的生效版本。
+
+        可通过配置覆盖（不改 YAML active 标记，避免污染英文评测默认）：
+          prompts.active_versions.<prompt_id>: <version int>
+        例如 local-dev 设 answer_generation: 2 强制中文回答。
+        """
         self._ensure()
         if prompt_id not in self._prompts:
             raise PromptNotFound(prompt_id)
-        return self._prompts[prompt_id].active_version
+        prompt = self._prompts[prompt_id]
+        override = self._active_version_override(prompt_id)
+        if override is not None:
+            for v in prompt.versions:
+                if v.version == override:
+                    return v
+            logger.warning(
+                "prompts.active_versions.%s=%s 未找到，回退 YAML active",
+                prompt_id, override,
+            )
+        return prompt.active_version
+
+    @staticmethod
+    def _active_version_override(prompt_id: str) -> Optional[int]:
+        try:
+            from src.config import cfg
+
+            raw = cfg.get(f"prompts.active_versions.{prompt_id}")
+            if raw is None:
+                return None
+            return int(raw)
+        except Exception:
+            return None
 
     def get_prompt(self, prompt_id: str) -> Prompt:
         """返回完整 Prompt（含全部版本历史）。"""

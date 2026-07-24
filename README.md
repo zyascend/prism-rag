@@ -191,7 +191,28 @@ python scripts/run_api.py
 # GET  /trace/{trace_id}
 ```
 
-常用 Make：`make help` · `make test` · `make fetch-indexes` · `make ingest-pdf PDF=...`
+### Web Demo（Hybrid）
+
+**上传 PDF → 立刻提问（本机小文档推荐）**
+
+```bash
+make db                                          # pgvector
+export CONFIG_PROFILE=local-dev                  # MinerU + Visual(ColQwen2)；见 models.local-dev.yaml
+# which mineru  # 未装则解析降级 simple（日志 warning）
+# 需 BGE + ColQwen2（HF cache）+ LLM
+PYTHONPATH=. python scripts/run_api.py
+# 打开
+#   http://127.0.0.1:8000/demo/              问答 + 链路透视
+#   http://127.0.0.1:8000/demo/documents.html 文档库概况
+#   http://127.0.0.1:8000/demo/embed.html     上传 PDF + 实时嵌入进度
+```
+
+- **文档页** `GET /documents`：库内 doc 列表、页/chunk 统计、FAISS/BM25 状态。  
+- **嵌入页** `POST /ingest/jobs` + 轮询 `GET /ingest/jobs/{id}`：解析→分块→BGE→写库进度条。  
+- 问答页上传成功后默认按 `doc_id` 过滤；带 `doc_id` 时后端 **over-fetch 再过滤**。  
+- API 未起时问答页回退 **Demo fixtures**。跨域：`PRISMRAG_CORS_ORIGINS=…`
+
+常用 Make：`make help` · `make test` · `make fetch-indexes` · `make ingest-pdf PDF=...` · `make demo`
 
 ---
 

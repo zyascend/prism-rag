@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>文档库 · PrismRAG Demo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>PrismRAG</strong>
+      <span>文档库</span>
+    </div>
+    <nav id="main-nav" class="main-nav" aria-label="Demo pages"></nav>
+    <div class="top-right">
+      <input id="api-base" class="api-base" type="text" placeholder="API base" value="" title="Empty = same origin" aria-label="API base" />
+      <span id="health" class="health">health: —</span>
+      <button type="button" class="ghost-dark" id="btn-refresh">刷新</button>
+    </div>
+  </header>
+  <div id="error" class="error-bar" role="alert"></div>
+
+  <main class="page">
+    <section class="panel">
+      <h2>知识库概况</h2>
+      <p class="panel-hint">来自 <code>GET /documents</code>：pgvector chunks + documents 元数据，以及 FAISS 页索引状态。</p>
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card"><div class="stat-val" id="st-docs">—</div><div class="stat-lbl">文档</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-pages">—</div><div class="stat-lbl">页（chunk 去重）</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-chunks">—</div><div class="stat-lbl">Chunks</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-tables">—</div><div class="stat-lbl">表 chunks</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-faiss">—</div><div class="stat-lbl">FAISS 页</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-visual">—</div><div class="stat-lbl">Visual</div></div>
+      </div>
+      <div class="meta-row" id="corpus-extra"></div>
+    </section>
+
+    <section class="panel" style="margin-top:14px">
+      <div class="row-between">
+        <h2 style="margin:0">文档列表</h2>
+        <a class="primary-link" href="embed.html">+ 嵌入新 PDF</a>
+      </div>
+      <div class="table-wrap">
+        <table class="doc-table" id="doc-table">
+          <thead>
+            <tr>
+              <th>doc_id</th>
+              <th>来源</th>
+              <th>页</th>
+              <th>chunks</th>
+              <th>表</th>
+              <th>page 范围</th>
+              <th>入库时间</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="doc-tbody">
+            <tr><td colspan="8" class="muted">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <p class="footnote">在问答页勾选「仅当前文档」并带上 doc_id，可只检索本篇。</p>
+  <script src="common.js"></script>
+  <script src="documents.js"></script>
+</body>
+</html>

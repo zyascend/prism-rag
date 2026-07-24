@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional
 from src.config import cfg
 from src.observability import get_tracer
 from src.prompts import get_active
-from src.rejection import ABSTAIN_ANSWER
+from src.rejection import ABSTAIN_ANSWER, abstain_message
 
 logger = logging.getLogger(__name__)
 
@@ -481,7 +481,7 @@ class SelfRAGOrchestrator:
                 unsupported=(last_verdict or {}).get("unsupported", []),
             )
             return {
-                "answer": ABSTAIN_ANSWER,
+                "answer": abstain_message(),
                 "citations": [],
                 "context": (last or {}).get("context", ""),
                 "self_rag": meta,

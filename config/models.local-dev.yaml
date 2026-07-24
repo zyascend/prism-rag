@@ -1,10 +1,48 @@
 # config/models.local-dev.yaml
+# 本地 demo 演示配置：真 PDF 走 MinerU + 小语料开 Visual（ColQwen2）
+#
+# 依赖：
+#   - mineru CLI（PATH 中可执行）；未安装时 parser 会告警并降级 simple
+#   - ColQwen2 权重（HF cache，首次会加载）
+#   - pgvector（make db）
+#
+# 启动：
+#   export CONFIG_PROFILE=local-dev
+#   PYTHONPATH=. .venv/bin/python scripts/run_api.py
+
 ingestion:
-  parser: simple
+  parser: mineru
+  # 演示工业 PDF 时可开图注锚点（需 MinerU image 块）
+  image_caption_chunks: true
+
 retrieval:
-  use_visual: false
+  use_visual: true
   use_rerank: true
+
+embedding:
+  # 与云上 283q 主结论 visual backbone 对齐；本地 demo 数据量小可承受
+  visual_backend: colqwen2
+
+storage:
+  faiss:
+    # 本地 demo 独立索引，勿与 ViDoRe 全量工业 FAISS 混写
+    index_path: indexes/local-demo-colqwen2.faiss
+    id_map_path: indexes/local-demo-colqwen2-ids.npy
+    colqwen2_index_path: indexes/local-demo-colqwen2.faiss
+    colqwen2_id_map_path: indexes/local-demo-colqwen2-ids.npy
+
 llm:
-  base_url: https://token.sensenova.cn/v1
-  api_key: sk-9KsXrrsbMc3AVC8fH76syyHu6S1Mt3f2
-  model: deepseek-v4-flash
+  # SenseNova 配额易 429；本地 demo 默认走 Ollama（OpenAI 兼容）
+  # 需先: ollama serve && ollama list（已有 qwen2:7b 即可）
+  base_url: http://127.0.0.1:11434/v1
+  api_key: ollama
+  model: qwen2:7b
+
+# demo 生成强制简体中文（prompt v2；云上/英文评测不设此项 → 仍用 v1 英文）
+prompts:
+  active_versions:
+    answer_generation: 2
+    self_rag_regenerate: 2
+
+generation:
+  answer_language: zh

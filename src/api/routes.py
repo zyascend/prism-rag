@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
+import threading
+import time
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from src.cache.store import InMemoryLRUCache
 
@@ -16,7 +20,7 @@ from src.config import cfg
 from src.evaluation.vidore_adapter import PrismRAGRetriever
 from src.generation.generator import Generator, GenerationError
 from src.generation.self_rag import SelfRAGOrchestrator, self_rag_config
-from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
+from src.ingestion.encoders import BGEEmbedder, create_visual_encoder
 from src.ingestion.pdf_ingestor import PDFIngestor
 from src.ingestion.text_chunker import TextChunker
 from src.retrieval.bm25_retriever import BM25Retriever
@@ -27,6 +31,7 @@ from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
 from src.observability.middleware import ObservabilityMiddleware
 from src.observability import get_collector
+from src.rejection import abstain_message
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
 
@@ -34,6 +39,19 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="PrismRAG API", version="0.1.0")
 app.add_middleware(ObservabilityMiddleware)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+_cors = os.environ.get("PRISMRAG_CORS_ORIGINS", "").strip()
+if _cors:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[o.strip() for o in _cors.split(",") if o.strip()],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-Trace-Id"],
+    )
 _retriever: Optional[PrismRAGRetriever] = None
 
 
@@ -57,6 +75,10 @@ class RouteTraceItem(BaseModel):
     chunk_id: str
     page_id: int
     score: float
+    # demo hover：命中页/chunk 文本预览（可选，旧缓存可无）
+    text: Optional[str] = None
+    doc_id: Optional[str] = None
+    chunk_type: Optional[str] = None
 
 
 class RetrievalTrace(BaseModel):
@@ -83,11 +105,19 @@ def get_retriever() -> PrismRAGRetriever:
     if _retriever is None:
         cfg.load()
         use_visual = cfg.get("retrieval.use_visual", True)
+        visual_backend = cfg.get("embedding.visual_backend", "colpali")
         pg_store = PgVectorStore()
-        faiss_store = FaissColPaliStore()
+        # colqwen2 与云上 283q 对齐；local-dev 可指向独立 demo FAISS 路径
+        if str(visual_backend).startswith("colqwen2"):
+            faiss_store = FaissColPaliStore(
+                index_path=cfg.get("storage.faiss.colqwen2_index_path"),
+                id_map_path=cfg.get("storage.faiss.colqwen2_id_map_path"),
+            )
+        else:
+            faiss_store = FaissColPaliStore()
         bge = BGEEmbedder()
-        # 本地 dev (use_visual=false) 免 ColPali 3.5B 下载：仅当启用 visual 路才构造
-        colpali = ColPaliEmbedder() if use_visual else None
+        # 仅当启用 visual 才加载 Col*（local-dev demo 数据量小可开）
+        colpali = create_visual_encoder(visual_backend) if use_visual else None
         chunker = TextChunker(
             image_caption_chunks=cfg.get("ingestion.image_caption_chunks", False),
         )
@@ -106,9 +136,20 @@ def get_retriever() -> PrismRAGRetriever:
         faiss_loaded = faiss_store.load()
         if faiss_loaded:
             bm25.fit_from_pgvector(pg_store)
-            logger.info("API: 索引加载完成")
+            logger.info(
+                "API: 索引加载完成 · visual=%s backend=%s",
+                use_visual, visual_backend if use_visual else "off",
+            )
         else:
-            logger.warning("API: FAISS 索引未找到，请先运行 ingest_vidore.py")
+            logger.warning(
+                "API: FAISS 未找到（path=%s）；upload/ingest 后会创建。"
+                "全量 ViDoRe 请用 ingest_vidore.py",
+                faiss_store.index_path,
+            )
+            try:
+                bm25.fit_from_pgvector(pg_store)
+            except Exception as e:
+                logger.warning("API: BM25 fit 跳过: %s", e)
     return _retriever
 
 
@@ -270,10 +311,189 @@ class AskResponse(BaseModel):
     retrieval_trace: RetrievalTrace = RetrievalTrace()
     self_rag: Optional[SelfRAGInfo] = None
     crag: Optional[CRAGInfo] = None
+    # 入模上下文（压缩/表保护后的最终 prompt context）；demo 链路透视用
+    context: str = ""
 
 
 UPLOAD_DIR = Path("data/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── 异步入库任务（demo 嵌入页轮询）──
+_ingest_jobs: Dict[str, Dict[str, Any]] = {}
+_ingest_jobs_lock = threading.Lock()
+_INGEST_JOB_TTL_SEC = 3600
+
+
+class DocumentInfo(BaseModel):
+    doc_id: str
+    content_hash: str = ""
+    source_path: str = ""
+    created_at: Optional[str] = None
+    num_chunks: int = 0
+    num_pages: int = 0
+    num_tables: int = 0
+    num_text: int = 0
+    page_from: Optional[int] = None
+    page_to: Optional[int] = None
+
+
+class CorpusStats(BaseModel):
+    num_documents: int = 0
+    num_document_rows: int = 0
+    num_pages: int = 0
+    num_chunks: int = 0
+    num_table_chunks: int = 0
+    index_pages: int = 0
+    index_size_mb: float = 0.0
+    use_visual: bool = True
+    bm25_ready: bool = False
+
+
+class DocumentsResponse(BaseModel):
+    stats: CorpusStats
+    documents: List[DocumentInfo] = []
+
+
+class IngestJobCreateResponse(BaseModel):
+    job_id: str
+    doc_id: str
+    filename: str
+    status: str = "queued"
+
+
+class IngestJobStatus(BaseModel):
+    job_id: str
+    doc_id: str
+    filename: str = ""
+    status: str  # queued | running | done | error
+    phase: str = "queued"
+    pct: float = 0.0
+    message: str = ""
+    events: List[dict] = []
+    result: Optional[IngestResponse] = None
+    error: Optional[str] = None
+    created_at: float = 0.0
+    updated_at: float = 0.0
+
+
+def _job_update(job_id: str, **kwargs) -> None:
+    with _ingest_jobs_lock:
+        job = _ingest_jobs.get(job_id)
+        if not job:
+            return
+        job.update(kwargs)
+        job["updated_at"] = time.time()
+        if "phase" in kwargs or "message" in kwargs:
+            job.setdefault("events", []).append(
+                {
+                    "t": time.time(),
+                    "phase": job.get("phase"),
+                    "pct": job.get("pct"),
+                    "message": job.get("message"),
+                }
+            )
+            # 限制事件长度
+            if len(job["events"]) > 80:
+                job["events"] = job["events"][-80:]
+
+
+def _run_ingest_job(job_id: str, pdf_path: Path, doc_id: str) -> None:
+    """后台线程：解析 → 分块 → 编码 → 写库，并推进 job 进度。"""
+    _job_update(job_id, status="running", phase="start", pct=1, message="启动入库…")
+    retriever = get_retriever()
+
+    def progress(phase: str, pct: float, message: str) -> None:
+        _job_update(job_id, phase=phase, pct=pct, message=message, status="running")
+
+    try:
+        ingestor = PDFIngestor(
+            retriever.pg, retriever.faiss, retriever.bge,
+            retriever.colpali, retriever.chunker, bm25=retriever.bm25,
+        )
+        ingestor.set_progress_fn(progress)
+        result = ingestor.ingest(pdf_path, doc_id=doc_id)
+        if not retriever.bm25.ready:
+            progress("bm25", 96, "BM25 全量 fit…")
+            retriever.bm25.fit_from_pgvector(retriever.pg)
+        if cfg.get("retrieval.use_visual", True):
+            progress("faiss", 98, "保存 FAISS…")
+            retriever.faiss.save()
+        try:
+            retriever.invalidate_cache()
+        except Exception as e:
+            logger.warning("post-ingest cache invalidate failed: %s", e)
+        payload = IngestResponse(
+            doc_id=result["doc_id"],
+            num_pages=int(result.get("num_pages") or 0),
+            num_chunks=int(result.get("num_chunks") or 0),
+        )
+        _job_update(
+            job_id,
+            status="done",
+            phase="done",
+            pct=100,
+            message=f"完成 · status={result.get('status', 'ok')}",
+            result=payload.model_dump(),
+        )
+    except Exception as e:
+        logger.exception("ingest job %s failed: %s", job_id, e)
+        try:
+            retriever.pg.delete_by_doc_id(doc_id)
+        except Exception:
+            pass
+        pdf_path.unlink(missing_ok=True)
+        if cfg.get("ingestion.parser") == "mineru":
+            try:
+                shutil.rmtree(Path("data/mineru_output") / doc_id, ignore_errors=True)
+            except Exception:
+                pass
+        _job_update(
+            job_id,
+            status="error",
+            phase="error",
+            pct=100,
+            message=str(e),
+            error=str(e),
+        )
+
+
+def _finalize_sync_ingest(retriever, result: dict) -> IngestResponse:
+    if not retriever.bm25.ready:
+        retriever.bm25.fit_from_pgvector(retriever.pg)
+    if cfg.get("retrieval.use_visual", True):
+        retriever.faiss.save()
+    try:
+        retriever.invalidate_cache()
+    except Exception as e:
+        logger.warning("post-ingest cache invalidate failed: %s", e)
+    return IngestResponse(
+        doc_id=result["doc_id"],
+        num_pages=int(result.get("num_pages") or 0),
+        num_chunks=int(result.get("num_chunks") or 0),
+    )
+
+
+@app.get("/documents", response_model=DocumentsResponse)
+async def list_documents():
+    """当前知识库文档列表 + 全库统计（demo 文档页）。"""
+    retriever = get_retriever()
+    try:
+        docs = retriever.pg.list_documents()
+        stats = retriever.pg.corpus_stats()
+    except Exception as e:
+        logger.exception("list_documents failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"list documents failed: {e}")
+    stats_out = CorpusStats(
+        **stats,
+        index_pages=getattr(retriever.faiss, "num_pages", 0) or 0,
+        index_size_mb=round(float(getattr(retriever.faiss, "index_size_mb", 0) or 0), 2),
+        use_visual=bool(cfg.get("retrieval.use_visual", True)),
+        bm25_ready=bool(getattr(retriever.bm25, "ready", False)),
+    )
+    return DocumentsResponse(
+        stats=stats_out,
+        documents=[DocumentInfo(**d) for d in docs],
+    )
 
 
 @app.post("/ingest", response_model=IngestResponse)
@@ -297,14 +517,80 @@ async def ingest(file: UploadFile = File(...)):
                 shutil.rmtree(Path("data/mineru_output") / doc_id, ignore_errors=True)
             except Exception:
                 pass
-        logger.error(f"ingest failed: {e}")
-        raise HTTPException(status_code=500, detail="Ingestion failed")
-    # P2-A：BM25 已通过 ingestor 增量维护；仅当为空（首篇/重启未加载）才全量 refit
-    if not retriever.bm25.ready:
-        retriever.bm25.fit_from_pgvector(retriever.pg)
-    if cfg.get("retrieval.use_visual", True):
-        retriever.faiss.save()
-    return IngestResponse(**result)
+        logger.exception("ingest failed: %s", e)
+        # 本地 demo 需要可读错误（PG 未起 / 模型未下 / 解析失败），勿只回笼统文案
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
+    return _finalize_sync_ingest(retriever, result)
+
+
+@app.post("/ingest/jobs", response_model=IngestJobCreateResponse)
+async def create_ingest_job(file: UploadFile = File(...)):
+    """异步入库：立刻返回 job_id，前端轮询 GET /ingest/jobs/{id} 看进度。
+
+    编码在独立 daemon 线程执行，避免阻塞 uvicorn 事件循环，便于实时轮询。
+    """
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=422, detail="仅支持 PDF 文件")
+    job_id = uuid.uuid4().hex[:16]
+    doc_id = uuid.uuid4().hex[:12]
+    filename = file.filename or f"{doc_id}.pdf"
+    pdf_path = UPLOAD_DIR / f"{doc_id}.pdf"
+    pdf_path.write_bytes(await file.read())
+    now = time.time()
+    with _ingest_jobs_lock:
+        # 清理过期 job
+        dead = [k for k, v in _ingest_jobs.items() if now - v.get("created_at", now) > _INGEST_JOB_TTL_SEC]
+        for k in dead:
+            _ingest_jobs.pop(k, None)
+        _ingest_jobs[job_id] = {
+            "job_id": job_id,
+            "doc_id": doc_id,
+            "filename": filename,
+            "status": "queued",
+            "phase": "queued",
+            "pct": 0.0,
+            "message": "已接收文件，排队中…",
+            "events": [{"t": now, "phase": "queued", "pct": 0, "message": "queued"}],
+            "result": None,
+            "error": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+    t = threading.Thread(
+        target=_run_ingest_job,
+        args=(job_id, pdf_path, doc_id),
+        name=f"ingest-{job_id}",
+        daemon=True,
+    )
+    t.start()
+    return IngestJobCreateResponse(
+        job_id=job_id, doc_id=doc_id, filename=filename, status="queued",
+    )
+
+
+@app.get("/ingest/jobs/{job_id}", response_model=IngestJobStatus)
+async def get_ingest_job(job_id: str):
+    with _ingest_jobs_lock:
+        job = _ingest_jobs.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="job not found")
+        # 浅拷贝，避免持锁序列化
+        data = dict(job)
+    result = data.get("result")
+    return IngestJobStatus(
+        job_id=data["job_id"],
+        doc_id=data["doc_id"],
+        filename=data.get("filename") or "",
+        status=data["status"],
+        phase=data.get("phase") or "",
+        pct=float(data.get("pct") or 0),
+        message=data.get("message") or "",
+        events=list(data.get("events") or []),
+        result=IngestResponse(**result) if result else None,
+        error=data.get("error"),
+        created_at=float(data.get("created_at") or 0),
+        updated_at=float(data.get("updated_at") or 0),
+    )
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -342,34 +628,47 @@ async def ask(request: AskRequest):
             retrieval_trace=trace,
             self_rag=SelfRAGInfo(**sr_info) if sr_info else None,
             crag=CRAGInfo(**crag_info) if crag_info else None,
+            context=cached_answer.get("context") or "",
         )
 
+    # doc_id 过滤在检索后做：若只取 top-k，新上传小文档容易被大库挤掉。
+    # 有 doc_id 时先多取再过滤，保证「上传后立刻问本篇」可用。
+    search_k = request.k
+    if request.doc_id:
+        search_k = max(request.k * 10, 50)
     try:
         search_result = retriever.search_with_trace(
-            request.query, k=request.k,
+            request.query, k=search_k,
             use_visual=use_visual, use_rerank=request.use_rerank,
         )
     except Exception as e:
         logger.error(f"search error: {e}")
-        raise HTTPException(status_code=500, detail="Internal search error")
+        raise HTTPException(status_code=500, detail=f"Internal search error: {e}")
     results = search_result["results"]
     retrieval_trace = search_result["retrieval_trace"]
     if request.doc_id:
-        results = [r for r in results if r.get("doc_id") == request.doc_id]
+        results = [r for r in results if r.get("doc_id") == request.doc_id][: request.k]
+        # RouteTraceItem 无 doc_id 字段，仅截断 top5 展示
+        retrieval_trace = {
+            "bm25_top5": retrieval_trace.get("bm25_top5", [])[:5],
+            "dense_top5": retrieval_trace.get("dense_top5", [])[:5],
+            "visual_top5": retrieval_trace.get("visual_top5", [])[:5],
+        }
 
     # ── CRAG：检索后 grade / 可选改写再检索（默认关）──
     crag_public: dict = {"enabled": False, "applied": False}
     cr_cfg = crag_config()
     if cr_cfg.get("enabled") and results:
         def _research(q: str):
+            rk = max(request.k * 10, 50) if request.doc_id else request.k
             second = retriever.search(
                 q,
-                k=request.k,
+                k=rk,
                 use_visual=use_visual,
                 use_rerank=request.use_rerank,
             )
             if request.doc_id:
-                second = [r for r in second if r.get("doc_id") == request.doc_id]
+                second = [r for r in second if r.get("doc_id") == request.doc_id][: request.k]
             return second
 
         crag = CorrectiveRAG(
@@ -409,9 +708,10 @@ async def ask(request: AskRequest):
     if not results:
         return AskResponse(
             query=request.query,
-            answer="I don't have enough information to answer that question.",
+            answer=abstain_message(),
             citations=[], retrieval_trace=trace,
             crag=CRAGInfo(**crag_public),
+            context="",
         )
     try:
         sr_cfg = self_rag_config()
@@ -443,6 +743,8 @@ async def ask(request: AskRequest):
     }
     sr_public.setdefault("enabled", bool(sr_payload.get("enabled", False)))
 
+    context_out = gen_out.get("context") or ""
+
     # 写入 L4 Answer 缓存（受全局开关 + 确定性守卫；命中率经 cache_label 聚合）
     if cfg.cache.enabled and gen.cacheable and answer_key is not None and retriever._answer_cache is not None:
         retriever._answer_cache.put(answer_key, {
@@ -451,6 +753,7 @@ async def ask(request: AskRequest):
             "retrieval_trace": retrieval_trace,
             "self_rag": sr_public,
             "crag": crag_public,
+            "context": context_out,
         })
         collector.record_cache_event("answer", hit=False, config_label=cache_label)
 
@@ -460,4 +763,28 @@ async def ask(request: AskRequest):
         retrieval_trace=trace,
         self_rag=SelfRAGInfo(**sr_public),
         crag=CRAGInfo(**crag_public),
+        context=context_out,
     )
+
+
+def _demo_static_dir() -> Path:
+    """static/demo：优先仓库根（与 scripts/run_api.py cwd 一致），否则相对本文件回溯。"""
+    candidates = [
+        Path.cwd() / "static" / "demo",
+        Path(__file__).resolve().parents[2] / "static" / "demo",
+    ]
+    for p in candidates:
+        if p.is_dir():
+            return p
+    return candidates[0]
+
+
+_DEMO_DIR = _demo_static_dir()
+if _DEMO_DIR.is_dir():
+    app.mount(
+        "/demo",
+        StaticFiles(directory=str(_DEMO_DIR), html=True),
+        name="demo",
+    )
+else:
+    logger.warning("Demo static dir missing: %s", _DEMO_DIR)
