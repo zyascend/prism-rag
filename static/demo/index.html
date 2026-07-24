@@ -44,15 +44,14 @@
         <span id="loading" class="spinner" hidden>Working…</span>
       </div>
       <div class="answer-box" id="answer"><span class="muted">答案将显示在这里</span></div>
-      <div class="section-label">Step 5 · 入模 Context（喂给 LLM 的最终文本）</div>
-      <details class="context-panel" id="context-panel" open>
+      <div class="section-label">Citations（生成侧引用回链）</div>
+      <div id="citations"></div>
+      <details class="context-panel" id="context-panel">
         <summary>
-          <span id="context-summary" class="muted">Ask 后展示压缩/表保护后的 context</span>
+          <span id="context-summary" class="muted">完整入模 Context（折叠；页级预览请 hover 右侧三路）</span>
         </summary>
         <pre id="context-body" class="context-body">（尚无）</pre>
       </details>
-      <div class="section-label">Citations（生成侧引用回链）</div>
-      <div id="citations"></div>
     </section>
 
     <section class="panel panel-right" id="right">
@@ -95,7 +94,10 @@
       </ol>
 
       <!-- Three-route retrieve -->
-      <div class="section-label">Step 2 · 三路召回对照 <span class="muted">（各路独立 top，尚未融合）</span></div>
+      <div class="section-label">
+        Step 2 · 三路召回对照
+        <span class="muted">（hover 命中项 → 下方展示 page/chunk 文本）</span>
+      </div>
       <div class="routes" id="routes">
         <div class="route-col" data-route="bm25">
           <div class="route-head">
@@ -118,9 +120,16 @@
             <h3>Visual</h3>
             <span class="route-badge">页图 · page</span>
           </div>
-          <p class="route-desc">Col* MaxSim；local-dev 常关</p>
+          <p class="route-desc">ColQwen2 MaxSim（页级 grounding 到 chunk）</p>
           <ul id="trace-visual"></ul>
         </div>
+      </div>
+      <div class="hit-detail" id="hit-detail" aria-live="polite">
+        <div class="hit-detail-head">
+          <strong id="hit-detail-title">Page / chunk 详情</strong>
+          <span id="hit-detail-meta" class="muted">hover 上方任意命中项</span>
+        </div>
+        <pre id="hit-detail-body" class="hit-detail-body">将鼠标移到 BM25 / Dense / Visual 列表中的某一条，这里显示该页（chunk）文本预览。</pre>
       </div>
 
       <!-- Overlap / fusion narrative -->

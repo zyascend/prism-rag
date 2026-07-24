@@ -31,6 +31,24 @@ from src.cache.store import InMemoryLRUCache
 
 logger = logging.getLogger(__name__)
 
+# 单条 route hit 写入 trace 的文本预览长度（demo hover 用）
+_TRACE_TEXT_MAX = 900
+
+
+def _route_trace_item(r: dict, max_chars: int = _TRACE_TEXT_MAX) -> dict:
+    """构造 retrieval_trace 单条：保留 score/id，并附文本预览供 UI hover。"""
+    text = r.get("text") or r.get("snippet") or ""
+    if text and len(text) > max_chars:
+        text = text[:max_chars] + "…"
+    return {
+        "chunk_id": r.get("chunk_id", ""),
+        "page_id": r.get("page_id"),
+        "score": r.get("score", 0.0),
+        "doc_id": r.get("doc_id"),
+        "chunk_type": r.get("chunk_type"),
+        "text": text or None,
+    }
+
 
 class PrismRAGRetriever:
     """PrismRAG 统一检索器（vidore-benchmark 适配用）"""
@@ -388,30 +406,22 @@ class PrismRAGRetriever:
                 bm25_results = self.bm25.search(query, k=20)
                 routes.append(bm25_results)
                 trace["bm25_top5"] = [
-                    {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
-                    for r in bm25_results[:5]
+                    _route_trace_item(r) for r in bm25_results[:5]
                 ]
             except RuntimeError:
                 logger.warning("BM25 未就绪，跳过")
 
         # ── Dense route（原始 query + 可选 HyDE answer）─────
         if use_dense:
-            dense_queries = [query]
+            dense_primary = self.dense.search(query, k=20)
+            routes.append(dense_primary)
+            # Trace: 仅记录原始 query 的 top-5（含文本预览）
+            trace["dense_top5"] = [_route_trace_item(r) for r in dense_primary[:5]]
             if hyde_answer:
-                dense_queries.append(hyde_answer)
-
-            all_dense = []
-            for q in dense_queries:
-                results = self.dense.search(q, k=20)
-                routes.append(results)
-                all_dense.extend(results)
-
-            # Trace: 仅记录原始 query 的 top-5
-            if all_dense:
-                trace["dense_top5"] = [
-                    {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
-                    for r in all_dense[:5]
-                ]
+                try:
+                    routes.append(self.dense.search(hyde_answer, k=20))
+                except Exception as e:
+                    logger.debug("HyDE dense 跳过: %s", e)
 
         # ── Visual route（原始 query + 可选 HyDE answer；可被 router 跳过）────
         if effective_visual:
@@ -433,8 +443,7 @@ class PrismRAGRetriever:
                         logger.debug(f"HyDE visual 跳过（ColPali 可能未加载）: {e}")
 
                 trace["visual_top5"] = [
-                    {"chunk_id": r["chunk_id"], "page_id": r["page_id"], "score": r["score"]}
-                    for r in vis_results[:5]
+                    _route_trace_item(r) for r in vis_results[:5]
                 ]
             except Exception as e:
                 logger.warning(f"Visual 检索跳过: {e}")

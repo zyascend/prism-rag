@@ -123,7 +123,36 @@
     });
   }
 
-  function renderRouteList(el, items, emptyHint) {
+  function showHitDetail(routeName, it, rank) {
+    const title = $("hit-detail-title");
+    const meta = $("hit-detail-meta");
+    const body = $("hit-detail-body");
+    if (!title || !meta || !body) return;
+    const page = it.page_id != null ? it.page_id : "?";
+    const score =
+      typeof it.score === "number"
+        ? Number.isInteger(it.score)
+          ? String(it.score)
+          : it.score.toFixed(4)
+        : it.score;
+    title.textContent = `${routeName} · #${rank} · p.${page}`;
+    meta.textContent =
+      `${it.chunk_type || "chunk"} · score=${score}` +
+      (it.doc_id ? ` · doc=${it.doc_id}` : "") +
+      (it.chunk_id ? ` · ${it.chunk_id}` : "");
+    const text = (it.text || "").trim();
+    body.textContent = text
+      ? text
+      : "（无文本预览：可能是 visual 仅页 id、旧缓存、或 chunk 无 text 字段）";
+  }
+
+  function clearHitActive() {
+    document.querySelectorAll(".route-col li.hit-item.active").forEach((el) => {
+      el.classList.remove("active");
+    });
+  }
+
+  function renderRouteList(el, items, emptyHint, routeName) {
     el.innerHTML = "";
     if (!items || !items.length) {
       el.innerHTML = `<li class="empty-route">${escapeHtml(emptyHint || "本路无命中")}</li>`;
@@ -132,6 +161,7 @@
     scoreNorm(items).forEach((row, idx) => {
       const it = row.it;
       const li = document.createElement("li");
+      li.className = "hit-item";
       const page = it.page_id != null ? it.page_id : "?";
       const scoreStr =
         typeof row.score === "number" && !Number.isInteger(row.score)
@@ -143,6 +173,15 @@
         `<span class="score-num">${escapeHtml(scoreStr)}</span>` +
         `<span class="hit-id" title="${escapeHtml(it.chunk_id || "")}">${escapeHtml(it.chunk_id || "—")}</span>` +
         `<div class="score-bar"><i style="width:${row.pct}%"></i></div>`;
+      const show = () => {
+        clearHitActive();
+        li.classList.add("active");
+        showHitDetail(routeName, it, idx + 1);
+      };
+      li.addEventListener("mouseenter", show);
+      li.addEventListener("focus", show);
+      li.addEventListener("click", show);
+      li.tabIndex = 0;
       el.appendChild(li);
     });
   }
@@ -344,25 +383,21 @@
   }
 
   function renderContext(resp) {
+    // 完整入模 context 仍放左侧折叠；页级详情主交互在右侧三路 hover
     const body = $("context-body");
     const summary = $("context-summary");
-    const panel = $("context-panel");
     if (!body || !summary) return;
     const ctx = (resp && resp.context) || "";
     if (!ctx) {
       body.textContent = "（空 context：拒答 / 无检索结果 / 或旧缓存未存 context）";
-      summary.textContent = "context 为空 · 0 chars";
+      summary.textContent = "完整入模 Context · 空 · 页级请 hover 右侧三路";
       return;
     }
     body.textContent = ctx;
     const nChars = ctx.length;
-    const nLines = ctx.split("\n").length;
-    // 粗估：按空行分段看证据块数
     const blocks = ctx.split(/\n\s*\n/).filter((s) => s.trim()).length;
     summary.textContent =
-      `入模 context · ${nChars} chars · ~${nLines} lines · ~${blocks} blocks` +
-      ` · 此即 prompt 里 {{context}} 的最终内容（经 BGE 句级压缩 / 表完整保留）`;
-    if (panel) panel.open = true;
+      `完整入模 Context · ${nChars} chars · ~${blocks} blocks（折叠；页级预览 hover 右侧）`;
   }
 
   function renderResponse(resp, traceId) {
@@ -375,18 +410,38 @@
     renderRouteList(
       $("trace-bm25"),
       rt.bm25_top5,
-      "无 BM25 命中（库空或 query 无词面重叠）"
+      "无 BM25 命中（库空或 query 无词面重叠）",
+      "BM25"
     );
     renderRouteList(
       $("trace-dense"),
       rt.dense_top5,
-      "无 Dense 命中（BGE/pgvector 未返回）"
+      "无 Dense 命中（BGE/pgvector 未返回）",
+      "Dense"
     );
     renderRouteList(
       $("trace-visual"),
       rt.visual_top5,
-      "Visual 空：local-dev 常 use_visual=false，或 FAISS 无页图"
+      "Visual 空：未开 visual / FAISS 无页 / 本 query 无视觉命中",
+      "Visual"
     );
+    // 默认展示第一路第一条，方便不用 hover 也能看到文本
+    const first =
+      (rt.bm25_top5 && rt.bm25_top5[0]) ||
+      (rt.dense_top5 && rt.dense_top5[0]) ||
+      (rt.visual_top5 && rt.visual_top5[0]);
+    if (first) {
+      const routeName = rt.bm25_top5 && rt.bm25_top5[0] ? "BM25" : rt.dense_top5 && rt.dense_top5[0] ? "Dense" : "Visual";
+      showHitDetail(routeName, first, 1);
+      const listId =
+        routeName === "BM25" ? "trace-bm25" : routeName === "Dense" ? "trace-dense" : "trace-visual";
+      const firstLi = $(listId) && $(listId).querySelector("li.hit-item");
+      if (firstLi) firstLi.classList.add("active");
+    } else if ($("hit-detail-body")) {
+      $("hit-detail-title").textContent = "Page / chunk 详情";
+      $("hit-detail-meta").textContent = "无召回命中";
+      $("hit-detail-body").textContent = "本次三路均为空。";
+    }
     renderFuse(rt, (resp && resp.citations) || []);
     renderPipeline(resp);
     renderGates(resp);

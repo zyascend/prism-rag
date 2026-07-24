@@ -44,46 +44,58 @@
           {
             "chunk_id": "demo-doc:p12:c0",
             "page_id": 12,
-            "score": 12.4
+            "score": 12.4,
+            "text": "Main control panel rated supply: 480 VAC, 3-phase, 60 Hz. Do not connect to 208 VAC service without the step-up transformer kit.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "demo-doc:p12:c1",
             "page_id": 12,
-            "score": 8.1
+            "score": 8.1,
+            "text": "Main control panel rated supply: 480 VAC, 3-phase, 60 Hz. Do not connect to 208 VAC service without the step-up transformer kit.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "demo-doc:p3:c0",
             "page_id": 3,
-            "score": 5.2
+            "score": 5.2,
+            "text": "(fixture) page 3 · demo-doc:p3:c0"
           }
         ],
         "dense_top5": [
           {
             "chunk_id": "demo-doc:p12:c0",
             "page_id": 12,
-            "score": 0.87
+            "score": 0.87,
+            "text": "Main control panel rated supply: 480 VAC, 3-phase, 60 Hz. Do not connect to 208 VAC service without the step-up transformer kit.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "demo-doc:p14:c2",
             "page_id": 14,
-            "score": 0.71
+            "score": 0.71,
+            "text": "(fixture) page 14 · demo-doc:p14:c2"
           },
           {
             "chunk_id": "demo-doc:p3:c0",
             "page_id": 3,
-            "score": 0.64
+            "score": 0.64,
+            "text": "(fixture) page 3 · demo-doc:p3:c0"
           }
         ],
         "visual_top5": [
           {
             "chunk_id": "page:12",
             "page_id": 12,
-            "score": 0.66
+            "score": 0.66,
+            "text": "Main control panel rated supply: 480 VAC, 3-phase, 60 Hz. Do not connect to 208 VAC service without the step-up transformer kit.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "page:14",
             "page_id": 14,
-            "score": 0.51
+            "score": 0.51,
+            "text": "(fixture) page 14 · page:14"
           }
         ]
       },
@@ -121,31 +133,41 @@
           {
             "chunk_id": "demo-doc:p40:c1",
             "page_id": 40,
-            "score": 14.0
+            "score": 14.0,
+            "text": "Pre-operation checklist — pressurized transfer: high-level shutoff pretest; bonding; strainer position; wet/dry indicators GREEN.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "demo-doc:p41:c0",
             "page_id": 41,
-            "score": 11.2
+            "score": 11.2,
+            "text": "Do not initiate fuel flow until all trucks on that aircraft side are bonded and the panel pretest completes without fault codes.",
+            "doc_id": "demo-doc"
           }
         ],
         "dense_top5": [
           {
             "chunk_id": "demo-doc:p40:c1",
             "page_id": 40,
-            "score": 0.84
+            "score": 0.84,
+            "text": "Pre-operation checklist — pressurized transfer: high-level shutoff pretest; bonding; strainer position; wet/dry indicators GREEN.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "demo-doc:p41:c0",
             "page_id": 41,
-            "score": 0.79
+            "score": 0.79,
+            "text": "Do not initiate fuel flow until all trucks on that aircraft side are bonded and the panel pretest completes without fault codes.",
+            "doc_id": "demo-doc"
           }
         ],
         "visual_top5": [
           {
             "chunk_id": "page:40",
             "page_id": 40,
-            "score": 0.58
+            "score": 0.58,
+            "text": "Pre-operation checklist — pressurized transfer: high-level shutoff pretest; bonding; strainer position; wet/dry indicators GREEN.",
+            "doc_id": "demo-doc"
           }
         ]
       },
@@ -183,41 +205,54 @@
           {
             "chunk_id": "demo-doc:p88:c0",
             "page_id": 88,
-            "score": 15.1
+            "score": 15.1,
+            "text": "Manual rinse: maximum water pressure 175 PSI (1206 kPa). Do not use fire-main pressure without a reducing valve.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "demo-doc:p89:c1",
             "page_id": 89,
-            "score": 13.0
+            "score": 13.0,
+            "text": "Table 7-2 Wash limits — rinse wand 175 PSI max; foam lance 100 PSI max.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "demo-doc:p90:c0",
             "page_id": 90,
-            "score": 6.4
+            "score": 6.4,
+            "text": "(fixture) page 90 · demo-doc:p90:c0"
           }
         ],
         "dense_top5": [
           {
             "chunk_id": "demo-doc:p89:c1",
             "page_id": 89,
-            "score": 0.91
+            "score": 0.91,
+            "text": "Table 7-2 Wash limits — rinse wand 175 PSI max; foam lance 100 PSI max.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "demo-doc:p88:c0",
             "page_id": 88,
-            "score": 0.89
+            "score": 0.89,
+            "text": "Manual rinse: maximum water pressure 175 PSI (1206 kPa). Do not use fire-main pressure without a reducing valve.",
+            "doc_id": "demo-doc"
           }
         ],
         "visual_top5": [
           {
             "chunk_id": "page:89",
             "page_id": 89,
-            "score": 0.72
+            "score": 0.72,
+            "text": "Table 7-2 Wash limits — rinse wand 175 PSI max; foam lance 100 PSI max.",
+            "doc_id": "demo-doc"
           },
           {
             "chunk_id": "page:88",
             "page_id": 88,
-            "score": 0.7
+            "score": 0.7,
+            "text": "Manual rinse: maximum water pressure 175 PSI (1206 kPa). Do not use fire-main pressure without a reducing valve.",
+            "doc_id": "demo-doc"
           }
         ]
       },
@@ -240,14 +275,16 @@
           {
             "chunk_id": "demo-doc:p1:c0",
             "page_id": 1,
-            "score": 2.1
+            "score": 2.1,
+            "text": "(fixture) page 1 · demo-doc:p1:c0"
           }
         ],
         "dense_top5": [
           {
             "chunk_id": "demo-doc:p2:c0",
             "page_id": 2,
-            "score": 0.21
+            "score": 0.21,
+            "text": "(fixture) page 2 · demo-doc:p2:c0"
           }
         ],
         "visual_top5": []
@@ -279,21 +316,27 @@
           {
             "chunk_id": "demo-doc:p55:c2",
             "page_id": 55,
-            "score": 11.0
+            "score": 11.0,
+            "text": "Braid clamp fastener torque: 25 in-lb (2.8 N·m), tolerance ±2 in-lb. Recheck after thermal cycle.",
+            "doc_id": "demo-doc"
           }
         ],
         "dense_top5": [
           {
             "chunk_id": "demo-doc:p55:c2",
             "page_id": 55,
-            "score": 0.86
+            "score": 0.86,
+            "text": "Braid clamp fastener torque: 25 in-lb (2.8 N·m), tolerance ±2 in-lb. Recheck after thermal cycle.",
+            "doc_id": "demo-doc"
           }
         ],
         "visual_top5": [
           {
             "chunk_id": "page:55",
             "page_id": 55,
-            "score": 0.61
+            "score": 0.61,
+            "text": "Braid clamp fastener torque: 25 in-lb (2.8 N·m), tolerance ±2 in-lb. Recheck after thermal cycle.",
+            "doc_id": "demo-doc"
           }
         ]
       },

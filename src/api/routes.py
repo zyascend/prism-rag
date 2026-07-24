@@ -74,6 +74,10 @@ class RouteTraceItem(BaseModel):
     chunk_id: str
     page_id: int
     score: float
+    # demo hover：命中页/chunk 文本预览（可选，旧缓存可无）
+    text: Optional[str] = None
+    doc_id: Optional[str] = None
+    chunk_type: Optional[str] = None
 
 
 class RetrievalTrace(BaseModel):

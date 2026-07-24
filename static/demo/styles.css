@@ -378,6 +378,47 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
   line-height: 1.4;
   padding: 8px 4px;
 }
+.route-col li.hit-item {
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.route-col li.hit-item:hover,
+.route-col li.hit-item.active {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
+.hit-detail {
+  margin: 10px 0 4px;
+  border: 1px solid #93c5fd;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f0f9ff 0%, #f8fafc 40%);
+  padding: 10px 12px;
+  min-height: 120px;
+}
+.hit-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+.hit-detail-head strong { color: #1e3a8a; }
+.hit-detail-body {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 280px;
+  overflow: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 
 /* ── Fuse ── */
 .fuse-box {
