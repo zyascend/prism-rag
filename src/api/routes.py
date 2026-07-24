@@ -20,7 +20,7 @@ from src.config import cfg
 from src.evaluation.vidore_adapter import PrismRAGRetriever
 from src.generation.generator import Generator, GenerationError
 from src.generation.self_rag import SelfRAGOrchestrator, self_rag_config
-from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
+from src.ingestion.encoders import BGEEmbedder, create_visual_encoder
 from src.ingestion.pdf_ingestor import PDFIngestor
 from src.ingestion.text_chunker import TextChunker
 from src.retrieval.bm25_retriever import BM25Retriever
@@ -100,11 +100,19 @@ def get_retriever() -> PrismRAGRetriever:
     if _retriever is None:
         cfg.load()
         use_visual = cfg.get("retrieval.use_visual", True)
+        visual_backend = cfg.get("embedding.visual_backend", "colpali")
         pg_store = PgVectorStore()
-        faiss_store = FaissColPaliStore()
+        # colqwen2 与云上 283q 对齐；local-dev 可指向独立 demo FAISS 路径
+        if str(visual_backend).startswith("colqwen2"):
+            faiss_store = FaissColPaliStore(
+                index_path=cfg.get("storage.faiss.colqwen2_index_path"),
+                id_map_path=cfg.get("storage.faiss.colqwen2_id_map_path"),
+            )
+        else:
+            faiss_store = FaissColPaliStore()
         bge = BGEEmbedder()
-        # 本地 dev (use_visual=false) 免 ColPali 3.5B 下载：仅当启用 visual 路才构造
-        colpali = ColPaliEmbedder() if use_visual else None
+        # 仅当启用 visual 才加载 Col*（local-dev demo 数据量小可开）
+        colpali = create_visual_encoder(visual_backend) if use_visual else None
         chunker = TextChunker(
             image_caption_chunks=cfg.get("ingestion.image_caption_chunks", False),
         )
@@ -123,9 +131,20 @@ def get_retriever() -> PrismRAGRetriever:
         faiss_loaded = faiss_store.load()
         if faiss_loaded:
             bm25.fit_from_pgvector(pg_store)
-            logger.info("API: 索引加载完成")
+            logger.info(
+                "API: 索引加载完成 · visual=%s backend=%s",
+                use_visual, visual_backend if use_visual else "off",
+            )
         else:
-            logger.warning("API: FAISS 索引未找到，请先运行 ingest_vidore.py")
+            logger.warning(
+                "API: FAISS 未找到（path=%s）；upload/ingest 后会创建。"
+                "全量 ViDoRe 请用 ingest_vidore.py",
+                faiss_store.index_path,
+            )
+            try:
+                bm25.fit_from_pgvector(pg_store)
+            except Exception as e:
+                logger.warning("API: BM25 fit 跳过: %s", e)
     return _retriever
 
 

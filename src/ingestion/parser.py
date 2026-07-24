@@ -372,4 +372,14 @@ def build_parser(name: str | None = None) -> Parser:
     name = name or cfg.get("ingestion.parser", "simple")
     if name == "simple":
         return SimplePDFParser()
-    return MinerUParser()
+    if name == "mineru":
+        if shutil.which("mineru") is None:
+            # 本地 demo 可配置 mineru；CLI 未装时降级，避免 /ingest 直接 500
+            logger.warning(
+                "ingestion.parser=mineru 但 PATH 中无 mineru CLI，"
+                "降级为 SimplePDFParser。安装后重启服务即可："
+                "pip/uv 装 mineru 或见 https://github.com/opendatalab/MinerU"
+            )
+            return SimplePDFParser()
+        return MinerUParser()
+    raise ValueError(f"unknown ingestion.parser: {name!r} (expected simple|mineru)")

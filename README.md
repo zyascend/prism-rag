@@ -197,9 +197,10 @@ python scripts/run_api.py
 
 ```bash
 make db                                          # pgvector
-export CONFIG_PROFILE=local-dev                  # simple parser · 关 Visual（免 Col*）
-# 需本机已有 BGE 编码 + LLM（local-dev 指向 models.local-dev.yaml）
-python scripts/run_api.py
+export CONFIG_PROFILE=local-dev                  # MinerU + Visual(ColQwen2)；见 models.local-dev.yaml
+# which mineru  # 未装则解析降级 simple（日志 warning）
+# 需 BGE + ColQwen2（HF cache）+ LLM
+PYTHONPATH=. python scripts/run_api.py
 # 打开
 #   http://127.0.0.1:8000/demo/              问答 + 链路透视
 #   http://127.0.0.1:8000/demo/documents.html 文档库概况
