@@ -32,6 +32,8 @@ storage:
     colqwen2_id_map_path: indexes/local-demo-colqwen2-ids.npy
 
 llm:
-  base_url: https://token.sensenova.cn/v1
-  api_key: sk-9KsXrrsbMc3AVC8fH76syyHu6S1Mt3f2
-  model: deepseek-v4-flash
+  # SenseNova 配额易 429；本地 demo 默认走 Ollama（OpenAI 兼容）
+  # 需先: ollama serve && ollama list（已有 qwen2:7b 即可）
+  base_url: http://127.0.0.1:11434/v1
+  api_key: ollama
+  model: qwen2:7b
