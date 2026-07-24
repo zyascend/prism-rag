@@ -101,25 +101,229 @@
     });
   }
 
-  function renderRouteList(el, items) {
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function scoreNorm(items) {
+    if (!items || !items.length) return [];
+    const scores = items.map((it) => Number(it.score) || 0);
+    const max = Math.max.apply(null, scores.concat([0.0001]));
+    const min = Math.min.apply(null, scores);
+    const span = max - min || 1;
+    return items.map((it) => {
+      const s = Number(it.score) || 0;
+      // relative bar within this route (not cross-route comparable)
+      const pct = Math.round(((s - min) / span) * 100);
+      return { it, pct: Math.max(8, pct), score: s };
+    });
+  }
+
+  function renderRouteList(el, items, emptyHint) {
     el.innerHTML = "";
     if (!items || !items.length) {
-      el.innerHTML = "<li class='muted'>(empty)</li>";
+      el.innerHTML = `<li class="empty-route">${escapeHtml(emptyHint || "本路无命中")}</li>`;
       return;
     }
-    items.forEach((it) => {
+    scoreNorm(items).forEach((row, idx) => {
+      const it = row.it;
       const li = document.createElement("li");
-      const score = typeof it.score === "number" ? it.score.toFixed(3) : it.score;
-      li.textContent = `${it.chunk_id || "?"} · p${it.page_id} · ${score}`;
+      const page = it.page_id != null ? it.page_id : "?";
+      const scoreStr =
+        typeof row.score === "number" && !Number.isInteger(row.score)
+          ? row.score.toFixed(3)
+          : String(row.score);
+      li.innerHTML =
+        `<span class="hit-rank">${idx + 1}</span>` +
+        `<span class="hit-page">p.${escapeHtml(String(page))}</span>` +
+        `<span class="score-num">${escapeHtml(scoreStr)}</span>` +
+        `<span class="hit-id" title="${escapeHtml(it.chunk_id || "")}">${escapeHtml(it.chunk_id || "—")}</span>` +
+        `<div class="score-bar"><i style="width:${row.pct}%"></i></div>`;
       el.appendChild(li);
     });
+  }
+
+  function pageSet(items) {
+    const s = new Set();
+    (items || []).forEach((it) => {
+      if (it && it.page_id != null) s.add(String(it.page_id));
+    });
+    return s;
+  }
+
+  function renderFuse(rt, citations) {
+    const box = $("fuse-box");
+    const bm = pageSet(rt.bm25_top5);
+    const de = pageSet(rt.dense_top5);
+    const vi = pageSet(rt.visual_top5);
+    const all = new Set([].concat([...bm], [...de], [...vi]));
+    const multi = [];
+    all.forEach((p) => {
+      const routes = [];
+      if (bm.has(p)) routes.push("BM25");
+      if (de.has(p)) routes.push("Dense");
+      if (vi.has(p)) routes.push("Visual");
+      if (routes.length >= 2) multi.push({ p, routes });
+    });
+    multi.sort((a, b) => b.routes.length - a.routes.length || Number(a.p) - Number(b.p));
+
+    const citePages = new Set(
+      (citations || []).map((c) => String(c.page_number != null ? c.page_number : c.page_id))
+    );
+
+    let html = "";
+    if (!all.size) {
+      html = `<p class="muted">尚无召回页。Ask 后会对照三路 top 的 page 交叉。</p>`;
+    } else if (!multi.length) {
+      html =
+        `<p>三路 top 的 <b>page 无重叠</b>——融合更依赖 RRF 位次，精排压力更大。` +
+        ` 各路独有页：BM25 ${bm.size} · Dense ${de.size} · Visual ${vi.size}。</p>`;
+    } else {
+      html =
+        `<p><b>${multi.length}</b> 个 page 被 ≥2 路同时召回（交叉越强，通常越稳）：</p>` +
+        `<div class="fuse-tags">` +
+        multi
+          .map((m) => {
+            const used = citePages.has(m.p) ? " · 入引用" : "";
+            const cls = m.routes.length >= 3 ? "fuse-tag" : "fuse-tag weak";
+            return `<span class="${cls}"><span class="dot"></span>p.${escapeHtml(m.p)} · ${m.routes.join("+")}${used}</span>`;
+          })
+          .join("") +
+        `</div>`;
+    }
+    if (citePages.size) {
+      html +=
+        `<p style="margin:10px 0 0" class="muted">最终 citations 覆盖页：` +
+        [...citePages].map((p) => `p.${escapeHtml(p)}`).join(", ") +
+        `（精排/生成后落地，不必等于各路 top1）</p>`;
+    }
+    html +=
+      `<p style="margin:8px 0 0" class="muted">说明：API 只回各路 top5 + 最终答案；RRF/Rerank 中间列表未单独暴露，用「交叉页 + 引用页」反推融合结果。</p>`;
+    box.innerHTML = html;
+  }
+
+  function setPipeStep(name, cls, subText) {
+    const li = document.querySelector(`.pipe-step[data-step="${name}"]`);
+    if (!li) return;
+    li.classList.remove("idle", "done", "active", "warn", "skip");
+    li.classList.add(cls || "idle");
+    const map = {
+      query: "pipe-query-sub",
+      retrieve: "pipe-retrieve-sub",
+      fuse: "pipe-fuse-sub",
+      gates: "pipe-gates-sub",
+      answer: "pipe-answer-sub",
+    };
+    const el = document.getElementById(map[name]);
+    if (el && subText != null) el.textContent = subText;
+  }
+
+  function renderPipeline(resp) {
+    if (!resp) {
+      ["query", "retrieve", "fuse", "gates", "answer"].forEach((n) => setPipeStep(n, "idle"));
+      return;
+    }
+    const q = resp.query || "";
+    setPipeStep("query", "done", q.length > 42 ? q.slice(0, 40) + "…" : q || "ok");
+
+    const rt = resp.retrieval_trace || {};
+    const nB = (rt.bm25_top5 || []).length;
+    const nD = (rt.dense_top5 || []).length;
+    const nV = (rt.visual_top5 || []).length;
+    setPipeStep(
+      "retrieve",
+      nB + nD + nV > 0 ? "done" : "warn",
+      `BM25 ${nB} · Dense ${nD} · Visual ${nV}`
+    );
+
+    const cites = resp.citations || [];
+    setPipeStep(
+      "fuse",
+      "done",
+      cites.length ? `→ ${cites.length} citations` : "融合完成（无引用）"
+    );
+
+    const cr = resp.crag || { enabled: false };
+    const sr = resp.self_rag || { enabled: false };
+    let gateCls = "skip";
+    let gateSub = "均关闭（默认）";
+    if (cr.enabled || sr.enabled) {
+      gateCls = "done";
+      const bits = [];
+      if (cr.enabled) bits.push(cr.applied ? "CRAG applied" : "CRAG on");
+      if (sr.enabled) bits.push(sr.passed === false ? "Gate2 fail" : "Gate2 on");
+      gateSub = bits.join(" · ");
+      if (sr.enabled && sr.passed === false) gateCls = "warn";
+    }
+    setPipeStep("gates", gateCls, gateSub);
+
+    const ans = (resp.answer || "").trim();
+    const rejected = /enough information|cannot answer|not enough/i.test(ans);
+    setPipeStep(
+      "answer",
+      rejected ? "warn" : ans ? "done" : "warn",
+      rejected ? "拒答/信息不足" : ans ? `${ans.length} chars · ${cites.length} cite` : "空答案"
+    );
+  }
+
+  function renderGates(resp) {
+    const cr = (resp && resp.crag) || { enabled: false };
+    const sr = (resp && resp.self_rag) || { enabled: false };
+    const crCard = $("gate-crag");
+    const srCard = $("gate-selfrag");
+    const crStatus = crCard.querySelector(".gate-status");
+    const crDetail = crCard.querySelector(".gate-detail");
+    const srStatus = srCard.querySelector(".gate-status");
+    const srDetail = srCard.querySelector(".gate-detail");
+
+    crCard.className = "gate-card " + (cr.enabled ? (cr.applied ? "on" : "warn") : "off");
+    if (!cr.enabled) {
+      crStatus.className = "gate-status off";
+      crStatus.textContent = "OFF · 默认关闭";
+      crDetail.textContent = "生成前证据纠错未启用（云上实验阴性后保持关）";
+    } else {
+      crStatus.className = "gate-status " + (cr.applied ? "ok" : "off");
+      crStatus.textContent = cr.applied
+        ? `ON · applied · ${cr.final_action || "—"}`
+        : `ON · not applied · ${cr.skip_reason || cr.final_action || "—"}`;
+      crDetail.textContent =
+        `q: ${cr.query_original || "—"} → ${cr.query_used || "—"}` +
+        (cr.num_relevant != null ? ` · relevant=${cr.num_relevant}` : "") +
+        (cr.sufficient != null ? ` · sufficient=${cr.sufficient}` : "");
+    }
+
+    srCard.className = "gate-card " + (sr.enabled ? (sr.passed === false ? "warn" : "on") : "off");
+    if (!sr.enabled) {
+      srStatus.className = "gate-status off";
+      srStatus.textContent = "OFF · 默认关闭";
+      srDetail.textContent = "生成后忠实性门未启用；可配置 trigger=low_rerank";
+    } else {
+      const bad = sr.passed === false;
+      srStatus.className = "gate-status " + (bad ? "bad" : "ok");
+      srStatus.textContent =
+        `ON · passed=${sr.passed}` +
+        (sr.score != null ? ` · score=${sr.score}` : "") +
+        (sr.final_action ? ` · ${sr.final_action}` : "") +
+        (sr.attempts != null ? ` · attempts=${sr.attempts}` : "");
+      const detail = (sr.attempts_detail && sr.attempts_detail[0]) || {};
+      const uns = detail.unsupported || [];
+      srDetail.textContent = uns.length
+        ? `unsupported: ${uns.slice(0, 3).join("; ")}`
+        : detail.action
+          ? `last action=${detail.action}`
+          : "无 unsupported 明细";
+    }
   }
 
   function renderCitations(citations) {
     const root = $("citations");
     root.innerHTML = "";
     if (!citations || !citations.length) {
-      root.innerHTML = "<p class='muted'>No citations</p>";
+      root.innerHTML = "<p class='muted'>No citations — 拒答或证据未回链</p>";
       return;
     }
     citations.forEach((c, i) => {
@@ -134,42 +338,44 @@
     });
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
   function renderResponse(resp, traceId) {
     state.response = resp;
     state.traceId = traceId || (resp && resp._demo_trace_id) || null;
     $("answer").textContent = (resp && resp.answer) || "(empty answer)";
     renderCitations(resp && resp.citations);
     const rt = (resp && resp.retrieval_trace) || {};
-    renderRouteList($("trace-bm25"), rt.bm25_top5);
-    renderRouteList($("trace-dense"), rt.dense_top5);
-    renderRouteList($("trace-visual"), rt.visual_top5);
+    renderRouteList(
+      $("trace-bm25"),
+      rt.bm25_top5,
+      "无 BM25 命中（库空或 query 无词面重叠）"
+    );
+    renderRouteList(
+      $("trace-dense"),
+      rt.dense_top5,
+      "无 Dense 命中（BGE/pgvector 未返回）"
+    );
+    renderRouteList(
+      $("trace-visual"),
+      rt.visual_top5,
+      "Visual 空：local-dev 常 use_visual=false，或 FAISS 无页图"
+    );
+    renderFuse(rt, (resp && resp.citations) || []);
+    renderPipeline(resp);
+    renderGates(resp);
 
-    const sr = (resp && resp.self_rag) || { enabled: false };
-    const cr = (resp && resp.crag) || { enabled: false };
+    const modeLabel = state.mode === "live" ? "Live API" : "Demo fixture";
     $("eng-meta").innerHTML =
-      `<div>Trace-Id: <code>${escapeHtml(state.traceId || "—")}</code>` +
+      `<span><b>模式</b> ${modeLabel}</span>` +
+      `<span><b>Trace</b> <code>${escapeHtml(state.traceId || "—")}</code>` +
       (state.traceId && state.mode === "live"
-        ? ` · <a href="${apiUrl("/trace/" + state.traceId)}" target="_blank" rel="noopener">open /trace</a>`
+        ? ` <a href="${apiUrl("/trace/" + state.traceId)}" target="_blank" rel="noopener">打开</a>`
         : "") +
-      `</div>` +
-      `<div>doc_id filter: ${state.filterByDoc && state.lastDocId ? escapeHtml(state.lastDocId) : "off"}</div>` +
-      `<div>self_rag.enabled=${sr.enabled}` +
-      (sr.passed != null ? ` passed=${sr.passed}` : "") +
-      (sr.score != null ? ` score=${sr.score}` : "") +
-      (sr.final_action ? ` action=${escapeHtml(String(sr.final_action))}` : "") +
-      `</div>` +
-      `<div>crag.enabled=${cr.enabled}` +
-      (cr.applied != null ? ` applied=${cr.applied}` : "") +
-      (cr.final_action ? ` action=${escapeHtml(String(cr.final_action))}` : "") +
-      `</div>`;
+      `</span>` +
+      `<span><b>doc 过滤</b> ${
+        state.filterByDoc && state.lastDocId
+          ? `<code>${escapeHtml(state.lastDocId)}</code>`
+          : "off"
+      }</span>`;
     const dump = Object.assign({}, resp || {});
     delete dump._demo_trace_id;
     $("eng-json").textContent = JSON.stringify(dump, null, 2);

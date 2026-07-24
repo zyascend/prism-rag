@@ -27,7 +27,7 @@
 
   <main class="layout">
     <section class="panel" id="left">
-      <h2>Query &amp; Answer</h2>
+      <h2>① Query &amp; Answer</h2>
       <div class="upload-row">
         <input type="file" id="pdf-file" accept="application/pdf,.pdf" aria-label="PDF file to upload" />
         <button type="button" class="primary" id="btn-upload">Upload PDF</button>
@@ -43,28 +43,106 @@
         <span id="loading" class="spinner" hidden>Working…</span>
       </div>
       <div class="answer-box" id="answer"><span class="muted">答案将显示在这里</span></div>
+      <div class="section-label">Citations（生成侧引用回链）</div>
       <div id="citations"></div>
     </section>
 
-    <section class="panel" id="right">
-      <h2>Retrieval Trace &amp; Engineer</h2>
-      <div class="routes">
-        <div class="route-col">
-          <h3>BM25 <span class="muted">chunk</span></h3>
+    <section class="panel panel-right" id="right">
+      <h2>② 链路透视 · How it runs</h2>
+      <p class="panel-hint">
+        每次 Ask：<b>三路召回</b> → <b>RRF 融合</b> → <b>Rerank</b> →（可选 CRAG）→ <b>生成</b> →（可选 Gate2）→ 答案+引用
+      </p>
+
+      <!-- Pipeline stepper -->
+      <ol class="pipeline" id="pipeline" aria-label="RAG pipeline stages">
+        <li class="pipe-step idle" data-step="query">
+          <span class="pipe-num">1</span>
+          <span class="pipe-title">Query</span>
+          <span class="pipe-sub" id="pipe-query-sub">等待提问</span>
+        </li>
+        <li class="pipe-arrow" aria-hidden="true">→</li>
+        <li class="pipe-step idle" data-step="retrieve">
+          <span class="pipe-num">2</span>
+          <span class="pipe-title">三路召回</span>
+          <span class="pipe-sub" id="pipe-retrieve-sub">BM25 · Dense · Visual</span>
+        </li>
+        <li class="pipe-arrow" aria-hidden="true">→</li>
+        <li class="pipe-step idle" data-step="fuse">
+          <span class="pipe-num">3</span>
+          <span class="pipe-title">RRF + Rerank</span>
+          <span class="pipe-sub" id="pipe-fuse-sub">融合精排</span>
+        </li>
+        <li class="pipe-arrow" aria-hidden="true">→</li>
+        <li class="pipe-step idle" data-step="gates">
+          <span class="pipe-num">4</span>
+          <span class="pipe-title">门控</span>
+          <span class="pipe-sub" id="pipe-gates-sub">CRAG · Gate2</span>
+        </li>
+        <li class="pipe-arrow" aria-hidden="true">→</li>
+        <li class="pipe-step idle" data-step="answer">
+          <span class="pipe-num">5</span>
+          <span class="pipe-title">Answer</span>
+          <span class="pipe-sub" id="pipe-answer-sub">+ citations</span>
+        </li>
+      </ol>
+
+      <!-- Three-route retrieve -->
+      <div class="section-label">Step 2 · 三路召回对照 <span class="muted">（各路独立 top，尚未融合）</span></div>
+      <div class="routes" id="routes">
+        <div class="route-col" data-route="bm25">
+          <div class="route-head">
+            <h3>BM25</h3>
+            <span class="route-badge">词面 · chunk</span>
+          </div>
+          <p class="route-desc">倒排关键词匹配，擅长型号/编号/原文短语</p>
           <ul id="trace-bm25"></ul>
         </div>
-        <div class="route-col">
-          <h3>Dense <span class="muted">chunk</span></h3>
+        <div class="route-col" data-route="dense">
+          <div class="route-head">
+            <h3>Dense</h3>
+            <span class="route-badge">语义 · chunk</span>
+          </div>
+          <p class="route-desc">BGE 向量，擅长改写/同义表述</p>
           <ul id="trace-dense"></ul>
         </div>
-        <div class="route-col">
-          <h3>Visual <span class="muted">page</span></h3>
+        <div class="route-col" data-route="visual">
+          <div class="route-head">
+            <h3>Visual</h3>
+            <span class="route-badge">页图 · page</span>
+          </div>
+          <p class="route-desc">Col* MaxSim；local-dev 常关</p>
           <ul id="trace-visual"></ul>
         </div>
       </div>
+
+      <!-- Overlap / fusion narrative -->
+      <div class="section-label">Step 3 · 融合信号 <span class="muted">（多路是否击中同一页）</span></div>
+      <div class="fuse-box" id="fuse-box">
+        <p class="muted">Ask 后这里显示页级交叉：多路同时命中的 page 更可能进入精排前列。</p>
+      </div>
+
+      <!-- Gates -->
+      <div class="section-label">Step 4 · 可选门控 <span class="muted">（默认关，字段仍展示）</span></div>
+      <div class="gates" id="gates">
+        <div class="gate-card" id="gate-crag">
+          <div class="gate-title">CRAG <span class="gate-when">生成前 · 证据纠错</span></div>
+          <div class="gate-status muted">—</div>
+          <div class="gate-detail muted">grade → filter → 可选 reformulate 再检索</div>
+        </div>
+        <div class="gate-card" id="gate-selfrag">
+          <div class="gate-title">Self-RAG Gate2 <span class="gate-when">生成后 · 忠实性</span></div>
+          <div class="gate-status muted">—</div>
+          <div class="gate-detail muted">unsupported claim 检测；可 fail→regen</div>
+        </div>
+      </div>
+
+      <!-- Meta + raw -->
+      <div class="section-label">排障元数据</div>
+      <div class="meta-row" id="eng-meta">
+        <span class="muted">Trace / doc_id 将显示在此</span>
+      </div>
       <details class="eng" id="eng-panel">
-        <summary>Engineer panel</summary>
-        <div id="eng-meta" class="muted" style="margin:8px 0"></div>
+        <summary>Raw JSON（AskResponse）</summary>
         <pre id="eng-json">{}</pre>
       </details>
     </section>
