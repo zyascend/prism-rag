@@ -53,6 +53,9 @@ class PDFIngestor:
         pdf_path = Path(pdf_path)
         content_hash = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
 
+        # 空库/首次本地 demo：必须先建表，再查 content_hash（否则 documents 不存在 → 500）
+        self.pg.create_schema()
+
         # P1：同内容已入库 → 幂等 no-op（不再整篇重编码，避免浪费 GPU）
         existing = self.pg.get_doc_id_by_content_hash(content_hash)
         if existing is not None:
@@ -60,7 +63,6 @@ class PDFIngestor:
             return {"doc_id": existing, "num_pages": 0, "num_chunks": 0, "status": "noop_identical"}
 
         doc_id = doc_id or _rand_doc_id()
-        self.pg.create_schema()
 
         # P2-B：同 doc_id 修改版 → page diff UPDATE 路径（省 GPU）
         if doc_id and self.pg.document_exists(doc_id):
