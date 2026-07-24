@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PrismRAG Demo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>PrismRAG</strong>
+      <span>Industrial PDF RAG · Hybrid Demo</span>
+    </div>
+    <div class="top-right">
+      <div id="metrics" class="metrics"></div>
+      <div class="mode-toggle" role="group" aria-label="Mode">
+        <button type="button" id="mode-demo" class="active" data-mode="demo">Demo</button>
+        <button type="button" id="mode-live" data-mode="live">Live</button>
+      </div>
+      <input id="api-base" class="api-base" type="text" placeholder="API base (Live)" value="" title="Empty = same origin" />
+      <span id="health" class="health">health: —</span>
+    </div>
+  </header>
+  <div id="chip-detail" class="chip-detail" role="status"></div>
+  <div id="error" class="error-bar" role="alert"></div>
+
+  <main class="layout">
+    <section class="panel" id="left">
+      <h2>Query &amp; Answer</h2>
+      <div class="upload-row">
+        <input type="file" id="pdf-file" accept="application/pdf,.pdf" disabled />
+        <button type="button" class="primary" id="btn-upload" disabled>Upload PDF</button>
+        <label class="muted"><input type="checkbox" id="filter-doc" disabled /> 仅当前文档</label>
+        <span id="upload-status" class="muted"></span>
+      </div>
+      <div id="presets" class="presets"></div>
+      <div class="ask-row">
+        <input id="query" type="text" placeholder="Ask about the industrial manual…" />
+        <button type="button" class="primary" id="btn-ask">Ask</button>
+        <span id="loading" class="spinner" hidden>Working…</span>
+      </div>
+      <div class="answer-box" id="answer"><span class="muted">答案将显示在这里</span></div>
+      <div id="citations"></div>
+    </section>
+
+    <section class="panel" id="right">
+      <h2>Retrieval Trace &amp; Engineer</h2>
+      <div class="routes">
+        <div class="route-col">
+          <h3>BM25 <span class="muted">chunk</span></h3>
+          <ul id="trace-bm25"></ul>
+        </div>
+        <div class="route-col">
+          <h3>Dense <span class="muted">chunk</span></h3>
+          <ul id="trace-dense"></ul>
+        </div>
+        <div class="route-col">
+          <h3>Visual <span class="muted">page</span></h3>
+          <ul id="trace-visual"></ul>
+        </div>
+      </div>
+      <details class="eng" id="eng-panel">
+        <summary>Engineer panel</summary>
+        <div id="eng-meta" class="muted" style="margin:8px 0"></div>
+        <pre id="eng-json">{}</pre>
+      </details>
+    </section>
+  </main>
+  <p id="footnote" class="footnote"></p>
+  <script src="app.js"></script>
+</body>
+</html>
