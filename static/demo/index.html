@@ -18,7 +18,7 @@
         <button type="button" id="mode-demo" class="active" data-mode="demo">Demo</button>
         <button type="button" id="mode-live" data-mode="live">Live</button>
       </div>
-      <input id="api-base" class="api-base" type="text" placeholder="API base (Live)" value="" title="Empty = same origin" />
+      <input id="api-base" class="api-base" type="text" placeholder="API base (Live)" value="" title="Empty = same origin" aria-label="API base URL (Live)" />
       <span id="health" class="health">health: —</span>
     </div>
   </header>
@@ -29,14 +29,14 @@
     <section class="panel" id="left">
       <h2>Query &amp; Answer</h2>
       <div class="upload-row">
-        <input type="file" id="pdf-file" accept="application/pdf,.pdf" disabled />
+        <input type="file" id="pdf-file" accept="application/pdf,.pdf" disabled aria-label="PDF file to upload" />
         <button type="button" class="primary" id="btn-upload" disabled>Upload PDF</button>
         <label class="muted"><input type="checkbox" id="filter-doc" disabled /> 仅当前文档</label>
         <span id="upload-status" class="muted"></span>
       </div>
       <div id="presets" class="presets"></div>
       <div class="ask-row">
-        <input id="query" type="text" placeholder="Ask about the industrial manual…" />
+        <input id="query" type="text" placeholder="Ask about the industrial manual…" aria-label="Ask a question about the industrial manual" />
         <button type="button" class="primary" id="btn-ask">Ask</button>
         <span id="loading" class="spinner" hidden>Working…</span>
       </div>
