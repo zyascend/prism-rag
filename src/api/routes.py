@@ -31,6 +31,7 @@ from src.retrieval.reranker import Reranker
 from src.retrieval.visual_retriever import VisualRetriever
 from src.observability.middleware import ObservabilityMiddleware
 from src.observability import get_collector
+from src.rejection import abstain_message
 from src.store.faiss_store import FaissColPaliStore
 from src.store.pgvector_store import PgVectorStore
 
@@ -707,7 +708,7 @@ async def ask(request: AskRequest):
     if not results:
         return AskResponse(
             query=request.query,
-            answer="I don't have enough information to answer that question.",
+            answer=abstain_message(),
             citations=[], retrieval_trace=trace,
             crag=CRAGInfo(**crag_public),
             context="",

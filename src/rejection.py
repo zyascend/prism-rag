@@ -9,6 +9,7 @@ from typing import Optional
 
 # 全系统规范拒答句（Self-RAG / 空检索 / 文档建议对齐此句）
 ABSTAIN_ANSWER = "I don't have enough information to answer that question."
+ABSTAIN_ANSWER_ZH = "根据提供的资料，信息不足，无法回答。"
 
 # 子串匹配（answer.lower()）；覆盖硬拒答 + 常见软拒答
 REJECTION_PHRASES = (
@@ -37,7 +38,28 @@ REJECTION_PHRASES = (
     "not provided in the context",
     "not specified in the context",
     "not in the provided context",
+    # 中文 demo / 中文拒答
+    "信息不足",
+    "无法回答",
+    "没有足够信息",
+    "不足以回答",
+    "资料不足",
+    "上下文中没有",
+    "文档中没有",
+    "不知道",
 )
+
+
+def abstain_message() -> str:
+    """空检索 / 硬拒答时使用的规范句；local-dev 中文 demo 用中文句。"""
+    try:
+        from src.config import cfg
+
+        if str(cfg.get("generation.answer_language", "")).lower() in ("zh", "zh-cn", "chinese"):
+            return ABSTAIN_ANSWER_ZH
+    except Exception:
+        pass
+    return ABSTAIN_ANSWER
 
 
 def is_rejection(answer: Optional[str]) -> bool:
@@ -45,7 +67,8 @@ def is_rejection(answer: Optional[str]) -> bool:
     if not answer:
         return True
     lower = answer.lower()
-    return any(phrase in lower for phrase in REJECTION_PHRASES)
+    # 中文短语 lower 不变；英文子串走 lower
+    return any(phrase in lower or phrase in answer for phrase in REJECTION_PHRASES)
 
 
 # 兼容旧名

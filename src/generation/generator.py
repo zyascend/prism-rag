@@ -10,7 +10,7 @@ from src.config import cfg
 from src.generation.context_filter import openai_complete_fn, prepare_context
 from src.observability import get_tracer
 from src.prompts import get_active
-from src.rejection import ABSTAIN_ANSWER
+from src.rejection import abstain_message
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class Generator:
                     "num_retrieved": 0, "num_citations": 0,
                     "citations": [], "context": "",
                 })
-                return {"answer": ABSTAIN_ANSWER, "citations": [], "context": ""}
+                return {"answer": abstain_message(), "citations": [], "context": ""}
 
             if precomputed_context is not None:
                 context = precomputed_context

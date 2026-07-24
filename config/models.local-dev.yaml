@@ -37,3 +37,12 @@ llm:
   base_url: http://127.0.0.1:11434/v1
   api_key: ollama
   model: qwen2:7b
+
+# demo 生成强制简体中文（prompt v2；云上/英文评测不设此项 → 仍用 v1 英文）
+prompts:
+  active_versions:
+    answer_generation: 2
+    self_rag_regenerate: 2
+
+generation:
+  answer_language: zh
