@@ -1,0 +1,202 @@
+{
+  "presets": [
+    {
+      "id": "q_voltage",
+      "label": "Rated voltage",
+      "query": "What is the rated supply voltage for the main control panel?"
+    },
+    {
+      "id": "q_procedure",
+      "label": "Pre-check steps",
+      "query": "List the pre-operation checks before starting pressurized fuel transfer."
+    },
+    {
+      "id": "q_multi",
+      "label": "Multi-citation PSI",
+      "query": "What is the maximum water pressure allowed for manual rinsing?"
+    },
+    {
+      "id": "q_reject",
+      "label": "Out-of-corpus",
+      "query": "What is the stock price of the equipment manufacturer next quarter?"
+    },
+    {
+      "id": "q_gate2",
+      "label": "Gate2 sample",
+      "query": "What torque is specified for the braid clamp fasteners?"
+    }
+  ],
+  "responses": {
+    "What is the rated supply voltage for the main control panel?": {
+      "query": "What is the rated supply voltage for the main control panel?",
+      "answer": "The main control panel is rated for 480 VAC, three-phase supply per the equipment data plate and Section 3.1 of the service manual.",
+      "citations": [
+        {
+          "chunk_id": "demo-doc:p12:c0",
+          "page_id": 12,
+          "doc_id": "demo-doc",
+          "page_number": 12,
+          "snippet": "Main control panel rated supply: 480 VAC, 3-phase, 60 Hz. Do not connect to 208 VAC service without the step-up transformer kit."
+        }
+      ],
+      "retrieval_trace": {
+        "bm25_top5": [
+          {"chunk_id": "demo-doc:p12:c0", "page_id": 12, "score": 12.4},
+          {"chunk_id": "demo-doc:p12:c1", "page_id": 12, "score": 8.1},
+          {"chunk_id": "demo-doc:p3:c0", "page_id": 3, "score": 5.2}
+        ],
+        "dense_top5": [
+          {"chunk_id": "demo-doc:p12:c0", "page_id": 12, "score": 0.87},
+          {"chunk_id": "demo-doc:p14:c2", "page_id": 14, "score": 0.71},
+          {"chunk_id": "demo-doc:p3:c0", "page_id": 3, "score": 0.64}
+        ],
+        "visual_top5": [
+          {"chunk_id": "page:12", "page_id": 12, "score": 0.66},
+          {"chunk_id": "page:14", "page_id": 14, "score": 0.51}
+        ]
+      },
+      "self_rag": {"enabled": false},
+      "crag": {"enabled": false, "applied": false},
+      "_demo_trace_id": "fixture-voltage-001"
+    },
+    "List the pre-operation checks before starting pressurized fuel transfer.": {
+      "query": "List the pre-operation checks before starting pressurized fuel transfer.",
+      "answer": "Before pressurized transfer: (1) verify high-level shutoff pre-test PASS, (2) confirm bonding cables attached, (3) inspect nozzle strainer in REFUEL position, (4) ensure wet/dry sensor indicators are GREEN on the main panel.",
+      "citations": [
+        {
+          "chunk_id": "demo-doc:p40:c1",
+          "page_id": 40,
+          "doc_id": "demo-doc",
+          "page_number": 40,
+          "snippet": "Pre-operation checklist — pressurized transfer: high-level shutoff pretest; bonding; strainer position; wet/dry indicators GREEN."
+        },
+        {
+          "chunk_id": "demo-doc:p41:c0",
+          "page_id": 41,
+          "doc_id": "demo-doc",
+          "page_number": 41,
+          "snippet": "Do not initiate fuel flow until all trucks on that aircraft side are bonded and the panel pretest completes without fault codes."
+        }
+      ],
+      "retrieval_trace": {
+        "bm25_top5": [
+          {"chunk_id": "demo-doc:p40:c1", "page_id": 40, "score": 14.0},
+          {"chunk_id": "demo-doc:p41:c0", "page_id": 41, "score": 11.2}
+        ],
+        "dense_top5": [
+          {"chunk_id": "demo-doc:p40:c1", "page_id": 40, "score": 0.84},
+          {"chunk_id": "demo-doc:p41:c0", "page_id": 41, "score": 0.79}
+        ],
+        "visual_top5": [
+          {"chunk_id": "page:40", "page_id": 40, "score": 0.58}
+        ]
+      },
+      "self_rag": {"enabled": false},
+      "crag": {"enabled": false, "applied": false},
+      "_demo_trace_id": "fixture-precheck-002"
+    },
+    "What is the maximum water pressure allowed for manual rinsing?": {
+      "query": "What is the maximum water pressure allowed for manual rinsing?",
+      "answer": "Manual rinsing must not exceed 175 PSI. Use the regulated wash wand; higher pressure may damage seals and sensor housings [1][2].",
+      "citations": [
+        {
+          "chunk_id": "demo-doc:p88:c0",
+          "page_id": 88,
+          "doc_id": "demo-doc",
+          "page_number": 88,
+          "snippet": "Manual rinse: maximum water pressure 175 PSI (1206 kPa). Do not use fire-main pressure without a reducing valve."
+        },
+        {
+          "chunk_id": "demo-doc:p89:c1",
+          "page_id": 89,
+          "doc_id": "demo-doc",
+          "page_number": 89,
+          "snippet": "Table 7-2 Wash limits — rinse wand 175 PSI max; foam lance 100 PSI max."
+        }
+      ],
+      "retrieval_trace": {
+        "bm25_top5": [
+          {"chunk_id": "demo-doc:p88:c0", "page_id": 88, "score": 15.1},
+          {"chunk_id": "demo-doc:p89:c1", "page_id": 89, "score": 13.0},
+          {"chunk_id": "demo-doc:p90:c0", "page_id": 90, "score": 6.4}
+        ],
+        "dense_top5": [
+          {"chunk_id": "demo-doc:p89:c1", "page_id": 89, "score": 0.91},
+          {"chunk_id": "demo-doc:p88:c0", "page_id": 88, "score": 0.89}
+        ],
+        "visual_top5": [
+          {"chunk_id": "page:89", "page_id": 89, "score": 0.72},
+          {"chunk_id": "page:88", "page_id": 88, "score": 0.70}
+        ]
+      },
+      "self_rag": {"enabled": false},
+      "crag": {"enabled": false, "applied": false},
+      "_demo_trace_id": "fixture-psi-003"
+    },
+    "What is the stock price of the equipment manufacturer next quarter?": {
+      "query": "What is the stock price of the equipment manufacturer next quarter?",
+      "answer": "I don't have enough information to answer that question.",
+      "citations": [],
+      "retrieval_trace": {
+        "bm25_top5": [
+          {"chunk_id": "demo-doc:p1:c0", "page_id": 1, "score": 2.1}
+        ],
+        "dense_top5": [
+          {"chunk_id": "demo-doc:p2:c0", "page_id": 2, "score": 0.21}
+        ],
+        "visual_top5": []
+      },
+      "self_rag": {"enabled": false},
+      "crag": {"enabled": false, "applied": false},
+      "_demo_trace_id": "fixture-reject-004"
+    },
+    "What torque is specified for the braid clamp fasteners?": {
+      "query": "What torque is specified for the braid clamp fasteners?",
+      "answer": "Braid clamp fasteners are torqued to 25 in-lb ± 2 in-lb per the connector assembly table.",
+      "citations": [
+        {
+          "chunk_id": "demo-doc:p55:c2",
+          "page_id": 55,
+          "doc_id": "demo-doc",
+          "page_number": 55,
+          "snippet": "Braid clamp fastener torque: 25 in-lb (2.8 N·m), tolerance ±2 in-lb. Recheck after thermal cycle."
+        }
+      ],
+      "retrieval_trace": {
+        "bm25_top5": [
+          {"chunk_id": "demo-doc:p55:c2", "page_id": 55, "score": 11.0}
+        ],
+        "dense_top5": [
+          {"chunk_id": "demo-doc:p55:c2", "page_id": 55, "score": 0.86}
+        ],
+        "visual_top5": [
+          {"chunk_id": "page:55", "page_id": 55, "score": 0.61}
+        ]
+      },
+      "self_rag": {
+        "enabled": true,
+        "passed": true,
+        "score": 0.92,
+        "attempts": 1,
+        "final_action": "accept",
+        "gate_degraded": false,
+        "attempts_detail": [
+          {
+            "attempt": 1,
+            "prompt_id": "gate2_v1",
+            "answer": "Braid clamp fasteners are torqued to 25 in-lb ± 2 in-lb per the connector assembly table.",
+            "action": "accept",
+            "passed": true,
+            "score": 0.92,
+            "unsupported": [],
+            "latency_ms": 180.0,
+            "gate_degraded": false,
+            "error": null
+          }
+        ]
+      },
+      "crag": {"enabled": false, "applied": false},
+      "_demo_trace_id": "fixture-gate2-005"
+    }
+  }
+}

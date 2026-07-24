@@ -1,0 +1,20 @@
+{
+  "chips": [
+    {
+      "label": "NDCG@10",
+      "value": "0.53",
+      "detail": "Boot-A · Full_zerank2 · 283q en · 协议 v1 · runs/20260720-bootA（Full_no_rerank 0.42 → zerank2 0.53）"
+    },
+    {
+      "label": "E2E Correct",
+      "value": "0.66",
+      "detail": "Goal-A ON 索引 · runs/20260723-on-goalA · 与拒答口径见 src/rejection.py"
+    },
+    {
+      "label": "Reject acc.",
+      "value": "0.95",
+      "detail": "E2E 拒答题准确率 · 同 Goal-A / handoff 定稿数字"
+    }
+  ],
+  "footnote": "角标为归档可辩护数字，非本页实时评测。CRAG 默认关闭，勿写质量大涨。"
+}
