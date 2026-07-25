@@ -3,6 +3,7 @@
 | 项 | 内容 |
 |----|------|
 | **分支** | `feat/p0-p1-retrieval-context` |
+| **综述全量对照（高/中/低 ROI）** | [`docs/assessments/2026-07-25-mrag-survey-optimization-analysis.md`](docs/assessments/2026-07-25-mrag-survey-optimization-analysis.md) |
 | **方案** | [`docs/superpowers/plans/2026-07-25-p0-p1-refiner-planning-impl.md`](docs/superpowers/plans/2026-07-25-p0-p1-refiner-planning-impl.md) |
 | **P0-B Refiner** | `src/generation/refiner.py` · `soft_rank` 模式；默认 **mode=bge**（现状）；表保护；L4 盐 `refiner_cache_salt` |
 | **P1-A Planning** | `src/retrieval/search_planner.py` · 默认 **enabled=false**；heuristic 选 visual |
