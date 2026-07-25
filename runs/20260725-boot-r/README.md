@@ -54,7 +54,15 @@
 | `retrieval.crossref_expand.enabled` | 灰度 / 与 soft_rank 组合再验 | 单开中等增益 |
 | CRAG / Gate2 always | **保持 false** | 与本次无关 |
 
-> 改默认前建议：本地确认 `models.yaml` + 可选 best 臂（soft_rank+planning+crossref）未做，组合效果未知。
+### 已落地（2026-07-25）
+
+| 键 | 新默认 |
+|----|--------|
+| `refiner.mode` / `context_filter.mode` | **soft_rank** |
+| `retrieval.search_planning.enabled` | **true** |
+| `retrieval.crossref_expand.enabled` | **true** |
+
+注意：三开关联开未单独跑 best 臂；线上异常时优先关 `crossref_expand`。黄金消融 `apply_search_planning=False`。
 
 ## 产物布局
 
@@ -69,6 +77,6 @@ runs/20260725-boot-r/
 
 ## 下一步
 
-1. 更新 `handoff.md` 写入本表与默认建议  
-2. （可选）改 `config/models.yaml` 默认 · PR  
+1. ✅ handoff + models.yaml 默认已更新（commit）  
+2. PR 合入 `feat/p0-p1-retrieval-context`  
 3. **关机省钱**（云 GPU 已空闲）
