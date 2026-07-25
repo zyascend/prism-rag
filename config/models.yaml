@@ -20,16 +20,32 @@ retrieval:
   rerank_k: 5
   context_compression_ratio: 0.4      # BGE 句级 cosine 过滤保留比（1.0 = 不压缩）
   rerank_score_reject_threshold: 0.0  # 置信度阈值（0 = 禁用，建议 0.3）
-  # Visual 按需路由（Boot-B）：默认关闭，保证 Boot-A 黄金消融与历史可比
+  # Visual 按需路由（Boot-B）：默认关闭；P1-A search_planning 上位后优先 planner
   visual_routing:
     enabled: false                    # true 时对 use_visual=True 的请求再按 mode 决策
     mode: heuristic                   # heuristic | always | never
+  # P1-A：规则 Search Planning（默认关；消融 always_full 或 enabled=false）
+  search_planning:
+    enabled: false
+    mode: heuristic                   # heuristic | always_full | text_only
+    allow_skip_retrieval: false       # 工业默认 false；true 时闲聊可 a_none
+    table_prefers_text: true
+    visual:
+      on_cues: true                   # visual cue → 开 visual 路
+      default_visual: false           # 无 cue 时是否开 visual
   # Phase B1：命中后邻居 expand（默认关；Boot-CP 再开）
   neighbor_expand:
     enabled: false
     mode: page                        # page | prev_next
     max_extra: 2                      # 每个 hit 最多扩几块
     stage: post_rerank                # post_rerank | pre_rerank
+  # P1-B：见表/见图交叉引用 expand（默认关）
+  crossref_expand:
+    enabled: false
+    stage: post_rerank
+    max_extra: 3
+    max_per_hit: 1
+    same_doc_only: true
   # Phase B2：查询意图 → table/visual chunk 轻 boost（默认关）
   modality_boost:
     enabled: false
@@ -49,9 +65,26 @@ retrieval:
     judge_model: null                 # null = 与主 LLM 相同
     chunk_text_max_chars: 600
 
-# 生成侧上下文过滤（Boot-B）；默认 bge = 现状
+# 生成侧上下文过滤（兼容别名）；与 refiner.mode 冲突时以 refiner 为准
 context_filter:
-  mode: bge                           # off | bge | llm | bge_then_llm
+  mode: bge                           # off | bge | soft_rank | llm | bge_then_llm | soft_rank_then_llm
+
+# P0-B Refiner（生成前）；默认 mode=bge 保持现状，soft_rank 需 Boot-R 阳性后再改
+refiner:
+  enabled: true
+  mode: bge                           # 空则回退 context_filter.mode
+  protect_table_chunks: true
+  emit_trace: true
+  soft_rank:
+    min_sim: 0.25
+    prune_below: null                 # null=不硬删；实验可设 0.15
+    temperature: 1.0
+    keep_ratio: 0.5                   # soft_rank 保留比；bge 仍用 context_compression_ratio
+  adaptive_ratio:
+    enabled: false
+    low_rerank_threshold: 0.35
+    ratio_high_conf: 0.4
+    ratio_low_conf: 0.7
 
 # Self-RAG Gate2（生成后忠实性门）；默认关闭，消融/线上显式打开
 generation:

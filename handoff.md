@@ -1,3 +1,20 @@
+## 0‴. P0/P1 Refiner · Planning · Crossref（feat/p0-p1-retrieval-context）
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `feat/p0-p1-retrieval-context` |
+| **方案** | [`docs/superpowers/plans/2026-07-25-p0-p1-refiner-planning-impl.md`](docs/superpowers/plans/2026-07-25-p0-p1-refiner-planning-impl.md) |
+| **P0-B Refiner** | `src/generation/refiner.py` · `soft_rank` 模式；默认 **mode=bge**（现状）；表保护；L4 盐 `refiner_cache_salt` |
+| **P1-A Planning** | `src/retrieval/search_planner.py` · 默认 **enabled=false**；heuristic 选 visual |
+| **P1-B Crossref** | `expand_crossrefs` + `PgVectorStore.find_chunks_by_ref` · 默认 **enabled=false** |
+| **配置** | `config/models.yaml` → `refiner` / `retrieval.search_planning` / `retrieval.crossref_expand` |
+| **单测** | `tests/test_refiner.py` · `test_search_planner.py` · `test_crossref_expand.py` |
+| **默认** | **全部不改变线上行为**（refiner=bge；planning/crossref 关） |
+| **下一步** | 云 **Boot-R** 多臂（R0 bge / R1 soft_rank / Pl / Cr）；阳性再改默认 |
+| **不做** | 默认 CRAG / prune 硬删 / LLM planning |
+
+---
+
 ## 0″. Demo 页（feat/demo-page）
 
 | 项 | 内容 |
@@ -10,8 +27,8 @@
 
 # Handoff — PrismRAG 当前状态
 
-> 分支: **docs/content-pipeline-phase-ab-roadmap**（文档）· CRAG 代码在 **feat/crag-failure-clinic**（未合 main）| 远程: origin  
-> 更新: **2026-07-23** — 检索主线 Phase A/B roadmap 落档；此前 CRAG ON 100q 阴性定稿
+> 分支: **feat/p0-p1-retrieval-context**（本轮）· Content Pipeline A/B 已合代码侧 | 远程: origin  
+> 更新: **2026-07-25** — P0 Refiner + P1 Planning/Crossref 实现（默认关 / bge）
 
 ---
 
