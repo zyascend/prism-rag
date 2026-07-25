@@ -1,18 +1,53 @@
-## 0‴. P0/P1 Refiner · Planning · Crossref（feat/p0-p1-retrieval-context）
+## 0‴. Boot-R 定稿 · 默认配置已更新（feat/p0-p1-retrieval-context）
 
 | 项 | 内容 |
 |----|------|
 | **分支** | `feat/p0-p1-retrieval-context` |
-| **综述全量对照（高/中/低 ROI）** | [`docs/assessments/2026-07-25-mrag-survey-optimization-analysis.md`](docs/assessments/2026-07-25-mrag-survey-optimization-analysis.md) |
-| **方案** | [`docs/superpowers/plans/2026-07-25-p0-p1-refiner-planning-impl.md`](docs/superpowers/plans/2026-07-25-p0-p1-refiner-planning-impl.md) |
-| **P0-B Refiner** | `src/generation/refiner.py` · `soft_rank` 模式；默认 **mode=bge**（现状）；表保护；L4 盐 `refiner_cache_salt` |
-| **P1-A Planning** | `src/retrieval/search_planner.py` · 默认 **enabled=false**；heuristic 选 visual |
-| **P1-B Crossref** | `expand_crossrefs` + `PgVectorStore.find_chunks_by_ref` · 默认 **enabled=false** |
-| **配置** | `config/models.yaml` → `refiner` / `retrieval.search_planning` / `retrieval.crossref_expand` |
-| **单测** | `tests/test_refiner.py` · `test_search_planner.py` · `test_crossref_expand.py` |
-| **默认** | **全部不改变线上行为**（refiner=bge；planning/crossref 关） |
-| **下一步** | 云 **Boot-R** 多臂（R0 bge / R1 soft_rank / Pl / Cr）；阳性再改默认 |
-| **不做** | 默认 CRAG / prune 硬删 / LLM planning |
+| **云跑** | SeetaCloud 4090D · 2026-07-25 · ~1h57m · skip-index · colqwen2 · qwen2:7b |
+| **产物** | [`runs/20260725-boot-r/`](runs/20260725-boot-r/)（本地已拉回 · README 已定稿） |
+| **脚本** | `scripts/cloud_boot_r.sh` |
+| **综述对照** | [`docs/assessments/2026-07-25-mrag-survey-optimization-analysis.md`](docs/assessments/2026-07-25-mrag-survey-optimization-analysis.md) |
+| **实现方案** | [`docs/superpowers/plans/2026-07-25-p0-p1-refiner-planning-impl.md`](docs/superpowers/plans/2026-07-25-p0-p1-refiner-planning-impl.md) |
+
+### Boot-R 四臂数字（vs base）
+
+| arm | Faith | E2E Correct | RejectAcc | latency | 误拒 | 判定 |
+|-----|------:|------------:|----------:|--------:|-----:|------|
+| **base** (bge) | 0.898 | 0.62 | 0.90 | 2.25s | 8 | 基线 |
+| **r1** soft_rank | 0.881 (−1.7) | **0.66 (+4)** | **0.95** | 2.31s (×1.03) | **6** | **Go** |
+| **pl** planning | 0.887 | 0.62 (0) | 0.90 | **1.99s (−12%)** | 7 | **Go** |
+| **cr** crossref | **0.904** | **0.64 (+2)** | 0.90 | 2.32s (×1.03) | 8 | 弱 Go |
+
+CtxRel：base 0.256 / r1 0.210 / pl 0.245 / cr 0.257 — **不作上线否决**。
+
+### 默认配置（`config/models.yaml` · 已改）
+
+| 键 | 新默认 | 依据 |
+|----|--------|------|
+| `refiner.mode` | **soft_rank** | Correct +4pt；`prune_below` 保持 null |
+| `context_filter.mode` | **soft_rank** | 与 refiner 对齐 |
+| `retrieval.search_planning.enabled` | **true** | latency −12%；Correct 持平 |
+| `retrieval.crossref_expand.enabled` | **true** | Correct +2pt；弱阳性可开 |
+| CRAG / Gate2 / expand B1 / boost | **仍 false** | 不变 |
+
+**消融保护：** `run_eval` / `ablation` 传 `apply_search_planning=False`，Full_zerank2 NDCG 与历史可比。
+
+### 回滚
+
+```yaml
+refiner.mode: bge
+context_filter.mode: bge
+retrieval.search_planning.enabled: false
+retrieval.crossref_expand.enabled: false
+```
+
+### 未做 / 注意
+
+| 项 | 说明 |
+|----|------|
+| best 组合臂 | soft_rank+planning+crossref **未同机三联**；默认同时开为单臂阳性叠加，若线上异常先关 crossref |
+| 默认 CRAG / prune 硬删 | **禁止** |
+| 云机关机 | 结果已拉本地 → **可关机** |
 
 ---
 
@@ -28,8 +63,8 @@
 
 # Handoff — PrismRAG 当前状态
 
-> 分支: **feat/p0-p1-retrieval-context**（本轮）· Content Pipeline A/B 已合代码侧 | 远程: origin  
-> 更新: **2026-07-25** — P0 Refiner + P1 Planning/Crossref 实现（默认关 / bge）
+> 分支: **feat/p0-p1-retrieval-context** | 远程: origin  
+> 更新: **2026-07-25** — Boot-R 定稿；默认 soft_rank + planning + crossref
 
 ---
 

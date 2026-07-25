@@ -24,9 +24,10 @@ retrieval:
   visual_routing:
     enabled: false                    # true 时对 use_visual=True 的请求再按 mode 决策
     mode: heuristic                   # heuristic | always | never
-  # P1-A：规则 Search Planning（默认关；消融 always_full 或 enabled=false）
+  # P1-A：规则 Search Planning（Boot-R pl 阳性：Correct 持平 · latency −12%）
+  # 黄金消融 run_eval 传 apply_search_planning=False，不受此项影响
   search_planning:
-    enabled: false
+    enabled: true
     mode: heuristic                   # heuristic | always_full | text_only
     allow_skip_retrieval: false       # 工业默认 false；true 时闲聊可 a_none
     table_prefers_text: true
@@ -39,9 +40,9 @@ retrieval:
     mode: page                        # page | prev_next
     max_extra: 2                      # 每个 hit 最多扩几块
     stage: post_rerank                # post_rerank | pre_rerank
-  # P1-B：见表/见图交叉引用 expand（默认关）
+  # P1-B：见表/见图交叉引用 expand（Boot-R cr 弱阳性：Correct +2pt）
   crossref_expand:
-    enabled: false
+    enabled: true
     stage: post_rerank
     max_extra: 3
     max_per_hit: 1
@@ -67,17 +68,17 @@ retrieval:
 
 # 生成侧上下文过滤（兼容别名）；与 refiner.mode 冲突时以 refiner 为准
 context_filter:
-  mode: bge                           # off | bge | soft_rank | llm | bge_then_llm | soft_rank_then_llm
+  mode: soft_rank                     # off | bge | soft_rank | llm | bge_then_llm | soft_rank_then_llm
 
-# P0-B Refiner（生成前）；默认 mode=bge 保持现状，soft_rank 需 Boot-R 阳性后再改
+# P0-B Refiner（Boot-R r1 阳性：E2E Correct +4pt · 误拒↓ · latency×1.03）
 refiner:
   enabled: true
-  mode: bge                           # 空则回退 context_filter.mode
+  mode: soft_rank                     # 空则回退 context_filter.mode；回滚设 bge
   protect_table_chunks: true
   emit_trace: true
   soft_rank:
     min_sim: 0.25
-    prune_below: null                 # null=不硬删；实验可设 0.15
+    prune_below: null                 # null=不硬删；禁止轻易开硬删（类 CRAG）
     temperature: 1.0
     keep_ratio: 0.5                   # soft_rank 保留比；bge 仍用 context_compression_ratio
   adaptive_ratio:

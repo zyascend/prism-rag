@@ -316,6 +316,7 @@ class PrismRAGRetriever:
         visual_query_embedding: Optional[torch.Tensor] = None,
         use_hyde: bool = False,
         reranker_type: str = "bge",
+        apply_search_planning: bool = True,
     ) -> List[dict]:
         """统一检索接口
 
@@ -328,6 +329,7 @@ class PrismRAGRetriever:
                                     传入时 visual route 走 search_with_embedding() 跳过编码。
             use_hyde: 是否启用 HyDE 查询改写
             reranker_type: 重排器选择 ("bge" | "zerank")
+            apply_search_planning: False 时透传 use_*（黄金消融用，保证 NDCG 可比）
 
         Returns:
             结果列表，每个 dict 含 chunk_id, page_id, score, retrieval_type 等
@@ -336,6 +338,7 @@ class PrismRAGRetriever:
             query, k, use_bm25, use_dense, use_visual, use_rerank,
             visual_query_embedding=visual_query_embedding,
             use_hyde=use_hyde, reranker_type=reranker_type,
+            apply_search_planning=apply_search_planning,
         )
         return result["results"]
 
@@ -351,6 +354,7 @@ class PrismRAGRetriever:
         use_hyde: bool = False,
         reranker_type: str = "bge",
         config_label: str = "",
+        apply_search_planning: bool = True,
     ) -> dict:
         """带 retrieval_trace 的统一检索接口
 
@@ -388,8 +392,11 @@ class PrismRAGRetriever:
             and intent.visual
         )
 
-        # ── Search Planning（P1-A；默认关，透传 use_*）──
+        # ── Search Planning（生产可开；消融传 apply_search_planning=False 保证可比）──
         plan_cfg = self._planning_cfg()
+        if not apply_search_planning:
+            # 强制透传 use_*（等同 planning disabled）
+            plan_cfg = {**plan_cfg, "enabled": False}
         plan = plan_search(
             query,
             use_bm25=use_bm25,
