@@ -7,7 +7,8 @@ from typing import List, Optional
 import openai
 
 from src.config import cfg
-from src.generation.context_filter import openai_complete_fn, prepare_context
+from src.generation.context_filter import openai_complete_fn
+from src.generation.refiner import refine_context, resolve_mode
 from src.observability import get_tracer
 from src.prompts import get_active
 from src.rejection import abstain_message
@@ -66,41 +67,26 @@ class Generator:
                 })
                 return {"answer": abstain_message(), "citations": [], "context": ""}
 
+            refiner_trace: dict = {}
             if precomputed_context is not None:
                 context = precomputed_context
             else:
-                # 表格 chunk 检索时按摘要定位，但生成时必须展开完整 Markdown 表格喂给 LLM，
-                # 因此整表跳过 compress_context（句级压缩会把表格行删掉，破坏结构）。
-                # 非表格 chunk 仍走 BGE 句级压缩，按原排序拼接上下文。
-                table_parts: dict = {}        # orig_index -> 完整表格 markdown
-                text_idx: list = []           # 非表格 chunk 的原排序下标
-                text_texts: list = []         # 非表格 chunk 的文本
-                for i, r in enumerate(top):
-                    if r.get("chunk_type") == "table":
-                        table_parts[i] = r["text"]
-                    else:
-                        text_idx.append(i)
-                        text_texts.append(r["text"])
-
-                if text_texts:
-                    mode = str(cfg.get("context_filter.mode", "bge"))
-                    complete_fn = self._complete_fn
-                    if complete_fn is None and mode in ("llm", "bge_then_llm"):
-                        complete_fn = openai_complete_fn(self.client, self.model)
-                    compressed_text = prepare_context(
-                        query,
-                        text_texts,
-                        self.bge,
-                        mode=mode,
-                        ratio=cfg.get("retrieval.context_compression_ratio", 0.4),
-                        complete_fn=complete_fn,
-                    )
-                    # 压缩结果是一个整体块，挂在非表格 chunk 的最小下标处，保持原有相对顺序
-                    table_parts[min(text_idx)] = (
-                        table_parts.get(min(text_idx), "") + "\n\n" + compressed_text
-                    ).strip()
-
-                context = "\n\n".join(table_parts[i] for i in sorted(table_parts))
+                # 表 chunk 全文保护 + 文本句级 refine（bge / soft_rank / llm）
+                mode = resolve_mode()
+                complete_fn = self._complete_fn
+                if complete_fn is None and mode in (
+                    "llm", "bge_then_llm", "soft_rank_then_llm"
+                ):
+                    complete_fn = openai_complete_fn(self.client, self.model)
+                refined = refine_context(
+                    query,
+                    top,
+                    self.bge,
+                    mode=mode,
+                    complete_fn=complete_fn,
+                )
+                context = refined.context
+                refiner_trace = refined.trace
 
             pv = get_active(prompt_id)
             prompt = [
@@ -128,8 +114,14 @@ class Generator:
                 "citations": citations,
                 "context": context,
                 "prompt_id": prompt_id,
+                "refiner": refiner_trace,
             })
-            return {"answer": answer_text, "citations": citations, "context": context}
+            return {
+                "answer": answer_text,
+                "citations": citations,
+                "context": context,
+                "refiner": refiner_trace,
+            }
 
     @property
     def cacheable(self) -> bool:

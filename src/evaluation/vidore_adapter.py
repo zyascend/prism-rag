@@ -16,11 +16,12 @@ from src.ingestion.encoders import BGEEmbedder, ColPaliEmbedder
 from src.ingestion.text_chunker import TextChunker
 from src.retrieval.bm25_retriever import BM25Retriever
 from src.retrieval.dense_retriever import DenseRetriever
-from src.retrieval.expand import expand_neighbors
+from src.retrieval.expand import expand_crossrefs, expand_neighbors
 from src.retrieval.fusion import RRFFusion
 from src.retrieval.hyde import HyDEGenerator
 from src.retrieval.query_intent import apply_modality_boost, detect_query_intent
 from src.retrieval.reranker import Reranker
+from src.retrieval.search_planner import plan_search, search_planning_config
 from src.retrieval.visual_retriever import VisualRetriever
 from src.retrieval.visual_router import VisualRouter, build_visual_router_from_config
 from src.observability import get_tracer, get_collector
@@ -152,8 +153,17 @@ class PrismRAGRetriever:
     def _boost_cfg(self) -> dict:
         return self._safe_cfg("retrieval.modality_boost")
 
+    def _crossref_cfg(self) -> dict:
+        return self._safe_cfg("retrieval.crossref_expand")
+
+    def _planning_cfg(self) -> dict:
+        try:
+            return search_planning_config(cfg.get)
+        except Exception:
+            return {"enabled": False}
+
     def _expand_cache_salt(self) -> str:
-        """neighbor_expand + modality_boost 配置盐。"""
+        """neighbor_expand + modality_boost + crossref + planning 配置盐。"""
         parts = []
         ex = self._expand_cfg()
         if not ex.get("enabled"):
@@ -171,6 +181,22 @@ class PrismRAGRetriever:
                 f"boost=on:{mb.get('table_score_bonus', 0.02)}:"
                 f"{mb.get('image_score_bonus', 0.02)}:"
                 f"{mb.get('force_visual_on_visual_intent', False)}"
+            )
+        cr = self._crossref_cfg()
+        if not cr.get("enabled"):
+            parts.append("xref=off")
+        else:
+            parts.append(
+                f"xref=on:{cr.get('max_extra', 3)}:{cr.get('stage', 'post_rerank')}"
+            )
+        pl = self._planning_cfg()
+        if not pl.get("enabled"):
+            parts.append("plan=off")
+        else:
+            vis = pl.get("visual") or {}
+            parts.append(
+                f"plan=on:{pl.get('mode', 'heuristic')}:"
+                f"dv={vis.get('default_visual', False)}"
             )
         return "|".join(parts)
 
@@ -212,27 +238,44 @@ class PrismRAGRetriever:
     def _maybe_expand(
         self, hits: list, *, stage: str, k: int, trace: dict
     ) -> list:
-        """按配置在 pre/post_rerank 阶段做邻居 expand。"""
+        """按配置在 pre/post_rerank 阶段做邻居 expand + crossref expand。"""
+        expanded = list(hits)
         ex = self._expand_cfg()
-        if not ex.get("enabled"):
-            return hits
-        if (ex.get("stage") or "post_rerank") != stage:
-            return hits
-        mode = ex.get("mode") or "page"
-        max_extra = int(ex.get("max_extra") or 2)
-        # post：可略高于 k；pre：给 rerank 更多候选
-        cap = max(k + max_extra * max(len(hits), 1), k) if stage == "post_rerank" else None
-        expanded, info = expand_neighbors(
-            hits, self.pg, mode=mode, max_extra=max_extra, cap=cap,
-        )
-        trace["neighbor_expand"] = info
-        if stage == "post_rerank" and k:
-            # 主 hits 优先，再附扩块；cap 必须 >k 否则 expand 永远被裁掉（Boot-CP 教训）
-            primary_ids = {h.get("chunk_id") for h in hits}
-            primary = [r for r in expanded if r.get("chunk_id") in primary_ids]
-            extra = [r for r in expanded if r.get("chunk_id") not in primary_ids]
-            total_cap = max(k + max_extra * min(len(primary), 5), k)
-            expanded = (primary + extra)[:total_cap]
+        if ex.get("enabled") and (ex.get("stage") or "post_rerank") == stage:
+            mode = ex.get("mode") or "page"
+            max_extra = int(ex.get("max_extra") or 2)
+            cap = max(k + max_extra * max(len(expanded), 1), k) if stage == "post_rerank" else None
+            expanded, info = expand_neighbors(
+                expanded, self.pg, mode=mode, max_extra=max_extra, cap=cap,
+            )
+            trace["neighbor_expand"] = info
+            if stage == "post_rerank" and k:
+                primary_ids = {h.get("chunk_id") for h in hits}
+                primary = [r for r in expanded if r.get("chunk_id") in primary_ids]
+                extra = [r for r in expanded if r.get("chunk_id") not in primary_ids]
+                total_cap = max(k + max_extra * min(len(primary), 5), k)
+                expanded = (primary + extra)[:total_cap]
+
+        cr = self._crossref_cfg()
+        if cr.get("enabled") and (cr.get("stage") or "post_rerank") == stage:
+            max_extra = int(cr.get("max_extra") or 3)
+            max_per_hit = int(cr.get("max_per_hit") or 1)
+            same_doc = bool(cr.get("same_doc_only", True))
+            before = list(expanded)
+            expanded, info = expand_crossrefs(
+                expanded,
+                self.pg,
+                max_extra=max_extra,
+                max_per_hit=max_per_hit,
+                same_doc_only=same_doc,
+            )
+            trace["crossref_expand"] = info
+            if stage == "post_rerank" and k:
+                primary_ids = {h.get("chunk_id") for h in before}
+                primary = [r for r in expanded if r.get("chunk_id") in primary_ids]
+                extra = [r for r in expanded if r.get("chunk_id") not in primary_ids]
+                total_cap = max(k + max_extra * min(len(primary), 5), k)
+                expanded = (primary + extra)[:total_cap]
         return expanded
 
     def answer_cache_key(
@@ -242,8 +285,9 @@ class PrismRAGRetriever:
 
         与 L3 不同，doc_id 影响最终答案（路由层在检索后做确定性后置过滤），必须纳入 key；
         index_version 保证语料变更后旧 key 自动失效（不依赖 TTL）。
-        Self-RAG 开关/阈值变化也必须入 key，避免开/关串答案。
+        Self-RAG / CRAG / Refiner 开关变化也必须入 key，避免开/关串答案。
         """
+        from src.generation.refiner import refiner_cache_salt
         from src.generation.self_rag import self_rag_cache_salt
         from src.retrieval.crag import crag_cache_salt
 
@@ -257,6 +301,7 @@ class PrismRAGRetriever:
             f"v={self.index_version}",
             self_rag_cache_salt(),
             crag_cache_salt(),
+            refiner_cache_salt(),
         ]
         return "|".join(parts)
 
@@ -271,6 +316,7 @@ class PrismRAGRetriever:
         visual_query_embedding: Optional[torch.Tensor] = None,
         use_hyde: bool = False,
         reranker_type: str = "bge",
+        apply_search_planning: bool = True,
     ) -> List[dict]:
         """统一检索接口
 
@@ -283,6 +329,7 @@ class PrismRAGRetriever:
                                     传入时 visual route 走 search_with_embedding() 跳过编码。
             use_hyde: 是否启用 HyDE 查询改写
             reranker_type: 重排器选择 ("bge" | "zerank")
+            apply_search_planning: False 时透传 use_*（黄金消融用，保证 NDCG 可比）
 
         Returns:
             结果列表，每个 dict 含 chunk_id, page_id, score, retrieval_type 等
@@ -291,6 +338,7 @@ class PrismRAGRetriever:
             query, k, use_bm25, use_dense, use_visual, use_rerank,
             visual_query_embedding=visual_query_embedding,
             use_hyde=use_hyde, reranker_type=reranker_type,
+            apply_search_planning=apply_search_planning,
         )
         return result["results"]
 
@@ -306,6 +354,7 @@ class PrismRAGRetriever:
         use_hyde: bool = False,
         reranker_type: str = "bge",
         config_label: str = "",
+        apply_search_planning: bool = True,
     ) -> dict:
         """带 retrieval_trace 的统一检索接口
 
@@ -343,10 +392,47 @@ class PrismRAGRetriever:
             and intent.visual
         )
 
-        # ── Visual 按需路由（在缓存 key 之前解析 effective_visual）──
+        # ── Search Planning（生产可开；消融传 apply_search_planning=False 保证可比）──
+        plan_cfg = self._planning_cfg()
+        if not apply_search_planning:
+            # 强制透传 use_*（等同 planning disabled）
+            plan_cfg = {**plan_cfg, "enabled": False}
+        plan = plan_search(
+            query,
+            use_bm25=use_bm25,
+            use_dense=use_dense,
+            use_visual=use_visual,
+            cfg=plan_cfg,
+            intent=intent,
+        )
+        use_bm25 = plan.use_bm25
+        use_dense = plan.use_dense
+        use_visual = plan.use_visual
+        if plan.skip_retrieval:
+            empty_trace = {
+                "bm25_top5": [],
+                "dense_top5": [],
+                "visual_top5": [],
+                "hyde": "",
+                "visual_routed": False,
+                "visual_routing_mode": None,
+                "search_plan": plan.as_dict(),
+            }
+            if owns_trace:
+                with tracer.start_span("retrieval") as _span:
+                    _span.set_metadata({"skip_retrieval": True, "search_plan": plan.as_dict()})
+                _t = tracer.finish_trace()
+                if _t:
+                    collector.ingest_trace(_t)
+            return {"results": [], "retrieval_trace": empty_trace}
+
+        # ── Visual 按需路由（planning 关时沿用 VisualRouter；planning 开则 plan 已定 visual）──
         effective_visual = use_visual
         visual_routed: bool | None = None
-        if use_visual and self.visual_router is not None:
+        if plan_cfg.get("enabled"):
+            effective_visual = use_visual
+            visual_routed = use_visual
+        elif use_visual and self.visual_router is not None:
             effective_visual = self.visual_router.should_use_visual(query)
             visual_routed = effective_visual
         if force_visual:
@@ -392,6 +478,7 @@ class PrismRAGRetriever:
             "visual_routing_mode": (
                 self.visual_router.mode if self.visual_router is not None else None
             ),
+            "search_plan": plan.as_dict(),
         }
 
         # ── HyDE: 生成假设文档 ────────────────────────────────

@@ -23,7 +23,7 @@ Schema:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import psycopg2
@@ -293,6 +293,71 @@ class PgVectorStore:
                     "prev_chunk_id": r[8] or "", "next_chunk_id": r[9] or "",
                 }
                 for r in cur.fetchall()
+            ]
+
+    def find_chunks_by_ref(
+        self,
+        doc_id: Optional[str],
+        needles: Sequence[str],
+        *,
+        limit: int = 5,
+    ) -> List[dict]:
+        """按 caption/text/table_summary 子串匹配引用目标（crossref expand）。
+
+        doc_id 非空时限制同文档；needles 为空返回 []。
+        """
+        patterns = [f"%{n}%" for n in needles if n and str(n).strip()]
+        if not patterns:
+            return []
+        with self.conn.cursor() as cur:
+            clauses = []
+            params: List[Any] = []
+            for p in patterns:
+                clauses.append(
+                    "(caption ILIKE %s OR text ILIKE %s OR COALESCE(table_summary,'') ILIKE %s)"
+                )
+                params.extend([p, p, p])
+            where = "(" + " OR ".join(clauses) + ")"
+            if doc_id:
+                sql = f"""
+                    SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text,
+                           doc_ref, table_summary, section_path, caption,
+                           prev_chunk_id, next_chunk_id
+                    FROM chunks
+                    WHERE doc_id = %s AND {where}
+                    ORDER BY page_number ASC
+                    LIMIT %s
+                """
+                params = [doc_id] + params + [int(limit)]
+            else:
+                sql = f"""
+                    SELECT chunk_id, page_id, doc_id, page_number, chunk_type, text,
+                           doc_ref, table_summary, section_path, caption,
+                           prev_chunk_id, next_chunk_id
+                    FROM chunks
+                    WHERE {where}
+                    ORDER BY page_number ASC
+                    LIMIT %s
+                """
+                params = params + [int(limit)]
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+            return [
+                {
+                    "chunk_id": r[0],
+                    "page_id": r[1],
+                    "doc_id": r[2],
+                    "page_number": r[3],
+                    "chunk_type": r[4],
+                    "text": r[5],
+                    "doc_ref": r[6] or "",
+                    "table_summary": r[7] or "",
+                    "section_path": r[8] or "",
+                    "caption": r[9] or "",
+                    "prev_chunk_id": r[10] or "",
+                    "next_chunk_id": r[11] or "",
+                }
+                for r in rows
             ]
 
     def get_pages_by_doc_id(self, doc_id: str) -> List[tuple]:

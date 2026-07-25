@@ -223,6 +223,8 @@ def run_ablation(
                 use_visual=config.use_visual, use_rerank=config.use_rerank,
                 visual_query_embedding=visual_q_emb,
                 use_hyde=config.use_hyde, reranker_type=config.reranker_type,
+                # 黄金消融不走 Search Planning，保证 Full_zerank2 与历史 NDCG 可比
+                apply_search_planning=False,
             )
             latencies.append((time.time() - start) * 1000)
 

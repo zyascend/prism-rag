@@ -1,13 +1,17 @@
 """生成侧上下文过滤：BGE 句级压缩 + 可选 LLM 句过滤。
 
-mode（config context_filter.mode）:
-  off           — 原文拼接
-  bge           — 仅 BGE compress_context（默认，兼容现状）
-  llm           — 仅 LLM 句过滤
-  bge_then_llm  — 先 BGE 再 LLM
+mode（config context_filter.mode / refiner.mode）:
+  off                — 原文拼接
+  bge                — 仅 BGE compress_context（默认，兼容现状）
+  soft_rank          — 句级 soft 赋权（见 src.generation.refiner）
+  llm                — 仅 LLM 句过滤
+  bge_then_llm       — 先 BGE 再 LLM
+  soft_rank_then_llm — 先 soft_rank 再 LLM
 
 LLM 与 CtxRel 评分使用不同 prompt（context_sentence_filter），避免自循环。
 失败时 fallback 到 BGE 或原文。
+
+完整 hits 级管线（表保护 + trace）见 ``refine_context``。
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ import re
 from typing import Callable, List, Optional, Sequence
 
 from src.config import cfg
-from src.evaluation.ragas_metrics import compress_context, split_context_to_sentences
+from src.evaluation.ragas_metrics import split_context_to_sentences
 
 logger = logging.getLogger(__name__)
 
@@ -120,51 +124,24 @@ def prepare_context(
     ratio: Optional[float] = None,
     complete_fn: Optional[CompleteFn] = None,
 ) -> str:
-    """统一上下文管线，供 Generator / RAGAS 共用。"""
-    mode = mode or str(cfg.get("context_filter.mode", "bge"))
+    """统一上下文管线，供 Generator / RAGAS 共用。
+
+    委托 ``refiner.prepare_context_via_refiner``（含 soft_rank）；
+    行为与旧 bge/llm/off 兼容。
+    """
+    from src.generation.refiner import prepare_context_via_refiner, resolve_mode
+
+    mode = mode or resolve_mode()
     ratio = (
         ratio
         if ratio is not None
         else float(cfg.get("retrieval.context_compression_ratio", 0.4))
     )
-    chunks_list = [c for c in chunks if c]
-    if not chunks_list:
-        return ""
-
-    joined = "\n\n".join(chunks_list)
-
-    def _bge(text_chunks: List[str]) -> str:
-        if bge_embedder is None or ratio >= 1.0:
-            return "\n\n".join(text_chunks)
-        return compress_context(query, text_chunks, bge_embedder, ratio=ratio)
-
-    if mode == "off":
-        return joined
-
-    if mode == "bge":
-        return _bge(chunks_list)
-
-    if mode == "llm":
-        if complete_fn is None:
-            logger.warning("context_filter.mode=llm but no complete_fn; fallback to bge/join")
-            return _bge(chunks_list)
-        return filter_sentences_llm(
-            joined,
-            query,
-            complete_fn=complete_fn,
-            fallback=lambda t, q: _bge(chunks_list),
-        )
-
-    if mode == "bge_then_llm":
-        mid = _bge(chunks_list)
-        if complete_fn is None:
-            return mid
-        return filter_sentences_llm(
-            mid,
-            query,
-            complete_fn=complete_fn,
-            fallback=lambda t, q: mid,
-        )
-
-    logger.warning("Unknown context_filter.mode=%r; using bge", mode)
-    return _bge(chunks_list)
+    return prepare_context_via_refiner(
+        query,
+        chunks,
+        bge_embedder,
+        mode=mode,
+        ratio=ratio,
+        complete_fn=complete_fn,
+    )

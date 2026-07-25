@@ -1,13 +1,94 @@
-"""Neighbor / parent–child expand（Phase B1）。
+"""Neighbor / parent–child expand（Phase B1）+ Cross-ref expand（P1-B）。
 
-对检索 top 命中按 page 或 prev/next 扩邻居块，默认关闭。
+对检索 top 命中按 page 或 prev/next 扩邻居块；可选解析「见表/见图」扩引用块。
+默认均关闭。
 """
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger(__name__)
+
+# 内置交叉引用正则：(kind, pattern) — group 最后一组为编号
+_DEFAULT_CROSSREF_PATTERNS: List[Tuple[str, re.Pattern]] = [
+    (
+        "table",
+        re.compile(
+            r"(?i)\b(?:see\s+)?(?:table|tbl\.?)\s*([A-Z]?\d+(?:[\-.]\d+)*)"
+        ),
+    ),
+    (
+        "figure",
+        re.compile(
+            r"(?i)\b(?:see\s+)?(?:figure|fig\.?)\s*([A-Z]?\d+(?:[\-.]\d+)*)"
+        ),
+    ),
+    (
+        "table",
+        re.compile(r"(见|参见|参照)\s*表\s*([\d.\-]+)"),
+    ),
+    (
+        "figure",
+        re.compile(r"(见|参见|参照)\s*图\s*([\d.\-]+)"),
+    ),
+]
+
+
+def extract_crossrefs(text: str, patterns: Optional[Sequence] = None) -> List[Tuple[str, str]]:
+    """从文本抽出 (kind, id_str) 列表，去重保序。"""
+    if not text:
+        return []
+    pats = patterns or _DEFAULT_CROSSREF_PATTERNS
+    seen = set()
+    out: List[Tuple[str, str]] = []
+    for item in pats:
+        if isinstance(item, tuple) and len(item) == 2 and hasattr(item[1], "finditer"):
+            kind, pat = item
+        else:
+            # 配置传入的字符串 pattern
+            kind, raw = ("ref", item) if isinstance(item, str) else item
+            pat = re.compile(raw) if isinstance(raw, str) else raw
+            if not isinstance(kind, str):
+                kind = "ref"
+        for m in pat.finditer(text):
+            # 取最后一个捕获组作为编号
+            if not m.groups():
+                continue
+            id_str = (m.group(m.lastindex) or "").strip()
+            if not id_str:
+                continue
+            key = (kind, id_str.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((kind, id_str))
+    return out
+
+
+def _needles_for_ref(kind: str, id_str: str) -> List[str]:
+    """生成 ILIKE/包含匹配用的 needle 列表。"""
+    needles = []
+    if kind == "table":
+        needles.extend([
+            f"Table {id_str}",
+            f"TABLE {id_str}",
+            f"Tbl. {id_str}",
+            f"表 {id_str}",
+            f"表{id_str}",
+        ])
+    elif kind == "figure":
+        needles.extend([
+            f"Figure {id_str}",
+            f"Fig. {id_str}",
+            f"Fig {id_str}",
+            f"图 {id_str}",
+            f"图{id_str}",
+        ])
+    else:
+        needles.append(id_str)
+    return needles
 
 
 def expand_neighbors(
@@ -177,7 +258,14 @@ def _expand_prev_next(
     return added
 
 
-def _as_result(ch: dict, parent_score: float, expanded_from: Optional[str]) -> dict:
+def _as_result(
+    ch: dict,
+    parent_score: float,
+    expanded_from: Optional[str],
+    *,
+    retrieval_type: str = "neighbor_expand",
+    score_scale: float = 0.5,
+) -> dict:
     return {
         "chunk_id": ch.get("chunk_id"),
         "page_id": ch.get("page_id"),
@@ -191,8 +279,104 @@ def _as_result(ch: dict, parent_score: float, expanded_from: Optional[str]) -> d
         "caption": ch.get("caption", ""),
         "prev_chunk_id": ch.get("prev_chunk_id", ""),
         "next_chunk_id": ch.get("next_chunk_id", ""),
-        "score": parent_score * 0.5,
-        "rerank_score": parent_score * 0.5,
-        "retrieval_type": "neighbor_expand",
+        "score": parent_score * score_scale,
+        "rerank_score": parent_score * score_scale,
+        "retrieval_type": retrieval_type,
         "expanded_from": expanded_from or "",
     }
+
+
+def expand_crossrefs(
+    results: Sequence[dict],
+    pg_store: Any,
+    *,
+    max_extra: int = 3,
+    max_per_hit: int = 1,
+    same_doc_only: bool = True,
+    patterns: Optional[Sequence] = None,
+    match_fields: Optional[Sequence[str]] = None,
+    cap: Optional[int] = None,
+) -> Tuple[List[dict], Dict[str, Any]]:
+    """解析 hit 文本中的表/图引用并扩入目标 chunk。
+
+    pg_store 需提供 ``find_chunks_by_ref(doc_id, needles, limit=...)``；
+    若无该方法则 no-op。
+    """
+    if not results or max_extra <= 0:
+        return list(results), {"enabled": True, "added": 0, "refs": []}
+
+    if not hasattr(pg_store, "find_chunks_by_ref"):
+        logger.warning("crossref expand: pg_store has no find_chunks_by_ref; skip")
+        return list(results), {"enabled": True, "added": 0, "refs": [], "skipped": "no_api"}
+
+    fields = list(match_fields or ("text", "caption", "table_summary", "section_path"))
+    seen = {r.get("chunk_id") for r in results if r.get("chunk_id")}
+    out: List[dict] = list(results)
+    added_ids: List[str] = []
+    found_refs: List[str] = []
+    budget = max_extra
+
+    for r in results:
+        if budget <= 0:
+            break
+        blob = " ".join(str(r.get(f) or "") for f in fields)
+        refs = extract_crossrefs(blob, patterns=patterns)
+        if not refs:
+            continue
+        parent_score = float(r.get("rerank_score") or r.get("score") or 0.0)
+        parent_id = r.get("chunk_id") or ""
+        doc_id = r.get("doc_id") or ""
+        if same_doc_only and not doc_id:
+            continue
+
+        per_hit = 0
+        for kind, id_str in refs:
+            if budget <= 0 or per_hit >= max_per_hit:
+                break
+            needles = _needles_for_ref(kind, id_str)
+            found_refs.append(f"{kind}:{id_str}")
+            try:
+                matches = pg_store.find_chunks_by_ref(
+                    doc_id if same_doc_only else None,
+                    needles,
+                    limit=3,
+                )
+            except Exception as e:
+                logger.warning("crossref find failed: %s", e)
+                continue
+            for ch in matches or []:
+                if budget <= 0 or per_hit >= max_per_hit:
+                    break
+                cid = ch.get("chunk_id")
+                if not cid or cid in seen:
+                    continue
+                # 避免把引用句自身当目标
+                if cid == parent_id:
+                    continue
+                seen.add(cid)
+                out.append(
+                    _as_result(
+                        ch,
+                        parent_score,
+                        parent_id,
+                        retrieval_type="crossref_expand",
+                        score_scale=0.95,
+                    )
+                )
+                added_ids.append(cid)
+                per_hit += 1
+                budget -= 1
+
+    if cap is not None and cap > 0 and len(out) > cap:
+        primary = [r for r in out if r.get("chunk_id") not in set(added_ids)]
+        extras = [r for r in out if r.get("chunk_id") in set(added_ids)]
+        out = (primary + extras)[:cap]
+
+    trace = {
+        "enabled": True,
+        "added": len(added_ids),
+        "added_ids": added_ids[:20],
+        "refs": found_refs[:20],
+        "max_extra": max_extra,
+    }
+    return out, trace
