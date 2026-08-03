@@ -346,15 +346,15 @@ config/models.yaml         # agent: enabled false ...
 
 ```mermaid
 flowchart TB
-  routes[routes.py] --> runner[runner.py]
-  runner --> graph[graph.py]
-  runner --> ckpt[checkpoint.py]
-  graph --> sub[subgraphs.py]
-  graph --> tools[tools.py]
-  tools --> retriever[vidore_adapter / retrieval]
-  tools --> generator[generator.py]
-  tools --> prompts[PromptRegistry]
-  runner --> obs[observability]
+  routes["routes.py"] --> runner["runner.py"]
+  runner --> graphMod["graph.py"]
+  runner --> ckpt["checkpoint.py"]
+  graphMod --> sub["subgraphs.py"]
+  graphMod --> tools["tools.py"]
+  tools --> retriever["vidore_adapter / retrieval"]
+  tools --> generator["generator.py"]
+  tools --> prompts["PromptRegistry"]
+  runner --> obs["observability"]
 ```
 
 ---
