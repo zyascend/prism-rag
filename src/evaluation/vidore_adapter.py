@@ -290,6 +290,8 @@ class PrismRAGRetriever:
         from src.generation.refiner import refiner_cache_salt
         from src.generation.self_rag import self_rag_cache_salt
         from src.retrieval.crag import crag_cache_salt
+        # Local import avoids retrieval→agent cycles; evaluation may import agent.config.
+        from src.agent.config import agent_cache_salt
 
         norm = unicodedata.normalize("NFKC", query).lower().strip()
         norm = " ".join(norm.split())
@@ -302,6 +304,7 @@ class PrismRAGRetriever:
             self_rag_cache_salt(),
             crag_cache_salt(),
             refiner_cache_salt(),
+            agent_cache_salt(),
         ]
         return "|".join(parts)
 
