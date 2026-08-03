@@ -264,6 +264,7 @@ class AskRequest(BaseModel):
     doc_id: Optional[str] = None
     k: int = 5
     use_rerank: bool = True
+    mode: str = "pipeline"  # pipeline | agent
 
 
 class SelfRAGAttemptDetail(BaseModel):
@@ -304,6 +305,40 @@ class CRAGInfo(BaseModel):
     grade_degraded: Optional[bool] = None
 
 
+class AgentStepInfo(BaseModel):
+    """Agent trajectory 单步（与 StepRecord 对齐）。"""
+    step: int = 0
+    node: str = ""
+    tool: Optional[str] = None
+    input_summary: str = ""
+    output_summary: str = ""
+    ok: bool = True
+    error: Optional[str] = None
+    latency_ms: Optional[float] = None
+    counts: Dict[str, Any] = {}
+
+
+class AgentInfo(BaseModel):
+    """Agent 路径摘要（默认 null；mode=agent 且 enabled 时 used=true）。"""
+    used: bool = False
+    status: Optional[str] = None
+    subqueries: List[str] = []
+    trajectory: List[AgentStepInfo] = []
+    counts: Dict[str, Any] = {}
+    degraded_to_pipeline: bool = False
+    thread_id: Optional[str] = None
+    ignored_reason: Optional[str] = None
+
+
+class AskResumeRequest(BaseModel):
+    """HITL resume：继续被 interrupt 的 agent 线程。"""
+    thread_id: str
+    subqueries: Optional[List[str]] = None  # None = approve as-is（空列表→图内 fallback）
+    k: int = 5
+    use_rerank: bool = True
+    doc_id: Optional[str] = None
+
+
 class AskResponse(BaseModel):
     query: str
     answer: str
@@ -311,6 +346,7 @@ class AskResponse(BaseModel):
     retrieval_trace: RetrievalTrace = RetrievalTrace()
     self_rag: Optional[SelfRAGInfo] = None
     crag: Optional[CRAGInfo] = None
+    agent: Optional[AgentInfo] = None
     # 入模上下文（压缩/表保护后的最终 prompt context）；demo 链路透视用
     context: str = ""
 
@@ -593,6 +629,147 @@ async def get_ingest_job(job_id: str):
     )
 
 
+def _make_complete_fn(gen):
+    """Build complete_fn from Generator (same chat client pattern as CRAG/self_rag)."""
+    injected = getattr(gen, "_complete_fn", None)
+    if callable(injected):
+        return injected
+    from src.generation.context_filter import openai_complete_fn
+
+    client = getattr(gen, "client", None)
+    model = getattr(gen, "model", None) or cfg.get("llm.model", "gpt-4o-mini")
+    if client is None:
+        raise RuntimeError("generator has no client for agent complete_fn")
+    return openai_complete_fn(client, model)
+
+
+def _agent_step_infos(trajectory: Optional[List[dict]], *, return_trajectory: bool) -> List[AgentStepInfo]:
+    if not return_trajectory or not trajectory:
+        return []
+    out: List[AgentStepInfo] = []
+    for t in trajectory:
+        if not isinstance(t, dict):
+            continue
+        out.append(
+            AgentStepInfo(
+                step=int(t.get("step") or 0),
+                node=str(t.get("node") or ""),
+                tool=t.get("tool"),
+                input_summary=str(t.get("input_summary") or ""),
+                output_summary=str(t.get("output_summary") or ""),
+                ok=bool(t.get("ok", True)),
+                error=t.get("error"),
+                latency_ms=t.get("latency_ms"),
+                counts=dict(t.get("counts") or {}) if isinstance(t.get("counts"), dict) else {},
+            )
+        )
+    return out
+
+
+def _trace_from_evidence(evidence: Optional[List[dict]]) -> RetrievalTrace:
+    """Synthesize a light retrieval_trace from agent evidence (dense_top5 only)."""
+    items: List[RouteTraceItem] = []
+    for e in (evidence or [])[:5]:
+        if not isinstance(e, dict):
+            continue
+        page_raw = e.get("page_id")
+        try:
+            page_id = int(page_raw) if page_raw is not None else 0
+        except (TypeError, ValueError):
+            page_id = 0
+        items.append(
+            RouteTraceItem(
+                chunk_id=str(e.get("chunk_id") or ""),
+                page_id=page_id,
+                score=float(e.get("score") or 0.0),
+                text=(e.get("text") or "")[:200] if e.get("text") else None,
+                doc_id=e.get("doc_id"),
+            )
+        )
+    return RetrievalTrace(dense_top5=items)
+
+
+def _agent_info_from_result(result, acfg: dict) -> AgentInfo:
+    return AgentInfo(
+        used=True,
+        status=result.status,
+        subqueries=list(result.subqueries or []),
+        trajectory=_agent_step_infos(
+            result.trajectory, return_trajectory=bool(acfg.get("return_trajectory", True))
+        ),
+        counts=dict(result.counts or {}),
+        degraded_to_pipeline=(result.status == "degraded"),
+        thread_id=result.thread_id,
+    )
+
+
+def _citations_safe(raw: Optional[List[dict]]) -> List[Citation]:
+    out: List[Citation] = []
+    for c in raw or []:
+        if not isinstance(c, dict):
+            continue
+        try:
+            out.append(
+                Citation(
+                    chunk_id=str(c.get("chunk_id") or ""),
+                    page_id=int(c.get("page_id") or 0),
+                    doc_id=c.get("doc_id"),
+                    page_number=c.get("page_number"),
+                    snippet=str(c.get("snippet") or (c.get("text") or "")[:200]),
+                )
+            )
+        except Exception:
+            continue
+    return out
+
+
+def _current_trace_id() -> str:
+    from src.observability import get_tracer
+
+    tr = get_tracer().current_trace()
+    if tr is not None and getattr(tr, "trace_id", None):
+        return str(tr.trace_id)
+    return uuid.uuid4().hex[:16]
+
+
+def _build_agent_search_fn(retriever, *, k: int, use_rerank: bool, doc_id: Optional[str], use_visual: bool):
+    def search_fn(q, k_local=None):
+        kk = int(k_local) if k_local is not None else k
+        search_k = max(kk * 10, 50) if doc_id else kk
+        hits = retriever.search(
+            q,
+            k=search_k,
+            use_visual=use_visual,
+            use_rerank=use_rerank,
+        )
+        if doc_id:
+            hits = [r for r in hits if r.get("doc_id") == doc_id][:kk]
+        return hits
+
+    return search_fn
+
+
+def _pipeline_fallback_fn(retriever, gen, *, query: str, k: int, use_rerank: bool, doc_id: Optional[str], use_visual: bool):
+    def pipeline_fallback():
+        search_k = max(k * 10, 50) if doc_id else k
+        hits = retriever.search(
+            query,
+            k=search_k,
+            use_visual=use_visual,
+            use_rerank=use_rerank,
+        )
+        if doc_id:
+            hits = [r for r in hits if r.get("doc_id") == doc_id][:k]
+        out = gen.answer(query, hits, k_context=k)
+        return {
+            "answer": out.get("answer") or "",
+            "citations": out.get("citations") or [],
+            "context": out.get("context") or "",
+        }
+
+    return pipeline_fallback
+
+
 @app.post("/ask", response_model=AskResponse)
 async def ask(request: AskRequest):
     retriever = get_retriever()
@@ -600,6 +777,7 @@ async def ask(request: AskRequest):
     collector = get_collector()
     # L4 Answer 缓存的 config_label 与 L3 在线路径保持一致（空串：在线请求无 per-config 拆分）
     cache_label = ""
+    req_mode = (request.mode or "pipeline").strip().lower()
 
     # ── L4 Answer Cache ───────────────────────────────────────
     gen = get_generator(retriever.bge)
@@ -609,27 +787,116 @@ async def ask(request: AskRequest):
         if retriever._answer_cache is None:
             retriever._answer_cache = InMemoryLRUCache(max_size=cfg.cache.max_size)
         answer_key = retriever.answer_cache_key(
-            request.query, gen.model, request.k, request.doc_id,
+            request.query, gen.model, request.k, request.doc_id, mode=req_mode,
         )
         cached_answer = retriever._answer_cache.get(answer_key)
     if cached_answer is not None:
         collector.record_cache_event("answer", hit=True, config_label=cache_label)
         rt = cached_answer["retrieval_trace"]
         trace = RetrievalTrace(
-            bm25_top5=[RouteTraceItem(**t) for t in rt["bm25_top5"]],
-            dense_top5=[RouteTraceItem(**t) for t in rt["dense_top5"]],
-            visual_top5=[RouteTraceItem(**t) for t in rt["visual_top5"]],
+            bm25_top5=[RouteTraceItem(**t) for t in rt.get("bm25_top5", [])],
+            dense_top5=[RouteTraceItem(**t) for t in rt.get("dense_top5", [])],
+            visual_top5=[RouteTraceItem(**t) for t in rt.get("visual_top5", [])],
         )
         sr_info = cached_answer.get("self_rag")
         crag_info = cached_answer.get("crag")
+        agent_info = cached_answer.get("agent")
         return AskResponse(
             query=request.query, answer=cached_answer["answer"],
             citations=[Citation(**c) for c in cached_answer["citations"]],
             retrieval_trace=trace,
             self_rag=SelfRAGInfo(**sr_info) if sr_info else None,
             crag=CRAGInfo(**crag_info) if crag_info else None,
+            agent=AgentInfo(**agent_info) if agent_info else None,
             context=cached_answer.get("context") or "",
         )
+
+    # ── Agent branch（L4 miss 后、pipeline search 前）──
+    from src.agent.config import agent_config
+
+    acfg = agent_config()
+    agent_ignored: Optional[AgentInfo] = None
+    if req_mode == "agent":
+        if not acfg.get("enabled"):
+            # 继续 pipeline；响应标注 ignored
+            agent_ignored = AgentInfo(
+                used=False, ignored_reason="agent.enabled=false",
+            )
+        else:
+            from src.agent.runner import run_agent
+
+            search_fn = _build_agent_search_fn(
+                retriever,
+                k=request.k,
+                use_rerank=request.use_rerank,
+                doc_id=request.doc_id,
+                use_visual=use_visual,
+            )
+            complete_fn = _make_complete_fn(gen)
+
+            def generate_fn(q, hits):
+                return gen.answer(q, hits, k_context=request.k)
+
+            pipeline_fallback = _pipeline_fallback_fn(
+                retriever,
+                gen,
+                query=request.query,
+                k=request.k,
+                use_rerank=request.use_rerank,
+                doc_id=request.doc_id,
+                use_visual=use_visual,
+            )
+            trace_id = _current_trace_id()
+            try:
+                result = run_agent(
+                    request.query,
+                    search_fn=search_fn,
+                    complete_fn=complete_fn,
+                    generate_fn=generate_fn,
+                    pipeline_fallback_fn=pipeline_fallback,
+                    trace_id=trace_id,
+                )
+            except Exception as e:
+                logger.exception("agent path failed: %s", e)
+                raise HTTPException(status_code=500, detail=f"Agent error: {e}")
+
+            agent_public = _agent_info_from_result(result, acfg)
+            # interrupted: empty answer ok (HITL pause)
+            citations = _citations_safe(result.citations)
+            rt_model = _trace_from_evidence(result.evidence)
+            rt_dict = {
+                "bm25_top5": [t.model_dump() for t in rt_model.bm25_top5],
+                "dense_top5": [t.model_dump() for t in rt_model.dense_top5],
+                "visual_top5": [t.model_dump() for t in rt_model.visual_top5],
+            }
+            context_out = result.context or ""
+            # interrupted 不写 L4（答案未完成）；degraded/ok 可缓存
+            if (
+                result.status != "interrupted"
+                and cfg.cache.enabled
+                and gen.cacheable
+                and answer_key is not None
+                and retriever._answer_cache is not None
+            ):
+                retriever._answer_cache.put(answer_key, {
+                    "answer": result.answer,
+                    "citations": [c.model_dump() for c in citations],
+                    "retrieval_trace": rt_dict,
+                    "self_rag": None,
+                    "crag": None,
+                    "agent": agent_public.model_dump(),
+                    "context": context_out,
+                })
+                collector.record_cache_event("answer", hit=False, config_label=cache_label)
+
+            return AskResponse(
+                query=request.query,
+                answer=result.answer or "",
+                citations=citations,
+                retrieval_trace=rt_model,
+                agent=agent_public,
+                context=context_out,
+            )
 
     # doc_id 过滤在检索后做：若只取 top-k，新上传小文档容易被大库挤掉。
     # 有 doc_id 时先多取再过滤，保证「上传后立刻问本篇」可用。
@@ -711,6 +978,7 @@ async def ask(request: AskRequest):
             answer=abstain_message(),
             citations=[], retrieval_trace=trace,
             crag=CRAGInfo(**crag_public),
+            agent=agent_ignored,
             context="",
         )
     try:
@@ -744,6 +1012,7 @@ async def ask(request: AskRequest):
     sr_public.setdefault("enabled", bool(sr_payload.get("enabled", False)))
 
     context_out = gen_out.get("context") or ""
+    agent_dump = agent_ignored.model_dump() if agent_ignored is not None else None
 
     # 写入 L4 Answer 缓存（受全局开关 + 确定性守卫；命中率经 cache_label 聚合）
     if cfg.cache.enabled and gen.cacheable and answer_key is not None and retriever._answer_cache is not None:
@@ -753,6 +1022,7 @@ async def ask(request: AskRequest):
             "retrieval_trace": retrieval_trace,
             "self_rag": sr_public,
             "crag": crag_public,
+            "agent": agent_dump,
             "context": context_out,
         })
         collector.record_cache_event("answer", hit=False, config_label=cache_label)
@@ -763,7 +1033,89 @@ async def ask(request: AskRequest):
         retrieval_trace=trace,
         self_rag=SelfRAGInfo(**sr_public),
         crag=CRAGInfo(**crag_public),
+        agent=agent_ignored,
         context=context_out,
+    )
+
+
+@app.post("/ask/resume", response_model=AskResponse)
+async def ask_resume(request: AskResumeRequest):
+    """Resume HITL-interrupted agent run (requires agent.enabled + checkpoint)."""
+    from src.agent.config import agent_config
+    from src.agent.runner import resume_agent
+
+    acfg = agent_config()
+    if not acfg.get("enabled"):
+        raise HTTPException(status_code=400, detail="agent.enabled=false; cannot resume")
+    ck = acfg.get("checkpoint") if isinstance(acfg.get("checkpoint"), dict) else {}
+    if not ck.get("enabled", True):
+        # default checkpoint.enabled is True in agent_config; explicit false → 400
+        raise HTTPException(
+            status_code=400,
+            detail="agent.checkpoint.enabled=false; resume unavailable",
+        )
+    try:
+        from src.agent.checkpoint import get_memory_saver
+
+        get_memory_saver()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"checkpoint unavailable: {e}")
+
+    retriever = get_retriever()
+    gen = get_generator(retriever.bge)
+    use_visual = cfg.get("retrieval.use_visual", True)
+
+    search_fn = _build_agent_search_fn(
+        retriever,
+        k=request.k,
+        use_rerank=request.use_rerank,
+        doc_id=request.doc_id,
+        use_visual=use_visual,
+    )
+    try:
+        complete_fn = _make_complete_fn(gen)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"complete_fn unavailable: {e}")
+
+    def generate_fn(q, hits):
+        return gen.answer(q, hits, k_context=request.k)
+
+    # None → [] so graph falls back to interrupted subqueries (approve as-is)
+    approved = list(request.subqueries) if request.subqueries is not None else []
+
+    pipeline_fallback = _pipeline_fallback_fn(
+        retriever,
+        gen,
+        query="",  # resume path uses checkpointed query for generate; fallback is last resort
+        k=request.k,
+        use_rerank=request.use_rerank,
+        doc_id=request.doc_id,
+        use_visual=use_visual,
+    )
+
+    try:
+        result = resume_agent(
+            thread_id=request.thread_id,
+            approved_subqueries=approved,
+            search_fn=search_fn,
+            complete_fn=complete_fn,
+            generate_fn=generate_fn,
+            pipeline_fallback_fn=pipeline_fallback,
+        )
+    except Exception as e:
+        logger.exception("ask/resume failed: %s", e)
+        raise HTTPException(status_code=400, detail=f"resume failed: {e}")
+
+    agent_public = _agent_info_from_result(result, acfg)
+    citations = _citations_safe(result.citations)
+    rt_model = _trace_from_evidence(result.evidence)
+    return AskResponse(
+        query="",  # query lives in checkpoint; not re-sent on resume body
+        answer=result.answer or "",
+        citations=citations,
+        retrieval_trace=rt_model,
+        agent=agent_public,
+        context=result.context or "",
     )
 
 

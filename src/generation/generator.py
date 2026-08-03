@@ -123,6 +123,26 @@ class Generator:
                 "refiner": refiner_trace,
             }
 
+    def complete(self, prompt: str) -> str:
+        """Public single-prompt completion for agent/CRAG/tools (user message only).
+
+        Uses injected ``_complete_fn`` when set (tests / alternate judge model);
+        otherwise the same OpenAI-compatible chat path as generation.
+        """
+        if self._complete_fn is not None:
+            return self._complete_fn(prompt) or ""
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.temperature,
+            )
+        except (openai.APIError, openai.APIConnectionError, openai.APITimeoutError) as e:
+            raise GenerationError(f"LLM complete failed: {e}") from e
+        if not resp.choices:
+            return ""
+        return resp.choices[0].message.content or ""
+
     @property
     def cacheable(self) -> bool:
         """生成结果是否可安全缓存：仅当温度确定性（temperature==0）时为 True。

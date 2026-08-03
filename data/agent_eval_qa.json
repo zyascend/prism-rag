@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "description": "Agent dual-arm skeleton (5–10 items). Phase2 expands to ~40–50 multi_hop/atomic/reject. Source: e2e_qa / rejection samples for industrial PDF domain.",
+  "items": [
+    {
+      "id": "at_001",
+      "tag": "atomic",
+      "source_e2e_id": "e2e_002",
+      "query": "List two acceptable conditions for the shield termination of a braid clamp.",
+      "gold_answer": "Two acceptable conditions for the shield termination of a braid clamp are: 1) The braid/shield should be evenly distributed around the braid clamp, ensuring that the strands are close to but not in contact with the outer shoulder flange. 2) Shield ground strands should hold the braid clamp in tight contact with the cable outer jacket without impeding the assembly of the connector.",
+      "notes": "single-locus fact; agent should stay atomic"
+    },
+    {
+      "id": "at_002",
+      "tag": "atomic",
+      "source_e2e_id": "e2e_005",
+      "query": "Is non-wetting or de-wetting in the overlap area considered an acceptable condition?",
+      "gold_answer": "No, nonwetting or dewetting in the overlap area is not considered an acceptable condition. It falls under the defect conditions as indicated in the provided context.",
+      "notes": "yes/no atomic"
+    },
+    {
+      "id": "mh_001",
+      "tag": "multi_hop",
+      "source_e2e_id": "e2e_003",
+      "query": "What signal is used to indicate hot brakes, and what is the first step if one is detected during inspection?",
+      "gold_answer": "The signal used to indicate hot brakes is a rapid fanning motion with one hand in front of the face and pointing to the wheel with the other hand. If hot brakes are detected during inspection, the first step is to check for hot brakes as per procedure c.",
+      "notes": "compound; may benefit from two self-contained subqueries"
+    },
+    {
+      "id": "mh_002",
+      "tag": "multi_hop",
+      "source_e2e_id": "e2e_004",
+      "query": "Contrast the role of visual aids in the aircraft fuel servicing manual and the UID asset marking manual, focusing on how each type of aid supports procedural accuracy in high-risk operations.",
+      "gold_answer": "In the aircraft fuel servicing manual (TO 00-25-172CL-4), magnifying loops and other optical magnification enhancement tools are utilized to support procedural accuracy. In contrast, the UID asset marking manual focuses on visual inspection techniques for existing indirect UID labels and DPM symbols.",
+      "notes": "needs two evidence loci (fuel servicing vs UID manuals)"
+    },
+    {
+      "id": "mh_003",
+      "tag": "multi_hop",
+      "source_e2e_id": "e2e_023",
+      "query": "What is the difference between the packaging of garments, shoe covers, and wiping cloths as per the USAF technical manuals and orders?",
+      "gold_answer": "The packaging of garments, shoe covers, and wiping cloths differs based on their specific requirements.",
+      "notes": "multi-entity contrast"
+    },
+    {
+      "id": "rj_001",
+      "tag": "reject",
+      "source_e2e_id": "rej_001",
+      "query": "What is the meaning of life according to philosophy?",
+      "gold_answer": null,
+      "expect_reject": true,
+      "notes": "out of industrial PDF domain"
+    },
+    {
+      "id": "rj_002",
+      "tag": "reject",
+      "source_e2e_id": "rej_002",
+      "query": "Who won the 2022 FIFA World Cup?",
+      "gold_answer": null,
+      "expect_reject": true,
+      "notes": "not in knowledge base"
+    },
+    {
+      "id": "rj_003",
+      "tag": "reject",
+      "query": "What is the capital of Mars?",
+      "gold_answer": null,
+      "expect_reject": true,
+      "notes": "nonsensical / unanswerable"
+    }
+  ]
+}

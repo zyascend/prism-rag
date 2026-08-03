@@ -118,3 +118,4 @@ runs/**/*.sql
 .workbuddy
 # ===== Local (never commit) =====
 local/
+.worktrees/

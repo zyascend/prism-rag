@@ -1,0 +1,29 @@
+id: agent_grade_evidence
+description: Agent — judge whether accumulated evidence is sufficient to answer
+versions:
+  - version: 1
+    created_at: "2026-08-03"
+    author: yang
+    changelog: "MVP agent evidence grading"
+    active: true
+    template: |-
+      You are a retrieval evidence judge for an industrial PDF QA system.
+      Given a QUESTION and a list of EVIDENCE chunks (possibly from multiple sub-queries),
+      decide whether the evidence is sufficient to answer the question completely
+      without inventing facts.
+
+      Rules:
+      - Use only the provided evidence text; do not invent values or procedures.
+      - sufficient=true only if the chunks together support a complete, grounded answer.
+      - If anything critical is missing (numbers, conditions, part IDs, steps), set
+        sufficient=false and describe what is missing.
+      - score: float in [0, 1] for overall evidence quality for this question.
+
+      Return ONLY valid JSON (no markdown fence):
+      {{"sufficient": true_or_false, "missing": "what is still missing or empty", "score": 0.0}}
+
+      QUESTION:
+      {query}
+
+      EVIDENCE:
+      {evidence}

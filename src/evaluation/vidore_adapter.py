@@ -279,17 +279,25 @@ class PrismRAGRetriever:
         return expanded
 
     def answer_cache_key(
-        self, query: str, model: str, k_context: int, doc_id: Optional[str]
+        self,
+        query: str,
+        model: str,
+        k_context: int,
+        doc_id: Optional[str],
+        mode: Optional[str] = None,
     ) -> str:
         """构造 L4 Answer 缓存 key：归一化 query + model + k_context + doc_id + index_version 盐。
 
         与 L3 不同，doc_id 影响最终答案（路由层在检索后做确定性后置过滤），必须纳入 key；
         index_version 保证语料变更后旧 key 自动失效（不依赖 TTL）。
-        Self-RAG / CRAG / Refiner 开关变化也必须入 key，避免开/关串答案。
+        Self-RAG / CRAG / Refiner / Agent 开关变化也必须入 key，避免开/关串答案。
+        ``mode``（pipeline|agent）保证 agent 与 pipeline 答案永不串 key。
         """
         from src.generation.refiner import refiner_cache_salt
         from src.generation.self_rag import self_rag_cache_salt
         from src.retrieval.crag import crag_cache_salt
+        # Local import avoids retrieval→agent cycles; evaluation may import agent.config.
+        from src.agent.config import agent_cache_salt
 
         norm = unicodedata.normalize("NFKC", query).lower().strip()
         norm = " ".join(norm.split())
@@ -302,7 +310,12 @@ class PrismRAGRetriever:
             self_rag_cache_salt(),
             crag_cache_salt(),
             refiner_cache_salt(),
+            agent_cache_salt(),
         ]
+        # Only non-pipeline modes alter the key so historical pipeline keys stay stable.
+        m = (mode or "pipeline").strip().lower()
+        if m and m != "pipeline":
+            parts.append(f"mode={m}")
         return "|".join(parts)
 
     def search(

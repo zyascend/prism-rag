@@ -1,3 +1,66 @@
+## 0⁵. Agentic RAG（LangGraph）Phase1 MVP 已落地
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `feat/agentic-rag-langgraph` |
+| **默认** | **`agent.enabled: false`**（pipeline 零行为变化；禁止默认打开） |
+| **代码** | `src/agent/` · `POST /ask` `mode=agent` · `/ask/resume` · Demo Mode · `data/agent_eval_qa.json` 骨架 |
+| **架构** | [`docs/architecture/agent.md`](docs/architecture/agent.md)（含 Feature Map 自检表 §12.1）· [`agent-graph.mmd`](docs/architecture/agent-graph.mmd) |
+| **Spec / Plan** | [`specs/2026-08-03-…`](docs/superpowers/specs/2026-08-03-agentic-rag-langgraph-design.md) · [`plans/2026-08-03-…`](docs/superpowers/plans/2026-08-03-agentic-rag-langgraph.md) |
+| **验收** | mock 单测全绿（见下）；**Phase2 云上双臂未做** → **无 Go，不改 enabled** |
+| **不做** | 默认开 agent · 自由 ReAct 生产路径 · web/KG · 黄金 NDCG 走 agent · 本机 283/RAGAS |
+
+### 如何试用 `mode=agent`（临时开，勿合入默认）
+
+```bash
+# 1) 配置：临时把 config/models.yaml 的 agent.enabled 改为 true
+#    或进程内覆盖 / env（若部署层支持）— 用完改回 false
+# 2) 启动 API 后：
+curl -s localhost:8000/ask -H 'Content-Type: application/json' \
+  -d '{"query":"<复合短问>","mode":"agent","k":5}'
+# 响应应含 agent.trajectory / subqueries / counts；mode=pipeline 或不传 mode 仍走原 pipeline
+# Demo：http://host:8000/demo/ 选 Agent 模式看轨迹面板
+```
+
+HITL 默认关；需 `agent.hitl.review_subqueries: true` + checkpoint 后才走 interrupt → `POST /ask/resume`。
+
+### 测试命令（本机 · 必绿）
+
+```bash
+.venv/bin/python -m pytest tests/test_agent_*.py tests/test_api.py tests/test_demo_fixtures.py -q
+# 2026-08-03：57 passed
+```
+
+### Phase2（未做 · 独立云跑 checklist）
+
+- 扩 `data/agent_eval_qa.json` ~40–50（multi_hop / atomic / reject）
+- 双臂 pipeline vs agent（可选 grade off）；Correct / 误拒 / latency / avg searches
+- 产物 `runs/YYYYMMDD-agent-eval/` + README 决议
+- **仅 Go 后**另议是否启发式进 agent；**默认 enabled 仍建议 false**
+
+### 下一步
+
+- 合 PR（默认 off）或继续 Phase2 云跑
+- 可选本机轻量真链路 ≤10q（local-demo + 已缓存模型）
+
+---
+
+## 0⁗. Agentic RAG（LangGraph）设计已确认（docs）
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `docs/agentic-rag-langgraph-design`（设计阶段）→ 实现见 **§0⁵ `feat/agentic-rag-langgraph`** |
+| **Spec** | [`docs/superpowers/specs/2026-08-03-agentic-rag-langgraph-design.md`](docs/superpowers/specs/2026-08-03-agentic-rag-langgraph-design.md) |
+| **Plan** | [`docs/superpowers/plans/2026-08-03-agentic-rag-langgraph.md`](docs/superpowers/plans/2026-08-03-agentic-rag-langgraph.md) |
+| **架构图解** | [`docs/architecture/agent.md`](docs/architecture/agent.md) |
+| **决议** | 方案 1′：可控固定图 + 窄工具（C）· 拆问多跳（A）· 默认 off · 双轨验收 |
+| **本机 eval** | **允许轻量真链路 ≤10q**（local-demo + 已缓存模型）；mock 单测仍是底线；**上线决议仍靠云上子集** |
+| **学习** | LangGraph 主特性 Feature Map（条件边/环/Send/子图/tools/stream/checkpoint/HITL） |
+| **下一步** | Phase1 MVP 已完成（§0⁵）；Phase2 云上子集未做 |
+| **不做** | 默认开 agent · 自由 ReAct 生产路径 · web/KG · 黄金 NDCG 走 agent |
+
+---
+
 ## 0‴. Boot-R 定稿 · 默认配置已更新（feat/p0-p1-retrieval-context）
 
 | 项 | 内容 |
@@ -63,8 +126,8 @@ retrieval.crossref_expand.enabled: false
 
 # Handoff — PrismRAG 当前状态
 
-> 分支: **feat/p0-p1-retrieval-context** | 远程: origin  
-> 更新: **2026-07-25** — Boot-R 定稿；默认 soft_rank + planning + crossref
+> 分支: **feat/agentic-rag-langgraph** | 远程: origin  
+> 更新: **2026-08-03** — Agentic RAG LangGraph Phase1 MVP（Tasks 0–12）；`agent.enabled` 默认 false
 
 ---
 

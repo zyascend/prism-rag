@@ -39,6 +39,11 @@
       </div>
       <div id="presets" class="presets"></div>
       <div class="ask-row">
+        <div class="ask-mode-toggle" role="group" aria-label="Ask path mode">
+          <span class="ask-mode-label">Mode</span>
+          <button type="button" id="ask-mode-pipeline" class="active" data-ask-mode="pipeline">Pipeline</button>
+          <button type="button" id="ask-mode-agent" data-ask-mode="agent">Agent</button>
+        </div>
         <input id="query" type="text" placeholder="Ask about the industrial manual…" aria-label="Ask a question about the industrial manual" />
         <button type="button" class="primary" id="btn-ask">Ask</button>
         <span id="loading" class="spinner" hidden>Working…</span>
@@ -59,6 +64,16 @@
       <p class="panel-hint">
         每次 Ask：<b>三路召回</b> → <b>RRF 融合</b> → <b>Rerank</b> →（可选 CRAG）→ <b>生成</b> →（可选 Gate2）→ 答案+引用
       </p>
+
+      <!-- Agent trajectory (shown when response.agent present) -->
+      <div id="agent-panel" class="agent-panel" hidden>
+        <div class="section-label" style="margin-top:0">
+          Agent · 拆问与轨迹
+          <span class="muted" id="agent-status-line">—</span>
+        </div>
+        <div class="agent-subqueries" id="agent-subqueries"></div>
+        <ol class="agent-timeline" id="agent-timeline" aria-label="Agent trajectory"></ol>
+      </div>
 
       <!-- Pipeline stepper -->
       <ol class="pipeline" id="pipeline" aria-label="RAG pipeline stages">

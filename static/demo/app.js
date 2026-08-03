@@ -5,6 +5,7 @@
 
   const state = {
     mode: "demo", // "demo" | "live"
+    askMode: "pipeline", // "pipeline" | "agent" — Live /ask body.mode
     apiBase: "",
     health: null,
     query: "",
@@ -89,6 +90,9 @@
       btn.textContent = p.label || p.id;
       if ((p.id || "").includes("reject") || (p.label || "").toLowerCase().includes("out")) {
         btn.classList.add("reject");
+      }
+      if ((p.id || "").includes("agent") || (p.label || "").toLowerCase().includes("agent")) {
+        btn.classList.add("agent");
       }
       btn.title = state.mode === "live"
         ? "Live 模式：会向 API 发真实问题（非 fixture）"
@@ -314,6 +318,85 @@
     );
   }
 
+  function renderAgent(resp) {
+    const panel = $("agent-panel");
+    const sqRoot = $("agent-subqueries");
+    const tl = $("agent-timeline");
+    const statusLine = $("agent-status-line");
+    if (!panel || !sqRoot || !tl) return;
+
+    const ag = resp && resp.agent;
+    if (!ag) {
+      panel.hidden = true;
+      sqRoot.innerHTML = "";
+      tl.innerHTML = "";
+      if (statusLine) statusLine.textContent = "—";
+      return;
+    }
+
+    panel.hidden = false;
+    const bits = [];
+    if (ag.used === false) bits.push("not used");
+    else if (ag.used) bits.push("used");
+    if (ag.status) bits.push(String(ag.status));
+    if (ag.degraded_to_pipeline) bits.push("degraded→pipeline");
+    if (ag.ignored_reason) bits.push(String(ag.ignored_reason));
+    if (ag.thread_id) bits.push("thread " + String(ag.thread_id).slice(0, 8));
+    if (statusLine) statusLine.textContent = bits.length ? "· " + bits.join(" · ") : "";
+
+    sqRoot.innerHTML = "";
+    const subs = ag.subqueries || [];
+    if (!subs.length) {
+      sqRoot.innerHTML = `<span class="muted">无 subqueries（atomic 或未拆问）</span>`;
+    } else {
+      subs.forEach((q, i) => {
+        const span = document.createElement("span");
+        span.className = "agent-subq";
+        span.innerHTML =
+          `<span class="sq-idx">${i + 1}</span>` +
+          `<span>${escapeHtml(q)}</span>`;
+        sqRoot.appendChild(span);
+      });
+    }
+
+    tl.innerHTML = "";
+    const traj = ag.trajectory || [];
+    if (!traj.length) {
+      tl.innerHTML = `<li class="agent-step"><div class="agent-step-body muted">无 trajectory 步骤</div></li>`;
+      return;
+    }
+    traj.forEach((step) => {
+      const li = document.createElement("li");
+      li.className = "agent-step" + (step.ok === false ? " bad" : "");
+      const lat =
+        step.latency_ms != null && step.latency_ms !== ""
+          ? `${Number(step.latency_ms).toFixed(0)} ms`
+          : "";
+      const tool = step.tool
+        ? `<span class="tool">${escapeHtml(step.tool)}</span>`
+        : "";
+      const inSum = step.input_summary ? escapeHtml(step.input_summary) : "";
+      const outSum = step.output_summary ? escapeHtml(step.output_summary) : "";
+      const err = step.error
+        ? `<div class="err">${escapeHtml(step.error)}</div>`
+        : "";
+      const bodyBits = [];
+      if (inSum) bodyBits.push(`in: ${inSum}`);
+      if (outSum) bodyBits.push(`out: ${outSum}`);
+      li.innerHTML =
+        `<div class="agent-step-head">` +
+        `<span class="node">#${escapeHtml(String(step.step != null ? step.step : "?"))} · ${escapeHtml(step.node || "—")}</span>` +
+        tool +
+        (lat ? `<span class="lat">${escapeHtml(lat)}</span>` : "") +
+        `</div>` +
+        `<div class="agent-step-body">` +
+        (bodyBits.length ? bodyBits.join(" · ") : "—") +
+        err +
+        `</div>`;
+      tl.appendChild(li);
+    });
+  }
+
   function renderGates(resp) {
     const cr = (resp && resp.crag) || { enabled: false };
     const sr = (resp && resp.self_rag) || { enabled: false };
@@ -445,10 +528,13 @@
     renderFuse(rt, (resp && resp.citations) || []);
     renderPipeline(resp);
     renderGates(resp);
+    renderAgent(resp);
 
     const modeLabel = state.mode === "live" ? "Live API" : "Demo fixture";
+    const askLabel = state.askMode === "agent" ? "Agent" : "Pipeline";
     $("eng-meta").innerHTML =
       `<span><b>模式</b> ${modeLabel}</span>` +
+      `<span><b>Path</b> ${askLabel}</span>` +
       `<span><b>Trace</b> <code>${escapeHtml(state.traceId || "—")}</code>` +
       (state.traceId && state.mode === "live"
         ? ` <a href="${apiUrl("/trace/" + state.traceId)}" target="_blank" rel="noopener">打开</a>`
@@ -515,11 +601,20 @@
     return JSON.parse(JSON.stringify(resp));
   }
 
+  function setAskMode(askMode) {
+    state.askMode = askMode === "agent" ? "agent" : "pipeline";
+    const pipeBtn = $("ask-mode-pipeline");
+    const agentBtn = $("ask-mode-agent");
+    if (pipeBtn) pipeBtn.classList.toggle("active", state.askMode === "pipeline");
+    if (agentBtn) agentBtn.classList.toggle("active", state.askMode === "agent");
+  }
+
   async function askLive(query) {
     const body = {
       query,
       k: 5,
       use_rerank: true,
+      mode: state.askMode === "agent" ? "agent" : "pipeline",
     };
     // 有上传文档时默认带 doc_id（filter 勾选）—— 上传后立刻问本篇
     if (state.filterByDoc && state.lastDocId) {
@@ -654,6 +749,10 @@
   function wire() {
     $("mode-demo").addEventListener("click", () => setMode("demo"));
     $("mode-live").addEventListener("click", () => setMode("live"));
+    const pipeBtn = $("ask-mode-pipeline");
+    const agentBtn = $("ask-mode-agent");
+    if (pipeBtn) pipeBtn.addEventListener("click", () => setAskMode("pipeline"));
+    if (agentBtn) agentBtn.addEventListener("click", () => setAskMode("agent"));
     $("btn-ask").addEventListener("click", ask);
     $("query").addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") ask();

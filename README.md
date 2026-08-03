@@ -56,6 +56,7 @@ PDF
 | Ingestion | [ingestion.md](docs/architecture/ingestion.md) | 三路写入、页 diff、删除一致 |
 | Content Pipeline | [content-pipeline.md](docs/architecture/content-pipeline.md) | PDF/表/图解析与分块 |
 | Evaluation | [evaluation.md](docs/architecture/evaluation.md) | 三层评测体系与口径 |
+| Agent（LangGraph 旁路） | [agent.md](docs/architecture/agent.md) | 可控固定图 · 拆问多跳 · 默认 off |
 | Retrieval / Generation | — | ⏳ 待写 |
 
 索引与约定：[docs/architecture/README.md](docs/architecture/README.md)
