@@ -157,3 +157,27 @@ cache:
   enabled: true                # 全局开关：是否启用检索缓存（L3 结果缓存等）
   max_size: 2048               # 内存 LRU 容量（条目数）
   ttl_seconds: 0               # 0 = 仅依赖 index_version 盐失效；>0 仅作跨进程异常兜底
+
+# Agentic RAG（LangGraph）；默认关。见 docs/superpowers/specs/2026-08-03-agentic-rag-langgraph-design.md
+agent:
+  enabled: false
+  max_subqueries: 3
+  max_search_per_subquery: 1
+  max_total_searches: 3
+  max_llm_calls: 6
+  max_grade_cycles: 1
+  timeout_ms: 30000
+  on_error: degrade_pipeline
+  return_trajectory: true
+  grade:
+    enabled: true
+  checkpoint:
+    enabled: true
+  hitl:
+    review_subqueries: false
+  react_demo:
+    enabled: false
+  decompose:
+    prompt_id: agent_decompose
+  synthesize:
+    prompt_id: agent_synthesize
