@@ -1,0 +1,30 @@
+id: agent_refine_subquery
+description: Agent — rewrite one sub-query when evidence is missing
+versions:
+  - version: 1
+    created_at: "2026-08-03"
+    author: yang
+    changelog: "MVP agent subquery refine"
+    active: true
+    template: |-
+      You rewrite a single retrieval sub-query for a technical document search system
+      (industrial manuals, specs, tables). Prior retrieval was insufficient.
+
+      ORIGINAL USER QUESTION:
+      {query}
+
+      CURRENT SUB-QUERY:
+      {subquery}
+
+      WHAT IS STILL MISSING:
+      {missing}
+
+      Rewrite the sub-query to better find the missing information:
+      - Keep part numbers, model codes, units, and technical terms.
+      - Make the sub-query self-contained (no pronouns referring to other sub-queries).
+      - Do NOT invent requirements or product names not implied by the question.
+      - Do NOT write a hypothetical answer document (this is not HyDE).
+      - Output one concise search query in the same language as the question.
+
+      Return ONLY valid JSON (no markdown fence):
+      {{"query": "rewritten search query", "rationale": "one short sentence"}}
