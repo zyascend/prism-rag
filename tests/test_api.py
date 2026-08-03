@@ -14,8 +14,10 @@ def _fake_retriever():
         _answer_cache = None
         index_version = 0
 
-        def answer_cache_key(self, query, model, k, doc_id):
-            return f"{query}|{model}|{k}|{doc_id}|v{self.index_version}"
+        def answer_cache_key(self, query, model, k, doc_id, mode=None):
+            m = mode or "pipeline"
+            base = f"{query}|{model}|{k}|{doc_id}|v{self.index_version}"
+            return base if m == "pipeline" else f"{base}|mode={m}"
 
         def _hit(self):
             return {
@@ -93,8 +95,10 @@ def test_ask_with_doc_id_overfetches_then_filters():
         _answer_cache = None
         index_version = 0
 
-        def answer_cache_key(self, query, model, k, doc_id):
-            return f"{query}|{model}|{k}|{doc_id}|v{self.index_version}"
+        def answer_cache_key(self, query, model, k, doc_id, mode=None):
+            m = mode or "pipeline"
+            base = f"{query}|{model}|{k}|{doc_id}|v{self.index_version}"
+            return base if m == "pipeline" else f"{base}|mode={m}"
 
         def invalidate_cache(self):
             self.index_version += 1
