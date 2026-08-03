@@ -48,3 +48,16 @@ def test_metrics_chips():
     assert len(data["chips"]) >= 2
     for c in data["chips"]:
         assert c.get("label") and c.get("value") and c.get("detail")
+
+
+def test_agent_fixture_has_trajectory():
+    data = json.loads((DEMO / "fixtures.json").read_text(encoding="utf-8"))
+    agent_resps = [r for r in data["responses"].values() if r.get("agent")]
+    assert agent_resps, "need at least one fixture with agent trajectory"
+    ag = agent_resps[0]["agent"]
+    assert "subqueries" in ag and "trajectory" in ag
+    assert isinstance(ag["subqueries"], list) and len(ag["subqueries"]) >= 1
+    assert isinstance(ag["trajectory"], list) and len(ag["trajectory"]) >= 1
+    step = ag["trajectory"][0]
+    for key in ("step", "node", "latency_ms"):
+        assert key in step, f"trajectory step missing {key}"
