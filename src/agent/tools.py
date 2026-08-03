@@ -1,6 +1,9 @@
 """Agent tool surface — dependency-injected, no global retrieval/generation singletons.
 
 Tools call search / LLM / generate only via injected callables so unit tests stay mock-only.
+
+Also exports langchain ``@tool`` / StructuredTool factories for the optional ReAct demo
+(``react_demo``). Production fixed StateGraph calls ``AgentToolBox`` methods directly.
 """
 from __future__ import annotations
 
@@ -18,7 +21,86 @@ CompleteFn = Callable[[str], str]
 GenerateFn = Callable[..., dict]
 PromptGetActive = Callable[[str], Any]
 
-__all__ = ["AgentToolBox", "parse_json_object"]
+__all__ = [
+    "AgentToolBox",
+    "parse_json_object",
+    "make_knowledge_search_tool",
+    "make_agent_lc_tools",
+]
+
+
+def make_knowledge_search_tool(
+    search_fn: SearchFn,
+    *,
+    subquery_id: int = 0,
+    top_k_default: int = 5,
+    name: str = "knowledge_search",
+):
+    """Wrap a retrieval callable as a langchain StructuredTool (@tool).
+
+    Used by ``react_demo`` ToolNode loops. Production graph still calls
+    ``AgentToolBox.knowledge_search`` directly (no ReAct).
+    """
+    from langchain_core.tools import tool
+
+    default_k = int(top_k_default)
+    sid = int(subquery_id)
+
+    @tool(name)
+    def knowledge_search(query: str, top_k: int = default_k) -> str:
+        """Search the private PDF knowledge base. Returns JSON with hits[].
+
+        Args:
+            query: Self-contained search query (no anaphora).
+            top_k: Max hits to return.
+        """
+        k = int(top_k) if top_k is not None else default_k
+        try:
+            hits_raw = search_fn(query, k=k)
+        except TypeError:
+            hits_raw = search_fn(query)
+        hits: List[dict] = []
+        for i, h in enumerate(hits_raw or []):
+            if not isinstance(h, dict):
+                continue
+            item = dict(h)
+            item.setdefault("subquery_id", sid)
+            item.setdefault("rank", i + 1)
+            # Bound observation size for the ReAct loop
+            text = (item.get("text") or "")[:400]
+            hits.append(
+                {
+                    "chunk_id": item.get("chunk_id"),
+                    "doc_id": item.get("doc_id"),
+                    "page_id": item.get("page_id") or item.get("page_number"),
+                    "score": item.get("score"),
+                    "subquery_id": item.get("subquery_id"),
+                    "rank": item.get("rank"),
+                    "text": text,
+                }
+            )
+        return json.dumps(
+            {"hits": hits, "query": query, "subquery_id": sid},
+            ensure_ascii=False,
+        )
+
+    return knowledge_search
+
+
+def make_agent_lc_tools(
+    search_fn: SearchFn,
+    *,
+    subquery_id: int = 0,
+    top_k_default: int = 5,
+) -> List[Any]:
+    """Return langchain tools for the ReAct demo (narrow: knowledge_search only)."""
+    return [
+        make_knowledge_search_tool(
+            search_fn,
+            subquery_id=subquery_id,
+            top_k_default=top_k_default,
+        )
+    ]
 
 
 def parse_json_object(raw: str) -> Dict[str, Any]:
