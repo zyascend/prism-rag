@@ -1,9 +1,10 @@
 # Agent — Agentic RAG（LangGraph）
 
-> 状态：**设计已确认 · 实现前架构说明**（与代码落地后请同步）  
+> 状态：**Phase1 MVP 已落地**（`feat/agentic-rag-langgraph` · Tasks 0–12）· **`agent.enabled` 默认仍 false**  
 > 更新：2026-08-03  
 > Spec：[2026-08-03-agentic-rag-langgraph-design.md](../superpowers/specs/2026-08-03-agentic-rag-langgraph-design.md)  
-> Plan：[2026-08-03-agentic-rag-langgraph.md](../superpowers/plans/2026-08-03-agentic-rag-langgraph.md)
+> Plan：[2026-08-03-agentic-rag-langgraph.md](../superpowers/plans/2026-08-03-agentic-rag-langgraph.md)  
+> 图导出：[agent-graph.mmd](./agent-graph.mmd)
 
 ---
 
@@ -476,9 +477,36 @@ mindmap
 | Checkpoint | `MemorySaver` + `thread_id` |
 | Stream | `stream_agent` / demo |
 | interrupt | HITL 审子问 |
-| 可视化 | `get_graph().draw_mermaid()` |
+| 可视化 | `get_graph().draw_mermaid()` → [agent-graph.mmd](./agent-graph.mmd) |
 
 **明确不做：** Store 长期记忆、多 Agent 监督网络、web_search。
+
+### 12.1 Feature Map 自检表（Phase1 验收 · 2026-08-03）
+
+本地验收命令：
+
+```bash
+.venv/bin/python -m pytest tests/test_agent_*.py tests/test_api.py tests/test_demo_fixtures.py -q
+# → 57 passed
+```
+
+| 特性 | 验证命令/操作 | 状态 |
+|------|----------------|------|
+| StateGraph | `tests/test_agent_graph.py::test_graph_compile_and_invoke_atomic` | ✅ |
+| Conditional edges | `test_route_atomic` · `test_route_grade` | ✅ |
+| Cycles | `test_route_grade`（insufficient→refine；budget 0→synthesize）；`max_grade_cycles` 配置 + invoke | ✅ |
+| Reducers | `test_merge_evidence_appends`；`test_multi_uses_send_or_equivalent_n_searches` evidence len==2 | ✅ |
+| Send | `test_multi_uses_send_or_equivalent_n_searches`（`meta.use_send` + N 次 search） | ✅ |
+| Subgraph | `src/agent/subgraphs.py` via Send worker；轨迹节点 `retrieval_worker`（无独立 `test_subgraphs_*`，由 multi Send 覆盖） | ✅ |
+| @tool / ReAct demo | `tests/test_agent_react_demo.py`（默认 off；compile + max_steps） | ✅ |
+| Checkpoint + HITL | `tests/test_agent_checkpoint_hitl.py::test_interrupt_and_resume` · `test_resume_with_revised_subqueries` | ✅ |
+| Stream | `test_stream_agent_yields_events` | ✅ |
+| Mermaid | `docs/architecture/agent-graph.mmd` 存在；`test_export_graph_mermaid` | ✅ |
+| API mode=agent | `tests/test_agent_api.py`（disabled 忽略 / enabled 返回 trajectory / L4 salt / resume） | ✅ |
+| Demo fixtures | `tests/test_demo_fixtures.py::test_agent_fixture_has_trajectory` | ✅ |
+| Eval 骨架 | `tests/test_agent_eval.py` + `data/agent_eval_qa.json` | ✅ |
+
+**Phase2 未做：** 云上 ~40–50 双臂（pipeline vs agent）Correct/误拒/latency；**无 Go 前禁止 `enabled: true`。**
 
 ---
 
@@ -605,4 +633,4 @@ curl -s localhost:8000/ask -H 'Content-Type: application/json' \
 | ReAct | 仅 demo 开关 | 不进生产默认 |
 | 自动路由进 agent | 无（显式 mode） | 启发式 multi-hop 检测 |
 
-实现落地后：将本文「状态」改为与代码对齐，并补真实源码行号 / mermaid 导出文件路径。
+实现源码：`src/agent/`（config · state · tools · graph · subgraphs · runner · checkpoint · react_demo · eval）。Mermaid 导出见 [agent-graph.mmd](./agent-graph.mmd)。
