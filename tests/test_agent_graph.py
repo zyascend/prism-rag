@@ -101,3 +101,53 @@ def test_search_budget_caps_calls():
     )
     g.invoke(st)
     assert calls["n"] <= 2
+
+
+def test_multi_uses_send_or_equivalent_n_searches():
+    """N 个子问应触发 N 次 search（受 budget 限制）。"""
+    calls = []
+
+    def search_fn(q, k=5):
+        calls.append(q)
+        return [{"chunk_id": q, "text": q, "score": 1.0, "doc_id": "d"}]
+
+    def complete_fn(p):
+        if "subqueries" in p.lower() or "Split" in p or "sub-queries" in p:
+            return '{"subqueries": ["q1", "q2"], "strategy": "multi", "reason": "m"}'
+        return '{"sufficient": true, "missing": "", "score": 1}'
+
+    g = build_agent_graph(
+        search_fn=search_fn,
+        complete_fn=complete_fn,
+        generate_fn=lambda q, h: {"answer": "a", "citations": [], "rejected": False},
+        cfg={
+            "max_subqueries": 3,
+            "max_total_searches": 3,
+            "max_llm_calls": 6,
+            "max_grade_cycles": 1,
+            "grade": {"enabled": False},
+            "hitl": {"review_subqueries": False},
+            "checkpoint": {"enabled": False},
+            "use_send": True,
+        },
+    )
+    from src.agent.state import empty_agent_state
+
+    out = g.invoke(
+        empty_agent_state(
+            "combo?",
+            cfg={
+                "max_subqueries": 3,
+                "max_total_searches": 3,
+                "max_llm_calls": 6,
+                "max_grade_cycles": 1,
+            },
+        )
+    )
+    assert len(calls) == 2
+    assert set(calls) == {"q1", "q2"}
+    # evidence merged from both workers
+    assert len(out.get("evidence") or []) == 2
+    assert (out.get("meta") or {}).get("use_send") is True
+    assert any(t.get("node") == "retrieval_worker" for t in out.get("trajectory") or [])
+    assert any(t.get("node") == "prepare_multi" for t in out.get("trajectory") or [])
