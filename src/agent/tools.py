@@ -24,6 +24,8 @@ PromptGetActive = Callable[[str], Any]
 __all__ = [
     "AgentToolBox",
     "parse_json_object",
+    "normalize_subquery_text",
+    "normalize_subquery_list",
     "make_knowledge_search_tool",
     "make_agent_lc_tools",
 ]
@@ -127,6 +129,100 @@ def parse_json_object(raw: str) -> Dict[str, Any]:
     return data
 
 
+_SUBQUERY_DICT_KEYS = ("query", "subquery", "text", "q", "question")
+_MAX_SUBQUERY_CHARS = 500
+
+
+def normalize_subquery_text(item: Any, *, max_chars: int = _MAX_SUBQUERY_CHARS) -> Optional[str]:
+    """Coerce one decompose/HITL subquery item into a plain search string.
+
+    Models often emit objects (or stringified dicts) like
+    ``{"query": "...", "source": "..."}`` instead of bare strings.  Those must
+    not be passed to ``knowledge_search`` as ``str(dict)``.
+    """
+    if item is None:
+        return None
+
+    if isinstance(item, dict):
+        for k in _SUBQUERY_DICT_KEYS:
+            v = item.get(k)
+            if v is None:
+                continue
+            # Nested dict rare; flatten once
+            if isinstance(v, dict):
+                inner = normalize_subquery_text(v, max_chars=max_chars)
+                if inner:
+                    return inner
+            t = str(v).strip()
+            if t:
+                return t[:max_chars]
+        return None
+
+    if isinstance(item, (list, tuple)):
+        # Prefer first usable element
+        for el in item:
+            t = normalize_subquery_text(el, max_chars=max_chars)
+            if t:
+                return t
+        return None
+
+    s = str(item).strip()
+    if not s:
+        return None
+
+    # Stringified JSON / Python dict from the model
+    if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+        parsed: Any = None
+        try:
+            parsed = json.loads(s)
+        except (json.JSONDecodeError, TypeError):
+            try:
+                import ast
+
+                parsed = ast.literal_eval(s)
+            except (ValueError, SyntaxError, TypeError):
+                parsed = None
+        if parsed is not None:
+            t = normalize_subquery_text(parsed, max_chars=max_chars)
+            if t:
+                return t
+
+    # Strip wrapping quotes leftover from loose model formatting
+    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+        s = s[1:-1].strip()
+    if not s:
+        return None
+    return s[:max_chars]
+
+
+def normalize_subquery_list(
+    items: Any,
+    *,
+    max_n: int = 3,
+    max_chars: int = _MAX_SUBQUERY_CHARS,
+) -> List[str]:
+    """Normalize a list of subquery items; drop empties; de-dupe; clamp length."""
+    if items is None:
+        return []
+    if not isinstance(items, (list, tuple)):
+        one = normalize_subquery_text(items, max_chars=max_chars)
+        return [one] if one else []
+    out: List[str] = []
+    seen: set[str] = set()
+    for raw in items:
+        t = normalize_subquery_text(raw, max_chars=max_chars)
+        if not t:
+            continue
+        key = t.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(t)
+        if len(out) >= max(1, int(max_n)):
+            break
+    return out
+
+
 def _format_evidence(evidence: Sequence[dict], *, max_chars: int = 600) -> str:
     parts: List[str] = []
     for i, d in enumerate(evidence, 1):
@@ -199,16 +295,22 @@ class AgentToolBox:
             return fallback
 
         subs_raw = data.get("subqueries")
+        # Accept list, or single string / object under alternate keys
         if not isinstance(subs_raw, list):
-            return fallback
-        subs: List[str] = []
-        for s in subs_raw:
-            t = str(s or "").strip()
-            if t and t not in subs:
-                subs.append(t)
+            for alt in ("queries", "sub_queries", "subquery"):
+                if isinstance(data.get(alt), list):
+                    subs_raw = data[alt]
+                    break
+            else:
+                # single object/string → treat as one-item list
+                if subs_raw is not None:
+                    subs_raw = [subs_raw]
+                else:
+                    return fallback
+
+        subs = normalize_subquery_list(subs_raw, max_n=max_sq)
         if not subs:
             return fallback
-        subs = subs[:max_sq]
 
         strategy = str(data.get("strategy") or "").strip().lower()
         if strategy not in ("atomic", "multi"):
@@ -229,11 +331,13 @@ class AgentToolBox:
         self, query: str, *, subquery_id: int, top_k: int = 5
     ) -> dict:
         """Retrieve hits and tag each with subquery_id + rank."""
+        # Defense in depth: strip dict-shaped leftovers from bad decompose output
+        q = normalize_subquery_text(query) or str(query or "").strip()
         try:
-            hits_raw = self.search_fn(query, k=top_k)
+            hits_raw = self.search_fn(q, k=top_k)
         except TypeError:
             # Some injectors use search_fn(query) only
-            hits_raw = self.search_fn(query)
+            hits_raw = self.search_fn(q)
         hits: List[dict] = []
         for i, h in enumerate(hits_raw or []):
             if not isinstance(h, dict):
@@ -242,7 +346,7 @@ class AgentToolBox:
             item["subquery_id"] = subquery_id
             item["rank"] = i + 1
             hits.append(item)
-        return {"hits": hits, "query": query, "subquery_id": subquery_id}
+        return {"hits": hits, "query": q, "subquery_id": subquery_id}
 
     def grade_evidence(self, query: str, evidence: list) -> dict:
         """LLM JSON grade: sufficient / missing / score.
@@ -330,29 +434,36 @@ class AgentToolBox:
             )
             raw = (self.complete_fn(prompt) or "").strip()
             # Prefer JSON {"query": "..."} if present; else first non-empty line
+            rewritten = ""
             try:
                 data = parse_json_object(raw)
-                rewritten = str(
-                    data.get("query") or data.get("subquery") or data.get("refined") or ""
-                ).strip()
+                rewritten = normalize_subquery_text(data) or ""
+                if not rewritten:
+                    rewritten = normalize_subquery_text(
+                        data.get("query")
+                        or data.get("subquery")
+                        or data.get("refined")
+                        or data.get("text")
+                    ) or ""
             except Exception:
-                # strip fences / take first line
+                # strip fences / take first line; still normalize dict-shaped lines
                 text = raw
                 fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, re.I)
                 if fence:
                     text = fence.group(1).strip()
-                rewritten = ""
                 for line in text.splitlines():
-                    line = line.strip().strip('"').strip("'")
-                    if line and not line.startswith("{"):
-                        rewritten = line
+                    line = line.strip()
+                    if not line:
+                        continue
+                    cand = normalize_subquery_text(line)
+                    if cand:
+                        rewritten = cand
                         break
                 if not rewritten:
-                    rewritten = text.strip().strip('"').strip("'")
+                    rewritten = normalize_subquery_text(text) or ""
             if not rewritten:
                 return original
-            # Keep rewrites bounded
-            return rewritten[:500]
+            return rewritten[:_MAX_SUBQUERY_CHARS]
         except Exception as e:
             logger.warning("refine_subquery failed (%s); keeping original", e)
             return original

@@ -10,9 +10,11 @@ versions:
       You plan retrieval for an industrial PDF QA system.
       Split the QUESTION into at most {max_subqueries} self-contained sub-queries.
       If the question is already atomic, return a single sub-query equal to the question.
+      Keep product / proper names intact (e.g. "RAG-Anything" is one unit — do not split into letters).
       Each sub-query must be understandable alone (no "the above value").
+      subqueries MUST be a JSON array of plain strings only — never objects, never source/reason fields inside the array.
       Return ONLY JSON:
-      {{"subqueries": ["..."], "strategy": "atomic"|"multi", "reason": "short"}}
+      {{"subqueries": ["plain string query 1", "plain string query 2"], "strategy": "atomic"|"multi", "reason": "short"}}
 
       QUESTION:
       {query}
