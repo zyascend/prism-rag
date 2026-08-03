@@ -1,15 +1,16 @@
-"""Agent StateGraph — decompose → retrieve (seq or Send) → grade ⇄ refine → synthesize.
+"""Agent StateGraph — decompose → [HITL] → retrieve (seq or Send) → grade ⇄ refine → synthesize.
 
 P1a: sequential multi-retrieve. P1b: optional Send map-reduce via use_send.
-HITL interrupt / checkpointer deferred (Task 7).
+P1c: MemorySaver checkpoint, stream, HITL interrupt after decompose.
 """
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from langgraph.graph import END, StateGraph
-from langgraph.types import Send
+from langgraph.types import Send, interrupt
 
 from src.agent.state import AgentState, next_step, step_record
 from src.agent.subgraphs import build_retrieval_subgraph, retrieval_worker_delta
@@ -24,7 +25,27 @@ __all__ = [
     "route_after_decompose",
     "route_after_grade",
     "fan_out_searches",
+    "export_graph_mermaid",
+    "hitl_enabled",
+    "checkpoint_enabled",
 ]
+
+
+def hitl_enabled(cfg: Optional[Dict[str, Any]]) -> bool:
+    h = (cfg or {}).get("hitl")
+    if isinstance(h, dict):
+        return bool(h.get("review_subqueries"))
+    return False
+
+
+def checkpoint_enabled(cfg: Optional[Dict[str, Any]]) -> bool:
+    """True when MemorySaver should be attached (checkpoint flag or HITL)."""
+    c = cfg or {}
+    cp = c.get("checkpoint")
+    if isinstance(cp, dict) and bool(cp.get("enabled")):
+        return True
+    # HITL resume requires a checkpointer even if flag is off
+    return hitl_enabled(c)
 
 
 def route_after_decompose(state: Dict[str, Any]) -> str:
@@ -119,6 +140,25 @@ def _select_multi_queries(state: Dict[str, Any]) -> tuple[List[str], bool]:
     return queries, False
 
 
+def _normalize_approved_subqueries(
+    approved: Any, fallback: List[str]
+) -> List[str]:
+    """Map interrupt resume value → subquery list."""
+    if isinstance(approved, list):
+        out = [str(x).strip() for x in approved if str(x).strip()]
+        return out if out else list(fallback)
+    if isinstance(approved, dict):
+        raw = approved.get("subqueries")
+        if isinstance(raw, list):
+            out = [str(x).strip() for x in raw if str(x).strip()]
+            return out if out else list(fallback)
+        if isinstance(raw, str) and raw.strip():
+            return [raw.strip()]
+    if isinstance(approved, str) and approved.strip():
+        return [approved.strip()]
+    return list(fallback)
+
+
 def build_agent_graph(
     *,
     search_fn: SearchFn,
@@ -130,9 +170,14 @@ def build_agent_graph(
 
     When ``cfg['use_send']`` is true, multi-subquery retrieval fans out via
     LangGraph ``Send`` + ``retrieval_subgraph``; otherwise sequential loop.
+
+    When ``checkpoint.enabled`` or HITL is on, compile with process-wide
+    ``MemorySaver``. HITL inserts ``hitl_review`` after ``decompose``.
     """
     cfg = dict(cfg or {})
     use_send = bool(cfg.get("use_send", False))
+    use_hitl = hitl_enabled(cfg)
+    use_checkpoint = checkpoint_enabled(cfg)
     box = AgentToolBox(
         search_fn=search_fn,
         complete_fn=complete_fn,
@@ -180,6 +225,54 @@ def build_agent_graph(
             "budget": budget,
             "meta": meta,
             "trajectory": traj,  # delta only
+            "pending_subqueries": [],
+        }
+
+    def hitl_review_node(state: Dict[str, Any]) -> Dict[str, Any]:
+        """Pause for human review of subqueries; resume value replaces them."""
+        t0 = time.perf_counter()
+        meta = _meta_copy(state)
+        step = next_step(state)
+        meta["step"] = step
+        subs = list(state.get("subqueries") or [])
+        if not subs:
+            q = state.get("query") or ""
+            subs = [q] if q else []
+
+        # interrupt() returns the value passed via Command(resume=...)
+        approved = interrupt(
+            {
+                "subqueries": subs,
+                "strategy": state.get("strategy") or "atomic",
+                "query": state.get("query") or "",
+            }
+        )
+        new_subs = _normalize_approved_subqueries(approved, subs)
+        # If human collapses to a single query, keep multi only when >1
+        strategy = str(state.get("strategy") or "atomic")
+        if len(new_subs) > 1:
+            strategy = "multi"
+        elif len(new_subs) == 1 and strategy == "multi":
+            strategy = "atomic"
+
+        latency = (time.perf_counter() - t0) * 1000
+        traj = [
+            step_record(
+                step=step,
+                node="hitl_review",
+                tool=None,
+                input_summary=f"n_pending={len(subs)}",
+                output_summary=f"n_approved={len(new_subs)} strategy={strategy}",
+                ok=True,
+                latency_ms=latency,
+                counts={"subqueries": len(new_subs)},
+            )
+        ]
+        return {
+            "subqueries": new_subs,
+            "strategy": strategy,
+            "meta": meta,
+            "trajectory": traj,
             "pending_subqueries": [],
         }
 
@@ -505,6 +598,8 @@ def build_agent_graph(
         meta["n_evidence"] = len(state.get("evidence") or [])
         meta["finalized"] = True
         meta["use_send"] = use_send
+        meta["hitl"] = use_hitl
+        meta["checkpoint"] = use_checkpoint
         # no trajectory delta — avoid duplicate step records
         return {"meta": meta}
 
@@ -526,8 +621,17 @@ def build_agent_graph(
         multi_entry = "retrieve_multi"
 
     builder.set_entry_point("decompose")
+
+    # HITL: pause after decompose so human can edit subqueries before retrieve
+    if use_hitl:
+        builder.add_node("hitl_review", hitl_review_node)
+        builder.add_edge("decompose", "hitl_review")
+        route_source = "hitl_review"
+    else:
+        route_source = "decompose"
+
     builder.add_conditional_edges(
-        "decompose",
+        route_source,
         route_after_decompose,
         {
             "retrieve_one": "retrieve_one",
@@ -562,5 +666,51 @@ def build_agent_graph(
     builder.add_edge("synthesize", "finalize")
     builder.add_edge("finalize", END)
 
-    # checkpointer optional — Task 7; compile without for P1a/P1b
+    if use_checkpoint:
+        from src.agent.checkpoint import get_memory_saver
+
+        return builder.compile(checkpointer=get_memory_saver())
     return builder.compile()
+
+
+def export_graph_mermaid(
+    path: str = "docs/architecture/agent-graph.mmd",
+    *,
+    cfg: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Export compiled graph topology as Mermaid; write to ``path`` if given."""
+    # Use noop deps — topology only
+    def _search(q: str, k: int = 5) -> List[dict]:
+        return []
+
+    def _complete(p: str) -> str:
+        return '{"subqueries": ["q"], "strategy": "atomic", "reason": "export"}'
+
+    def _generate(q: str, hits: Any) -> dict:
+        return {"answer": "", "citations": [], "rejected": True}
+
+    export_cfg = {
+        "enabled": True,
+        "grade": {"enabled": True},
+        "hitl": {"review_subqueries": False},
+        "checkpoint": {"enabled": False},
+        "use_send": True,
+        "max_subqueries": 3,
+        "max_total_searches": 3,
+        "max_llm_calls": 6,
+        "max_grade_cycles": 1,
+    }
+    if cfg:
+        export_cfg.update(cfg)
+    g = build_agent_graph(
+        search_fn=_search,
+        complete_fn=_complete,
+        generate_fn=_generate,
+        cfg=export_cfg,
+    )
+    mermaid = g.get_graph().draw_mermaid()
+    if path:
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(mermaid, encoding="utf-8")
+    return mermaid

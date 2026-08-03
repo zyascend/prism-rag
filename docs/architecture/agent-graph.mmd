@@ -1,0 +1,33 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	decompose(decompose)
+	retrieve_one(retrieve_one)
+	grade(grade)
+	refine(refine)
+	synthesize(synthesize)
+	finalize(finalize)
+	prepare_multi(prepare_multi)
+	retrieval_worker(retrieval_worker)
+	fan_in(fan_in)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> decompose;
+	decompose -. &nbsp;retrieve_multi&nbsp; .-> prepare_multi;
+	decompose -.-> retrieve_one;
+	fan_in --> grade;
+	grade -.-> refine;
+	grade -. &nbsp;abstain_or_synthesize&nbsp; .-> synthesize;
+	prepare_multi -.-> grade;
+	prepare_multi -.-> retrieval_worker;
+	refine --> prepare_multi;
+	retrieval_worker --> fan_in;
+	retrieve_one --> grade;
+	synthesize --> finalize;
+	finalize --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
