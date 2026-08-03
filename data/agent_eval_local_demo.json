@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "description": "Local-demo aligned dual-arm smoke (RAG-Anything paper, 18 pages / 51 chunks). Not Phase2 industrial e2e.",
+  "corpus": "data/uploads/75723afc3fda.pdf (RAG-Anything: All-in-One RAG Framework)",
+  "items": [
+    {
+      "id": "ld_at_001",
+      "tag": "atomic",
+      "query": "What does RAG stand for in the RAG-Anything paper?",
+      "gold_answer": "Retrieval-Augmented Generation",
+      "notes": "intro definition; single locus"
+    },
+    {
+      "id": "ld_at_002",
+      "tag": "atomic",
+      "query": "Which university are the RAG-Anything authors affiliated with?",
+      "gold_answer": "The University of Hong Kong",
+      "notes": "title page / abstract authors"
+    },
+    {
+      "id": "ld_at_003",
+      "tag": "atomic",
+      "query": "How many documents and questions does DocBench contain according to the paper?",
+      "gold_answer": "DocBench has 229 documents and 1,102 questions",
+      "notes": "Table 1 stats"
+    },
+    {
+      "id": "ld_mh_001",
+      "tag": "multi_hop",
+      "query": "What are the two evaluation benchmarks used in the RAG-Anything experiments, and how many questions does each have?",
+      "gold_answer": "DocBench (1,102 questions) and MMLongBench (1,082 questions)",
+      "notes": "needs both benchmark stats; multi_hop friendly"
+    },
+    {
+      "id": "ld_mh_002",
+      "tag": "multi_hop",
+      "query": "What is dual-graph construction in RAG-Anything, and why does the paper say a single unified graph is not enough?",
+      "gold_answer": "Dual-graph builds a cross-modal knowledge graph plus a text-based knowledge graph; a single unified graph risks overlooking modality-specific structural signals",
+      "notes": "method section multi-locus"
+    },
+    {
+      "id": "ld_rj_001",
+      "tag": "reject",
+      "query": "Who won the 2022 FIFA World Cup?",
+      "gold_answer": null,
+      "expect_reject": true,
+      "notes": "out of corpus"
+    }
+  ]
+}

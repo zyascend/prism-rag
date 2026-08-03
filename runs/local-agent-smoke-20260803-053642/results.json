@@ -1,0 +1,749 @@
+{
+  "created_at": "2026-08-03T05:45:02.452175+00:00",
+  "config_profile": "local-dev",
+  "llm_model": "qwen2:7b",
+  "max_queries": 8,
+  "k": 5,
+  "use_visual": true,
+  "qa_file": "data/agent_eval_qa.json",
+  "summary": {
+    "n_items": 8,
+    "error_items": 0,
+    "error_rate": 0.0,
+    "pipeline": {
+      "n": 8,
+      "errors": 0,
+      "correct_placeholder_rate": 0.375,
+      "latency_ms_mean": 4763.375
+    },
+    "agent": {
+      "n": 8,
+      "errors": 0,
+      "correct_placeholder_rate": 0.375,
+      "latency_ms_mean": 55362.5
+    },
+    "note": "correct_placeholder is string-match only — not Phase2 decision metric. Cloud dual-arm: scripts/run_agent_eval.py"
+  },
+  "items": [
+    {
+      "id": "at_001",
+      "tag": "atomic",
+      "query": "List two acceptable conditions for the shield termination of a braid clamp.",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 7855,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 21834,
+        "status": "abstain",
+        "subqueries": [
+          "{'query': 'What are the acceptable conditions for the shield termination of a braid clamp?', 'context': ''}",
+          "{'query': 'Can you list two acceptable conditions for the shield termination of a braid clamp?', 'context': ''}"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 21
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_002",
+      "tag": "atomic",
+      "query": "Is non-wetting or de-wetting in the overlap area considered an acceptable condition?",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 3286,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 30354,
+        "status": "abstain",
+        "subqueries": [
+          "{'query': 'What is defined as non-wetting or de-wetting?', 'document': 'industrial PDF QA system documentation'}",
+          "{'query': 'Is non-wetting or de-wetting considered an acceptable condition in the overlap area according to the industrial PDF QA system?', 'document': 'industrial PDF QA system documentation'}"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 45
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_001",
+      "tag": "multi_hop",
+      "query": "What signal is used to indicate hot brakes, and what is the first step if one is detected during inspection?",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答关于热刹车的指示信号以及检测到热刹车后的第一步操作的问题。",
+        "n_citations": 5,
+        "latency_ms": 5530,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 39524,
+        "status": "abstain",
+        "subqueries": [
+          "{'query': 'What signal is used to indicate hot brakes?', 'description': 'Identify the signal that indicates hot brakes.'}",
+          "{'query': 'What is the first step if hot brakes are detected during inspection?', 'description': 'Determine the initial action to take upon detecting hot brakes.'}"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 66
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_002",
+      "tag": "multi_hop",
+      "query": "Contrast the role of visual aids in the aircraft fuel servicing manual and the UID asset marking manual, focusing on how each type of aid supports procedural accuracy in high-risk operations.",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 3189,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 47303,
+        "status": "abstain",
+        "subqueries": [
+          "{'query': 'What is the role of visual aids in the aircraft fuel servicing manual?', 'context': 'Exploring the function of visual aids within the specific context of an aircraft fuel servicing manual.'}",
+          "{'query': 'How do visual aids support procedural accuracy in high-risk operations according to the aircraft fuel servicing manual?', 'context': 'Analyzing how visual aids enhance safety and precision in critical tasks outlined in the aircraft fuel servicing manual.'}",
+          "{'query': 'What is the role of visual aids in the UID asset marking manual?', 'context': 'Understanding the purpose of visual aids within the context of an UID asset marking manual.'}"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 88
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_003",
+      "tag": "multi_hop",
+      "query": "What is the difference between the packaging of garments, shoe covers, and wiping cloths as per the USAF technical manuals and orders?",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 4109,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 56679,
+        "status": "abstain",
+        "subqueries": [
+          "{'query': 'What does the USAF technical manual say about the packaging of garments?', 'source': 'USAF Technical Manual'}",
+          "{'query': 'What does the USAF technical order state regarding shoe covers packaging?', 'source': 'USAF Technical Order'}",
+          "{'query': 'How is wiping cloths packaged according to the USAF instructions?', 'source': 'USAF Instructions'}"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 109
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "rj_001",
+      "tag": "reject",
+      "query": "What is the meaning of life according to philosophy?",
+      "expect_reject": true,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 4004,
+        "error": null,
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 67719,
+        "status": "abstain",
+        "subqueries": [
+          "What is the meaning of life in philosophical context?",
+          "Who are some notable philosophers that have discussed the meaning of life?",
+          "What are their main theories or perspectives on the meaning of life?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 127
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_002",
+      "tag": "reject",
+      "query": "Who won the 2022 FIFA World Cup?",
+      "expect_reject": true,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 5596,
+        "error": null,
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 82976,
+        "status": "abstain",
+        "subqueries": [
+          "Who won the 2022 FIFA World Cup?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 140
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_003",
+      "tag": "reject",
+      "query": "What is the capital of Mars?",
+      "expect_reject": true,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 4538,
+        "error": null,
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 96511,
+        "status": "abstain",
+        "subqueries": [
+          "What is the capital of Mars?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 152
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": true
+      }
+    }
+  ]
+}

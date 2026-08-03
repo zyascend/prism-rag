@@ -1,0 +1,560 @@
+{
+  "created_at": "2026-08-03T05:59:36.649577+00:00",
+  "config_profile": "local-dev",
+  "llm_model": "qwen2:7b",
+  "max_queries": 6,
+  "k": 5,
+  "use_visual": true,
+  "qa_file": "data/agent_eval_local_demo.json",
+  "summary": {
+    "n_items": 6,
+    "error_items": 0,
+    "error_rate": 0.0,
+    "pipeline": {
+      "n": 6,
+      "errors": 0,
+      "correct_placeholder_rate": 0.3333333333333333,
+      "latency_ms_mean": 4961.5
+    },
+    "agent": {
+      "n": 6,
+      "errors": 0,
+      "correct_placeholder_rate": 0.3333333333333333,
+      "latency_ms_mean": 46761.166666666664
+    },
+    "note": "correct_placeholder is string-match only — not Phase2 decision metric. Cloud dual-arm: scripts/run_agent_eval.py"
+  },
+  "items": [
+    {
+      "id": "ld_at_001",
+      "tag": "atomic",
+      "query": "What does RAG stand for in the RAG-Anything paper?",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "RAG 在 RAG-Anything 论文中代表“阅读、理解、生成”(Read, Understand, Generate)。",
+        "n_citations": 5,
+        "latency_ms": 3273,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "RAG在RAG-Anything论文中代表“阅读、问答和生成”（Reading, Retrieval, and Generation）。",
+        "n_citations": 5,
+        "latency_ms": 19166,
+        "status": "ok",
+        "subqueries": [
+          "What does 'RAG' stand for in the context of the 'RAG-Anything' paper?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 15
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "ld_at_002",
+      "tag": "atomic",
+      "query": "Which university are the RAG-Anything authors affiliated with?",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 3331,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 28236,
+        "status": "abstain",
+        "subqueries": [
+          "Who are the authors of RAG-Anything?",
+          "What is the affiliation of these authors?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 35
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "ld_at_003",
+      "tag": "atomic",
+      "query": "How many documents and questions does DocBench contain according to the paper?",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "根据提供的资料，DocBench包含229个多模态文档和1,102个专家制作的问题答案对。",
+        "n_citations": 5,
+        "latency_ms": 2864,
+        "error": null,
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 42849,
+        "status": "abstain",
+        "subqueries": [
+          "What is the total number of documents in DocBench as mentioned in the paper?",
+          "What is the total number of questions in DocBench as stated in the paper?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 52
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "ld_mh_001",
+      "tag": "multi_hop",
+      "query": "What are the two evaluation benchmarks used in the RAG-Anything experiments, and how many questions does each have?",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 2371,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 57683,
+        "status": "abstain",
+        "subqueries": [
+          "What are the two evaluation benchmarks used in the RAG-Anything experiments?",
+          "How many questions does each of the two evaluation benchmarks have?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 70
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "ld_mh_002",
+      "tag": "multi_hop",
+      "query": "What is dual-graph construction in RAG-Anything, and why does the paper say a single unified graph is not enough?",
+      "expect_reject": false,
+      "pipeline": {
+        "answer": "在RAG-Anything中，双图构建是一种策略，它通过构建两个互补的图来解决多模态知识统一的问题。第一个是跨模态知识图，它忠实地标定了非文本内容（如图像、表格和方程式）中的知识，并将非文本原子单元转换为结构化的图形实体。第二个是基于文本的知识图，使用已建立的文字为中心的提取管道构建。这些互补的图通过实体合并，以保持不同模态之间的关系。\n\n论文中提到单一统一图可能不足以处理的原因在于直接构造一个单一体图可能会忽略特定于模态的结构性信号。RAG-Anything通过双图构建策略解决了这一挑战，首先建立了一个跨模态知识图，忠实地标定了非文本内容，并使用多模态大型表示准确地反映了每个单元在更广泛文档结构中的角色。然后，系统构建了基于文本的知识图，将非文本单位作为锚点和跨模态关系的基础。这需要高级的多模态编码器来捕获内部和外部依赖性，同时不丢失关键的视觉语义。\n\n此外，双图构建策略还解决了结构感知分解挑战，即在解析复杂布局时保持空间和层次关系的重要性。系统必须理解文本、图像和结构化数据等不同模态之间的语义对应，并在检索过程中协调跨异构信息源的推理。因此，RAG-Anything通过其统一框架和双图构建策略，为处理复杂的多模态知识提供了更全面的方法。",
+        "n_citations": 5,
+        "latency_ms": 14875,
+        "error": null,
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "在RAG-Anything中，双图构建是一种用于多模态知识统一的方法。它包括表格结构和双图构造来处理跨模态的知识。之所以论文提到单一的统一图不足以满足需求，是因为现实世界的应用需要全面理解人类知识表示的所有模态信息。当前的RAG框架通常会排除图表、图形和统计可视化等视觉元素，如相关矩阵和性能表，这使得它们在实际应用中不足够。因此，多模态RAG的发展是关键进步，它能够真正地跨所有模态提供全面的智能。单一统一图可能无法充分处理这些复杂且多样化的信息类型，尤其是在处理图表、图形的空间布局时，因为这些元素包含丰富的语义信息，并且在文档结构中以非预期的方式嵌入了关键信息。",
+        "n_citations": 5,
+        "latency_ms": 61813,
+        "status": "ok",
+        "subqueries": [
+          "Definition of dual-graph construction in RAG-Anything.",
+          "Reasons why the paper states a single unified graph is insufficient."
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 81
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "ld_rj_001",
+      "tag": "reject",
+      "query": "Who won the 2022 FIFA World Cup?",
+      "expect_reject": true,
+      "pipeline": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 3055,
+        "error": null,
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "根据提供的资料，信息不足，无法回答。",
+        "n_citations": 5,
+        "latency_ms": 70820,
+        "status": "abstain",
+        "subqueries": [
+          "Who is the winner of the 2022 FIFA World Cup?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 94
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          },
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          }
+        ],
+        "error": null,
+        "correct_placeholder": true
+      }
+    }
+  ]
+}

@@ -46,3 +46,8 @@ prompts:
 
 generation:
   answer_language: zh
+
+# --- LOCAL REAL-PATH ONLY (do not commit enabled:true as default) ---
+agent:
+  enabled: true
+  # optional: use_send: true
