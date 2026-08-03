@@ -498,30 +498,72 @@ flowchart TD
 
 ---
 
-## 14. 评测位置（双轨）
+## 14. 评测位置（三轨：mock · 本机轻量真链路 · 云上子集）
 
 ```mermaid
 flowchart LR
-  subgraph P1["Phase1 本地"]
+  subgraph P1a["本机 · mock"]
     UT[单测 mock 图/护栏]
-    Demo[Demo mode=agent]
   end
 
-  subgraph P2["Phase2 云上"]
-    Sub[agent_eval_qa 子集]
+  subgraph P1b["本机 · 轻量真链路"]
+    Smoke["≤10 条真检索+生成<br/>local-dev 小索引"]
+  end
+
+  subgraph P2["云上 · 可辩护"]
+    Sub[agent_eval_qa ~40–50]
     A1[pipeline 臂]
     A2[agent 臂]
     Dec{Correct / 误拒 / latency / avg searches}
   end
 
-  P1 --> Merge[代码可合 · enabled 仍 false]
+  P1a --> Merge[代码可合 · enabled 仍 false]
+  P1b --> Merge
   P2 --> Dec
   Dec -->|Go| Later[另议是否启发式进 agent]
   Dec -->|No-Go| Keep[保持默认关 · 写 runs README]
 ```
 
 - **L1 NDCG / 黄金消融：永不走 agent。**  
-- Phase2 子集建议：multi_hop + atomic + reject ≈ 40–50 条。
+- Phase2 子集建议：multi_hop + atomic + reject ≈ 40–50 条。  
+- **本机轻量真链路：数据量小就允许**（见 §14.1）；**不**用本机分数单独决定 `enabled: true`。
+
+### 14.1 本机轻量真链路协议（已确认可做）
+
+> 对齐 AGENTS.md：允许「`--max-queries 10` 以内的轻量验证」；禁止本机全量 283 / 全量 RAGAS / 无缓存下大模型。
+
+| 项 | 约定 |
+|----|------|
+| **目的** | 接口通、轨迹合理、延迟量级、拆问/多搜是否按预算；**冒烟**而非上线决议 |
+| **规模** | **≤10 条 query**（推荐 3～5 先通，再拉到 10） |
+| **语料** | `local-dev` 小索引 / 单份 demo PDF（如 `indexes/local-demo-colqwen2*` + `CONFIG_PROFILE=local-dev`） |
+| **模型** | 已缓存即可：Ollama `qwen2:7b` 等；**禁止**为冒烟触发新增大模型下载 |
+| **对照** | 同 3～10 条：`mode=pipeline` vs `mode=agent`（agent 需临时 `agent.enabled=true` 或 env 覆盖） |
+| **看什么** | HTTP 200；`agent.subqueries` / `trajectory`；`counts.searches` ≤ budget；有无 degrade；主观答案是否离谱 |
+| **不看什么** | 不报 NDCG；不把 10 条 Correct 当 Phase2 结论 |
+| **归档** | 可选 `runs/YYYYMMDD-agent-local-smoke/` 记命令与 2～3 条轨迹摘要 |
+
+**前置检查（有则跑，无则只 mock）：**
+
+```bash
+# 1) 配置与服务
+export CONFIG_PROFILE=local-dev   # 见 config/models.local-dev.yaml
+# ollama serve 且 ollama list 已有目标模型（不 pull 新模型）
+# make db 或既有 pgvector；local-demo 索引已存在则 -- 不必 re-ingest
+
+# 2) 单测仍是底线
+.venv/bin/python -m pytest tests/test_agent_*.py -q
+
+# 3) API 冒烟（实现后；agent.enabled 临时 true）
+# curl pipeline
+curl -s localhost:8000/ask -H 'Content-Type: application/json' \
+  -d '{"query":"<短问>","mode":"pipeline","k":5}'
+# curl agent
+curl -s localhost:8000/ask -H 'Content-Type: application/json' \
+  -d '{"query":"<复合短问>","mode":"agent","k":5}'
+```
+
+实现阶段可提供 `scripts/run_agent_local_smoke.py`（或 Makefile 目标）：读 `data/agent_eval_qa.json` 里 **tag 过滤后的前 N 条（N≤10）**，双 mode 输出 JSON；**默认 N=5**。
 
 ---
 

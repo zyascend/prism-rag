@@ -7,6 +7,7 @@
 | **Plan** | [`docs/superpowers/plans/2026-08-03-agentic-rag-langgraph.md`](docs/superpowers/plans/2026-08-03-agentic-rag-langgraph.md) |
 | **架构图解** | [`docs/architecture/agent.md`](docs/architecture/agent.md)（Mermaid 总览 · 实现前） |
 | **决议** | 方案 1′：可控固定图 + 窄工具（C）· 拆问多跳（A）· 默认 off · 双轨验收 |
+| **本机 eval** | **允许轻量真链路 ≤10q**（local-demo + 已缓存模型）；mock 单测仍是底线；**上线决议仍靠云上子集** |
 | **学习** | LangGraph 主特性 Feature Map（条件边/环/Send/子图/tools/stream/checkpoint/HITL） |
 | **下一步** | 切 `feat/agentic-rag-langgraph` 按 plan Task 0→12 实现（subagent 或 inline） |
 | **不做** | 默认开 agent · 自由 ReAct 生产路径 · web/KG · 黄金 NDCG 走 agent |

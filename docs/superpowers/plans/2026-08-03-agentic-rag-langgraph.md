@@ -25,7 +25,7 @@
 
 **明确不做:** web_search、KG、默认开 agent、NDCG 走 agent、子问依赖链、多 Agent、Store 业务记忆。
 
-**本地约束（AGENTS.md）:** 单测用 mock；禁止本机下载大模型 / 全量 ingest / 全量 283 评测。云上再跑 Phase2。
+**本地约束（AGENTS.md）:** 单测用 mock；**允许本机轻量真链路（≤10 query）**，前提：小语料（local-demo）+ 模型已在缓存、不触发新下载 / 不全量 ingest。禁止本机 283 / 全量 RAGAS。可辩护质量结论仍上云 Phase2。详见 [architecture/agent.md §14.1](../../architecture/agent.md)。
 
 ---
 
@@ -1261,13 +1261,26 @@ git commit -m "feat(demo): Pipeline|Agent mode and trajectory panel"
 
 ---
 
-## Task 11: 评测入口薄封装 + Phase2 骨架
+## Task 11: 评测入口薄封装 + 本机轻量真链路 + Phase2 骨架
 
 **Files:**
 - Create: `src/agent/eval.py`
-- Create: `data/agent_eval_qa.json`（骨架 5～10 条即可，Phase2 扩到 40–50）
-- Create: `scripts/run_agent_eval.py`（双臂框架，云上再跑）
+- Create: `data/agent_eval_qa.json`（骨架 **先 5～10 条**，足够本机 smoke；Phase2 再扩到 40–50）
+- Create: `scripts/run_agent_local_smoke.py`（本机 ≤10 条 pipeline vs agent）
+- Create: `scripts/run_agent_eval.py`（云上双臂框架，后置）
 - Modify: `handoff.md`（实现完成后更新状态）
+
+### 本机轻量真链路（Task 11 必做脚本能力）
+
+- [ ] **Step 0: 约定**
+
+| 项 | 值 |
+|----|-----|
+| 默认条数 | **5**（CLI `--max-queries` 上限 **10**） |
+| 配置 | `CONFIG_PROFILE=local-dev` + 已有 local-demo 索引 |
+| 模型 | Ollama 等 **已 list 可见**；脚本检测缺失则 **exit 提示，禁止自动 pull** |
+| 输出 | `runs/local-agent-smoke-<ts>/results.json` + 打印 counts/trajectory 摘要 |
+| 失败策略 | 单条异常记 error 继续；总失败率写入 summary |
 
 - [ ] **Step 1: `agent_answer_for_eval`**
 
