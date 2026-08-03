@@ -5,6 +5,7 @@ P1c: MemorySaver checkpoint, stream, HITL interrupt after decompose.
 """
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -26,9 +27,38 @@ __all__ = [
     "route_after_grade",
     "fan_out_searches",
     "export_graph_mermaid",
+    "sanitize_langgraph_mermaid",
     "hitl_enabled",
     "checkpoint_enabled",
 ]
+
+
+def sanitize_langgraph_mermaid(mermaid: str) -> str:
+    """Make LangGraph ``draw_mermaid()`` output portable for common renderers.
+
+    Raw LangGraph output often breaks VS Code / Cursor preview and SVG→image
+    pipelines because it embeds HTML in labels (``<p>…</p>``), HTML entities
+    (``&nbsp;``), and CSS properties some Mermaid builds reject
+    (e.g. ``line-height`` on ``classDef``).
+    """
+    s = mermaid.replace("\t", "    ")
+    # Strip <p> wrappers LangGraph puts inside stadium/rounded labels
+    s = re.sub(r"</?p>", "", s, flags=re.IGNORECASE)
+    # Edge labels use &nbsp; as padding — plain spaces work in Mermaid
+    s = s.replace("&nbsp;", " ")
+    # Collapse " -.   .-> " empty-ish dotted edges after nbsp strip
+    s = re.sub(r"-\.\s+\.->", "-.->", s)
+    # Normalize labeled dotted edges: -.  label  .->  →  -. label .->
+    s = re.sub(r"-\.\s+(\S(?:.*?\S)?)\s+\.->", r"-. \1 .->", s)
+    # classDef: drop unsupported / noisy props that can fail SVG renderers
+    s = re.sub(r",\s*line-height:[^,\n;]+", "", s)
+    # fill-opacity:0 makes start invisible and trips some SVG pipelines
+    s = re.sub(
+        r"(classDef\s+first\s+)[^\n]+",
+        r"\1fill:#ffffff,stroke:#999999,color:#333333",
+        s,
+    )
+    return s
 
 
 def hitl_enabled(cfg: Optional[Dict[str, Any]]) -> bool:
@@ -711,7 +741,7 @@ def export_graph_mermaid(
         generate_fn=_generate,
         cfg=export_cfg,
     )
-    mermaid = g.get_graph().draw_mermaid()
+    mermaid = sanitize_langgraph_mermaid(g.get_graph().draw_mermaid())
     if path:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)

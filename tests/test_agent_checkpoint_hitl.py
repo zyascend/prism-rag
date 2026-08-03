@@ -143,13 +143,32 @@ def test_checkpoint_singleton_shared():
 
 
 def test_export_graph_mermaid(tmp_path):
-    from src.agent.graph import export_graph_mermaid
+    from src.agent.graph import export_graph_mermaid, sanitize_langgraph_mermaid
 
     path = tmp_path / "agent-graph.mmd"
     mermaid = export_graph_mermaid(str(path))
     assert "decompose" in mermaid
     assert path.is_file()
-    assert "decompose" in path.read_text(encoding="utf-8")
+    body = path.read_text(encoding="utf-8")
+    assert "decompose" in body
+    # Portable for VS Code / Cursor / common Mermaid SVG renderers
+    assert "<p>" not in body
+    assert "</p>" not in body
+    assert "&nbsp;" not in body
+    assert "line-height" not in body
+
+    dirty = (
+        "graph TD;\n"
+        "__start__([<p>__start__</p>]):::first\n"
+        "A -. &nbsp;label&nbsp; .-> B;\n"
+        "classDef first fill-opacity:0\n"
+        "classDef default fill:#f2f0ff,line-height:1.2\n"
+    )
+    clean = sanitize_langgraph_mermaid(dirty)
+    assert "<p>" not in clean
+    assert "&nbsp;" not in clean
+    assert "line-height" not in clean
+    assert "label" in clean
 
 
 def test_hitl_off_no_interrupt():
