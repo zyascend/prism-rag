@@ -143,19 +143,22 @@ def _select_multi_queries(state: Dict[str, Any]) -> tuple[List[str], bool]:
 def _normalize_approved_subqueries(
     approved: Any, fallback: List[str]
 ) -> List[str]:
-    """Map interrupt resume value → subquery list."""
+    """Map interrupt resume value → clean subquery list (plain strings only)."""
+    from src.agent.tools import normalize_subquery_list, normalize_subquery_text
+
     if isinstance(approved, list):
-        out = [str(x).strip() for x in approved if str(x).strip()]
+        out = normalize_subquery_list(approved, max_n=max(1, len(approved)))
         return out if out else list(fallback)
     if isinstance(approved, dict):
         raw = approved.get("subqueries")
-        if isinstance(raw, list):
-            out = [str(x).strip() for x in raw if str(x).strip()]
-            return out if out else list(fallback)
-        if isinstance(raw, str) and raw.strip():
-            return [raw.strip()]
+        if raw is None and any(k in approved for k in ("query", "subquery", "text", "q")):
+            one = normalize_subquery_text(approved)
+            return [one] if one else list(fallback)
+        out = normalize_subquery_list(raw if raw is not None else approved, max_n=16)
+        return out if out else list(fallback)
     if isinstance(approved, str) and approved.strip():
-        return [approved.strip()]
+        one = normalize_subquery_text(approved)
+        return [one] if one else list(fallback)
     return list(fallback)
 
 
