@@ -85,19 +85,21 @@ PDF
 
 ### Layer 1 — 检索（Boot-A · 协议 v1 · 283q en）
 
-来源：[`runs/20260720-bootA/`](runs/20260720-bootA/) · ColQwen2 · `GOLDEN_NO_HYDE` · `--skip-index`
+来源：[`runs/20260720-bootA/`](runs/20260720-bootA/) · ColQwen2 · `GOLDEN_NO_HYDE` · `--skip-index`  
+Visual 修序后对照：[`runs/20260804-visual-page-order/`](runs/20260804-visual-page-order/)（仅 Visual 两臂；Full 表仍为 Boot-A，待重跑）
 
 | 配置 | NDCG@10 | 说明 |
 |------|--------:|------|
-| BM25_only | 0.4063 | |
-| Dense_only | 0.3638 | |
-| Visual_only | 0.1590 | 视觉单路仍弱 |
-| Full_no_rerank | 0.4201 | 三路无精排 |
-| Full_with_rerank (BGE) | 0.5161 | |
-| **Full_zerank2** | **0.5318** | 主结论配置 |
+| BM25_only | 0.4063 | Boot-A |
+| Dense_only | 0.3638 | Boot-A |
+| Visual_only | **0.4776** | 修序后生产路径（修前 0.159 为 grounding 乱序误测） |
+| Visual_only_pages | **0.5076** | 页级 MaxSim；≈ 官方 ColQwen2 Industrial ~0.50 |
+| Full_no_rerank | 0.4201 | Boot-A（含旧 visual 序；待重跑） |
+| Full_with_rerank (BGE) | 0.5161 | Boot-A |
+| **Full_zerank2** | **0.5318** | 主结论配置（Boot-A；修序后待重跑） |
 | 同索引复跑 Full_zerank2 | **Δ = 0** | 漂移验收通过 |
 
-**主结论：** Full_no_rerank → Full_zerank2 **+0.11 NDCG@10**（瓶颈在精排，不在再堆 Visual backbone）。  
+**主结论：** Full_no_rerank → Full_zerank2 **+0.11 NDCG@10**（瓶颈在精排）。Visual pure 已与官方对齐（~0.48–0.51），不再是 0.16。  
 HyDE：历史消融 Δ≈0 / 略负，**默认不跑**（见 [zerank2-hyde 复盘](docs/solutions/2026-07-02-zerank2-hyde-experiment.md)）。
 
 可选：Visual 路由 150q（Boot-B）always 1244ms / NDCG@10 0.436 vs heuristic 1019ms / 0.401（延迟约 **−18%**）→ [`runs/20260720-bootB/`](runs/20260720-bootB/)。

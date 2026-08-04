@@ -57,16 +57,17 @@ python scripts/run_eval.py --max-queries 10 --skip-index --language en \
 
 ### 4.1 默认：`GOLDEN_NO_HYDE`（Boot-A Job1）
 
-| name | bm25 | dense | visual | rerank | reranker | hyde |
-|------|:----:|:-----:|:------:|:------:|----------|:----:|
-| BM25_only | ✓ | | | | | |
-| Dense_only | | ✓ | | | | |
-| Visual_only | | | ✓ | | | |
-| BM25_Dense | ✓ | ✓ | | | | |
-| BM25_Dense_Visual | ✓ | ✓ | ✓ | | | |
-| Full_no_rerank | ✓ | ✓ | ✓ | | | |
-| Full_with_rerank | ✓ | ✓ | ✓ | ✓ | bge | |
-| Full_zerank2 | ✓ | ✓ | ✓ | ✓ | zerank | |
+| name | bm25 | dense | visual | rerank | reranker | hyde | 备注 |
+|------|:----:|:-----:|:------:|:------:|----------|:----:|------|
+| BM25_only | ✓ | | | | | | |
+| Dense_only | | ✓ | | | | | |
+| Visual_only | | | ✓ | | | | chunk expand + RRF（生产路径） |
+| Visual_only_pages | | | ✓ | | | | **页级 MaxSim**，对标官方 pure visual |
+| BM25_Dense | ✓ | ✓ | | | | | |
+| BM25_Dense_Visual | ✓ | ✓ | ✓ | | | | |
+| Full_no_rerank | ✓ | ✓ | ✓ | | | | |
+| Full_with_rerank | ✓ | ✓ | ✓ | ✓ | bge | | |
+| Full_zerank2 | ✓ | ✓ | ✓ | ✓ | zerank | | |
 
 ```bash
 python scripts/run_eval.py --skip-index --language en --expected-query-count 283 \

@@ -80,6 +80,9 @@ def test_run_ablation_passes_pre_encoded_visual(mock_load_dataset):
 
     mock_retriever = MagicMock()
     mock_retriever.search.return_value = []
+    mock_retriever.visual = MagicMock()
+    mock_retriever.visual.search_pages_with_embedding.return_value = []
+    mock_retriever.visual.search_pages.return_value = []
 
     pre_encoded = {
         0: torch.randn(1, 10, 128),
@@ -93,6 +96,7 @@ def test_run_ablation_passes_pre_encoded_visual(mock_load_dataset):
         output_dir="/tmp/test_ablation_results",
         pre_encoded_visual=pre_encoded,
         language="en",
+        config_filter="Visual_only",  # 排除 Visual_only_pages 以外的 Full_*
     )
 
     # 验证对 Visual_only 配置（use_visual=True）传入了 visual_query_embedding
@@ -103,6 +107,39 @@ def test_run_ablation_passes_pre_encoded_visual(mock_load_dataset):
     assert len(visual_config_calls) > 0
     for call in visual_config_calls:
         assert "visual_query_embedding" in call.kwargs
+
+
+def test_run_ablation_visual_only_pages_uses_page_level_maxsim():
+    """Visual_only_pages 走 search_pages*，不走 retriever.search / RRF。"""
+    queries_ds, _ = _make_mock_dataset(num_queries=2)
+    mock_retriever = MagicMock()
+    mock_retriever.visual = MagicMock()
+    mock_retriever.visual.search_pages_with_embedding.return_value = [
+        {"page_id": 101, "score": 0.9},
+        {"page_id": 999, "score": 0.1},
+    ]
+
+    pre_encoded = {
+        0: torch.randn(1, 10, 128),
+        1: torch.randn(1, 10, 128),
+    }
+
+    results = run_ablation(
+        retriever=mock_retriever,
+        queries_ds=queries_ds,
+        qrel_map={0: {101}, 1: {101}},
+        output_dir="/tmp/test_ablation_pages",
+        pre_encoded_visual=pre_encoded,
+        language="en",
+        config_filter="Visual_only_pages",
+    )
+
+    mock_retriever.search.assert_not_called()
+    assert mock_retriever.visual.search_pages_with_embedding.call_count == 2
+    assert results[0]["config"] == "Visual_only_pages"
+    assert results[0]["visual_page_level"] is True
+    # 相关页 rank1 → NDCG@10 = 1.0
+    assert results[0]["ndcg@10"] == 1.0
 
 
 def test_expected_query_count_validation():

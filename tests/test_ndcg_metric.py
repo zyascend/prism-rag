@@ -31,6 +31,12 @@ def test_recall_dedupes():
     assert compute_recall({"a", "b"}, ["a", "a", "x"], k=5) == 0.5
 
 
+def test_recall_unique_k_not_list_prefix():
+    """同页多 chunk 时 Recall@k 应按唯一 page 计，而非 list 前 k 条。"""
+    # list 前 2 条都是 a → 旧实现只看到 {a}；新实现唯一页 a,b
+    assert compute_recall({"a", "b"}, ["a", "a", "b"], k=2) == 1.0
+
+
 def test_mrr_first_hit():
     assert compute_mrr({"t"}, ["x", "t"]) == 0.5
 
@@ -43,4 +49,7 @@ def test_golden_no_hyde_excludes_hyde_configs():
     assert "Full_BGE_HyDE" not in GOLDEN_NO_HYDE_NAMES
     assert "Full_zerank2" in GOLDEN_NO_HYDE_NAMES
     assert "Full_no_rerank" in GOLDEN_NO_HYDE_NAMES
-    assert len(GOLDEN_NO_HYDE_NAMES) == 8
+    assert "Visual_only_pages" in GOLDEN_NO_HYDE_NAMES
+    assert len(GOLDEN_NO_HYDE_NAMES) == 9
+    page_cfg = next(c for c in ABLATION_CONFIGS if c.name == "Visual_only_pages")
+    assert page_cfg.visual_page_level is True

@@ -30,6 +30,8 @@ class AblationConfig:
     use_rerank: bool = True
     reranker_type: str = "bge"      # "bge" | "zerank"
     use_hyde: bool = False
+    # True: 直接用 FAISS MaxSim 页序算指标（与官方 pure visual 同构；不走 chunk/RRF）
+    visual_page_level: bool = False
 
 
 ABLATION_CONFIGS = [
@@ -37,6 +39,12 @@ ABLATION_CONFIGS = [
     AblationConfig(name="BM25_only", use_bm25=True, use_dense=False, use_visual=False, use_rerank=False),
     AblationConfig(name="Dense_only", use_bm25=False, use_dense=True, use_visual=False, use_rerank=False),
     AblationConfig(name="Visual_only", use_bm25=False, use_dense=False, use_visual=True, use_rerank=False),
+    # 页级 pure visual（诊断 / 对标官方 ColQwen2 NDCG；不经 chunk expand + RRF）
+    AblationConfig(
+        name="Visual_only_pages",
+        use_bm25=False, use_dense=False, use_visual=True, use_rerank=False,
+        visual_page_level=True,
+    ),
     AblationConfig(name="BM25_Dense", use_bm25=True, use_dense=True, use_visual=False, use_rerank=False),
     AblationConfig(name="BM25_Dense_Visual", use_bm25=True, use_dense=True, use_visual=True, use_rerank=False),
     AblationConfig(name="Full_no_rerank", use_bm25=True, use_dense=True, use_visual=True, use_rerank=False),
@@ -58,6 +66,7 @@ GOLDEN_NO_HYDE_NAMES = frozenset({
     "BM25_only",
     "Dense_only",
     "Visual_only",
+    "Visual_only_pages",
     "BM25_Dense",
     "BM25_Dense_Visual",
     "Full_no_rerank",
@@ -87,11 +96,14 @@ def compute_ndcg(relevant: set, ranked: List[str], k: int) -> float:
 
 
 def compute_recall(relevant: set, ranked: List[str], k: int) -> float:
+    """Recall@k：对重复 page 去重后取前 k 个唯一 id（与 compute_ndcg 一致）。"""
     if not relevant:
         return 0.0
     seen = set()
     hits = 0
-    for r in ranked[:k]:
+    for r in ranked:
+        if len(seen) >= k:
+            break
         if r in seen:
             continue
         seen.add(r)
@@ -217,18 +229,39 @@ def run_ablation(
                 visual_q_emb = pre_encoded_visual[q_idx]
 
             start = time.time()
-            retrieved = retriever.search(
-                query=query_text, k=10,
-                use_bm25=config.use_bm25, use_dense=config.use_dense,
-                use_visual=config.use_visual, use_rerank=config.use_rerank,
-                visual_query_embedding=visual_q_emb,
-                use_hyde=config.use_hyde, reranker_type=config.reranker_type,
-                # 黄金消融不走 Search Planning，保证 Full_zerank2 与历史 NDCG 可比
-                apply_search_planning=False,
-            )
+            if config.visual_page_level:
+                # 与官方 pure visual 同构：MaxSim 页序 → NDCG（不经 chunk expand / RRF）
+                visual = getattr(retriever, "visual", None)
+                if visual is None:
+                    raise RuntimeError(
+                        f"{config.name}: retriever.visual 不可用，无法跑页级 Visual 消融"
+                    )
+                if visual_q_emb is not None:
+                    page_hits = visual.search_pages_with_embedding(visual_q_emb, k=10)
+                else:
+                    page_hits = visual.search_pages(query_text, k=10)
+                ranked_page_ids = [str(pr["page_id"]) for pr in page_hits]
+            else:
+                search_kwargs = dict(
+                    query=query_text,
+                    k=10,
+                    use_bm25=config.use_bm25,
+                    use_dense=config.use_dense,
+                    use_visual=config.use_visual,
+                    use_rerank=config.use_rerank,
+                    visual_query_embedding=visual_q_emb,
+                    use_hyde=config.use_hyde,
+                    reranker_type=config.reranker_type,
+                )
+                # 新版 adapter 支持该参数：黄金消融关闭 Search Planning 保证 NDCG 可比
+                # 旧云端 adapter 无此 kw → 静默省略
+                import inspect
+                if "apply_search_planning" in inspect.signature(retriever.search).parameters:
+                    search_kwargs["apply_search_planning"] = False
+                retrieved = retriever.search(**search_kwargs)
+                ranked_page_ids = [str(r["page_id"]) for r in retrieved]
             latencies.append((time.time() - start) * 1000)
 
-            ranked_page_ids = [str(r["page_id"]) for r in retrieved]
             all_ranked_page_ids.append(ranked_page_ids)
             relevant = {str(cid) for cid in qrel_map.get(qid, set())}
             all_relevant.append(relevant)
@@ -248,6 +281,7 @@ def run_ablation(
             "mrr": round(mrr, 4), "avg_latency_ms": round(avg_lat, 1),
             "num_queries": n,
             "language": language,
+            "visual_page_level": bool(config.visual_page_level),
         }
         results.append(result)
         logger.info(f"  NDCG@10={ndcg10:.4f}, Recall@5={rec5:.4f}, MRR={mrr:.4f}")

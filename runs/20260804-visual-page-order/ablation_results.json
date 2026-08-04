@@ -1,0 +1,26 @@
+[
+  {
+    "config": "Visual_only",
+    "ndcg@5": 0.4939,
+    "ndcg@10": 0.4776,
+    "recall@5": 0.4585,
+    "recall@10": 0.4808,
+    "mrr": 0.5983,
+    "avg_latency_ms": 141.3,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  },
+  {
+    "config": "Visual_only_pages",
+    "ndcg@5": 0.4999,
+    "ndcg@10": 0.5076,
+    "recall@5": 0.4676,
+    "recall@10": 0.5283,
+    "mrr": 0.6284,
+    "avg_latency_ms": 138.7,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": true
+  }
+]
