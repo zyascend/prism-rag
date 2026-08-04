@@ -1,3 +1,24 @@
+## 0⁶. Visual 页序修复 — 云上 283q 已验证（阳性）
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `fix/visual-page-rank-order` |
+| **根因** | Visual grounding 用 SQL `ANY` 乱序 chunk + RRF 只认列表位次 |
+| **修复** | `VisualRetriever._ground_pages` 按 MaxSim 页序展开；`Visual_only_pages` 页级臂 |
+| **云跑** | SeetaCloud 4090D · 2026-08-04 · 283q en · skip-index · colqwen2 |
+| **产物** | [`runs/20260804-visual-page-order/`](runs/20260804-visual-page-order/) |
+
+### 数字（协议 v1）
+
+| config | NDCG@10 | vs Boot-A 0.159 |
+|--------|--------:|----------------:|
+| **Visual_only**（修序后） | **0.4776** | **+0.32** |
+| **Visual_only_pages** | **0.5076** | ≈ 官方 ColQwen2 ~0.50 |
+
+**结论：** 旧 0.16 是测错了；pure visual 实际 ~0.51，与官方对齐。
+
+---
+
 ## 0⁵. Agentic RAG（LangGraph）Phase1 MVP 已落地
 
 | 项 | 内容 |

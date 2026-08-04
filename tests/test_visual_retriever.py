@@ -38,6 +38,68 @@ def test_visual_retriever_search():
     mock_colpali.encode_query.assert_called_once_with("test query")
 
 
+def test_grounding_preserves_maxsim_page_order_when_sql_returns_shuffled():
+    """SQL ANY 乱序返回时，结果仍按 MaxSim 页序展开 chunk。"""
+    mock_faiss = MagicMock()
+    mock_faiss.maxsim_search.return_value = [
+        {"page_id": 10, "score": 0.9},
+        {"page_id": 20, "score": 0.8},
+        {"page_id": 30, "score": 0.7},
+    ]
+    # 故意打乱 page 顺序，且同页多 chunk
+    mock_pg = MagicMock()
+    mock_pg.get_chunks_by_page_ids.return_value = [
+        {"chunk_id": "c30a", "page_id": 30, "text": "p30"},
+        {"chunk_id": "c10a", "page_id": 10, "text": "p10a"},
+        {"chunk_id": "c20a", "page_id": 20, "text": "p20"},
+        {"chunk_id": "c10b", "page_id": 10, "text": "p10b"},
+        {"chunk_id": "c30b", "page_id": 30, "text": "p30b"},
+    ]
+    mock_colpali = MagicMock()
+    mock_colpali.encode_query.return_value = torch.randn(1, 8, 128)
+
+    retriever = VisualRetriever(mock_faiss, mock_pg, mock_colpali)
+    results = retriever.search("q", k=3)
+
+    page_order = [r["page_id"] for r in results]
+    assert page_order == [10, 10, 20, 30, 30]
+    assert [r["score"] for r in results] == [0.9, 0.9, 0.8, 0.7, 0.7]
+    assert [r["chunk_id"] for r in results] == ["c10a", "c10b", "c20a", "c30a", "c30b"]
+
+
+def test_search_pages_skips_grounding():
+    mock_faiss = MagicMock()
+    mock_faiss.maxsim_search.return_value = [
+        {"page_id": 1, "score": 0.85},
+        {"page_id": 2, "score": 0.72},
+    ]
+    mock_pg = MagicMock()
+    mock_colpali = MagicMock()
+    mock_colpali.encode_query.return_value = torch.randn(1, 8, 128)
+
+    retriever = VisualRetriever(mock_faiss, mock_pg, mock_colpali)
+    pages = retriever.search_pages("q", k=2)
+
+    assert pages == mock_faiss.maxsim_search.return_value
+    mock_pg.get_chunks_by_page_ids.assert_not_called()
+    mock_colpali.encode_query.assert_called_once_with("q")
+
+
+def test_search_pages_with_embedding_skips_encode():
+    mock_faiss = MagicMock()
+    mock_faiss.maxsim_search.return_value = [{"page_id": 1, "score": 0.5}]
+    mock_pg = MagicMock()
+    mock_colpali = MagicMock()
+    retriever = VisualRetriever(mock_faiss, mock_pg, mock_colpali)
+    q_emb = torch.randn(1, 8, 128)
+
+    pages = retriever.search_pages_with_embedding(q_emb, k=5)
+    assert len(pages) == 1
+    mock_colpali.encode_query.assert_not_called()
+    mock_faiss.maxsim_search.assert_called_once_with(q_emb, k=5)
+    mock_pg.get_chunks_by_page_ids.assert_not_called()
+
+
 def test_visual_retriever_search_with_embedding():
     """search_with_embedding() 跳过 encode_query()，直接调用 faiss.maxsim_search"""
     mock_faiss = MagicMock()
