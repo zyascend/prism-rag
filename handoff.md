@@ -1,21 +1,58 @@
+## 0⁷. Boot-A 重跑定稿 · Full_zerank2 = 0.5454（Visual 修序后）
+
+| 项 | 内容 |
+|----|------|
+| **主表 run** | [`runs/20260804-bootA-post-visual-fix/`](runs/20260804-bootA-post-visual-fix/) |
+| **云跑** | SeetaCloud 4090D · 2026-08-04 · 283q en · skip-index · colqwen2 · `--no-hyde` |
+| **代码** | main（#40 Visual 页序修复已合） |
+| **主结论** | **Full_zerank2 NDCG@10 = 0.5454**（vs 旧 Boot-A 0.5318 **+1.4pt**） |
+
+### 黄金消融（协议 v1 · 283q）
+
+| config | 旧 Boot-A | **本次** | Δ |
+|--------|----------:|---------:|--:|
+| BM25_only | 0.4063 | 0.4063 | 0 |
+| Dense_only | 0.3638 | 0.3724 | +0.009 |
+| Visual_only | 0.1590 | **0.4776** | **+0.319** |
+| Visual_only_pages | — | **0.5076** | 新 |
+| BM25_Dense | 0.4208 | 0.4249 | +0.004 |
+| BM25_Dense_Visual | 0.4201 | **0.4827** | **+0.063** |
+| Full_no_rerank | 0.4201 | **0.4827** | **+0.063** |
+| Full_with_rerank | 0.5161 | 0.5227 | +0.007 |
+| **Full_zerank2** | **0.5318** | **0.5454** | **+0.014** |
+
+### 解读
+
+1. 精排仍主增益：no_rerank 0.483 → zerank **0.545（+6.3pt）**  
+2. Visual 正贡献：BM25_Dense → +Visual **+6pt**（修前曾略负）  
+3. pure visual 与官方对齐：pages **0.508** ≈ ColQwen2 Industrial ~0.50  
+
+### 专项 Visual 臂（同日更早）
+
+[`runs/20260804-visual-page-order/`](runs/20260804-visual-page-order/) · Visual_only / pages 与全消融一致。
+
+**下一步：** 可选更新简历/Demo 数字；云机可关。
+
+---
+
 ## 0⁶. Visual 页序修复 — 云上 283q 已验证（阳性）
 
 | 项 | 内容 |
 |----|------|
-| **分支** | `fix/visual-page-rank-order` |
+| **PR** | #40 已合 main |
 | **根因** | Visual grounding 用 SQL `ANY` 乱序 chunk + RRF 只认列表位次 |
 | **修复** | `VisualRetriever._ground_pages` 按 MaxSim 页序展开；`Visual_only_pages` 页级臂 |
 | **云跑** | SeetaCloud 4090D · 2026-08-04 · 283q en · skip-index · colqwen2 |
-| **产物** | [`runs/20260804-visual-page-order/`](runs/20260804-visual-page-order/) |
+| **产物** | [`runs/20260804-visual-page-order/`](runs/20260804-visual-page-order/) · 全消融见 **§0⁷** |
 
-### 数字（协议 v1）
+### 数字（协议 v1 · 专项臂）
 
-| config | NDCG@10 | vs Boot-A 0.159 |
-|--------|--------:|----------------:|
+| config | NDCG@10 | vs 修前 0.159 |
+|--------|--------:|-------------:|
 | **Visual_only**（修序后） | **0.4776** | **+0.32** |
 | **Visual_only_pages** | **0.5076** | ≈ 官方 ColQwen2 ~0.50 |
 
-**结论：** 旧 0.16 是测错了；pure visual 实际 ~0.51，与官方对齐。
+**结论：** 旧 0.16 是测错了；pure visual 实际 ~0.51，与官方对齐。全表见 §0⁷。
 
 ---
 
@@ -147,8 +184,8 @@ retrieval.crossref_expand.enabled: false
 
 # Handoff — PrismRAG 当前状态
 
-> 分支: **feat/agentic-rag-langgraph** | 远程: origin  
-> 更新: **2026-08-03** — Agentic RAG LangGraph Phase1 MVP（Tasks 0–12）；`agent.enabled` 默认 false
+> 分支: **main** | 远程: origin  
+> 更新: **2026-08-04** — Visual 页序修复 #40 + Boot-A 重跑定稿 **Full_zerank2 = 0.5454**（§0⁷）
 
 ---
 
@@ -405,7 +442,7 @@ pgrep -x ollama >/dev/null || nohup ollama serve >> /root/autodl-tmp/logs/ollama
 
 | 目标 | 结果 |
 |------|------|
-| 可辩护检索主结论（精排瓶颈） | ✅ 协议 v1：Full_no_rerank **0.4201** → Full_zerank2 **0.5318**（+0.11）；vs BM25 +0.13 |
+| 可辩护检索主结论（精排瓶颈） | ✅ 协议 v1 主表 2026-08-04：Full_no_rerank **0.4827** → Full_zerank2 **0.5454**（+6.3pt）；vs 旧 Boot-A Full **+1.4pt** · Visual pure ~0.48–0.51 |
 | 同索引复跑不漂移 | ✅ Full_zerank2 两次 **Δ = 0** |
 | Visual 按需路由延迟–质量 | ✅ 150q：always **0.436**/1244ms vs heuristic **0.401**/1019ms（延迟约 **−18%**） |
 | 生成侧 BGE 压缩「有数」 | ✅ RAGAS 150q：Faith **0.909** / Rel **0.797** / CtxRel **0.258** |

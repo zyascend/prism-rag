@@ -83,23 +83,29 @@ PDF
 - 拒答 **不进** Faith / Rel 均值（`src/rejection.py`）。  
 - 详情：[evaluation.md](docs/architecture/evaluation.md) · 数字以 `runs/` + handoff 为准。
 
-### Layer 1 — 检索（Boot-A · 协议 v1 · 283q en）
+### Layer 1 — 检索（协议 v1 · 283q en · 主表）
 
-来源：[`runs/20260720-bootA/`](runs/20260720-bootA/) · ColQwen2 · `GOLDEN_NO_HYDE` · `--skip-index`  
-Visual 修序后对照：[`runs/20260804-visual-page-order/`](runs/20260804-visual-page-order/)（仅 Visual 两臂；Full 表仍为 Boot-A，待重跑）
+来源：[`runs/20260804-bootA-post-visual-fix/`](runs/20260804-bootA-post-visual-fix/) · ColQwen2 · `GOLDEN_NO_HYDE` · `--skip-index`  
+（Visual 页序修复 #40 后全消融；旧表见 [`20260720-bootA`](runs/20260720-bootA/)）
 
 | 配置 | NDCG@10 | 说明 |
 |------|--------:|------|
-| BM25_only | 0.4063 | Boot-A |
-| Dense_only | 0.3638 | Boot-A |
-| Visual_only | **0.4776** | 修序后生产路径（修前 0.159 为 grounding 乱序误测） |
+| BM25_only | 0.4063 | |
+| Dense_only | 0.3724 | |
+| Visual_only | **0.4776** | 生产路径（修前误测 0.159） |
 | Visual_only_pages | **0.5076** | 页级 MaxSim；≈ 官方 ColQwen2 Industrial ~0.50 |
-| Full_no_rerank | 0.4201 | Boot-A（含旧 visual 序；待重跑） |
-| Full_with_rerank (BGE) | 0.5161 | Boot-A |
-| **Full_zerank2** | **0.5318** | 主结论配置（Boot-A；修序后待重跑） |
-| 同索引复跑 Full_zerank2 | **Δ = 0** | 漂移验收通过 |
+| BM25_Dense | 0.4249 | |
+| BM25_Dense_Visual | **0.4827** | +Visual 约 **+6pt**（修前曾略掉点） |
+| Full_no_rerank | 0.4827 | 三路无精排 |
+| Full_with_rerank (BGE) | 0.5227 | |
+| **Full_zerank2** | **0.5454** | **主结论配置**（vs 旧 Boot-A 0.5318 **+1.4pt**） |
 
-**主结论：** Full_no_rerank → Full_zerank2 **+0.11 NDCG@10**（瓶颈在精排）。Visual pure 已与官方对齐（~0.48–0.51），不再是 0.16。  
+**主结论：**
+
+1. **Full_zerank2 NDCG@10 = 0.545**（当前可辩护主表）。  
+2. Full_no_rerank 0.483 → Full_zerank2 **0.545（+6.3pt）** — 瓶颈仍在精排。  
+3. Visual pure **~0.48–0.51**，与官方对齐；三路融合中 Visual 为正贡献。  
+
 HyDE：历史消融 Δ≈0 / 略负，**默认不跑**（见 [zerank2-hyde 复盘](docs/solutions/2026-07-02-zerank2-hyde-experiment.md)）。
 
 可选：Visual 路由 150q（Boot-B）always 1244ms / NDCG@10 0.436 vs heuristic 1019ms / 0.401（延迟约 **−18%**）→ [`runs/20260720-bootB/`](runs/20260720-bootB/)。
