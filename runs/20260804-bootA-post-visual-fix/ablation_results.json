@@ -1,0 +1,110 @@
+[
+  {
+    "config": "BM25_only",
+    "ndcg@5": 0.3957,
+    "ndcg@10": 0.4063,
+    "recall@5": 0.393,
+    "recall@10": 0.4545,
+    "mrr": 0.4993,
+    "avg_latency_ms": 22.6,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  },
+  {
+    "config": "Dense_only",
+    "ndcg@5": 0.3585,
+    "ndcg@10": 0.3724,
+    "recall@5": 0.3404,
+    "recall@10": 0.4061,
+    "mrr": 0.4818,
+    "avg_latency_ms": 102.2,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  },
+  {
+    "config": "Visual_only",
+    "ndcg@5": 0.4939,
+    "ndcg@10": 0.4776,
+    "recall@5": 0.4585,
+    "recall@10": 0.4808,
+    "mrr": 0.5983,
+    "avg_latency_ms": 169.4,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  },
+  {
+    "config": "Visual_only_pages",
+    "ndcg@5": 0.4999,
+    "ndcg@10": 0.5076,
+    "recall@5": 0.4676,
+    "recall@10": 0.5283,
+    "mrr": 0.6284,
+    "avg_latency_ms": 147.7,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": true
+  },
+  {
+    "config": "BM25_Dense",
+    "ndcg@5": 0.4112,
+    "ndcg@10": 0.4249,
+    "recall@5": 0.3923,
+    "recall@10": 0.4678,
+    "mrr": 0.533,
+    "avg_latency_ms": 128.7,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  },
+  {
+    "config": "BM25_Dense_Visual",
+    "ndcg@5": 0.4679,
+    "ndcg@10": 0.4827,
+    "recall@5": 0.4454,
+    "recall@10": 0.5169,
+    "mrr": 0.5874,
+    "avg_latency_ms": 299.6,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  },
+  {
+    "config": "Full_no_rerank",
+    "ndcg@5": 0.4679,
+    "ndcg@10": 0.4827,
+    "recall@5": 0.4454,
+    "recall@10": 0.5169,
+    "mrr": 0.5874,
+    "avg_latency_ms": 0.2,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  },
+  {
+    "config": "Full_with_rerank",
+    "ndcg@5": 0.5178,
+    "ndcg@10": 0.5227,
+    "recall@5": 0.4771,
+    "recall@10": 0.5476,
+    "mrr": 0.635,
+    "avg_latency_ms": 603.8,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  },
+  {
+    "config": "Full_zerank2",
+    "ndcg@5": 0.5442,
+    "ndcg@10": 0.5454,
+    "recall@5": 0.4982,
+    "recall@10": 0.5576,
+    "mrr": 0.674,
+    "avg_latency_ms": 1070.8,
+    "num_queries": 283,
+    "language": "en",
+    "visual_page_level": false
+  }
+]
