@@ -506,7 +506,8 @@ mindmap
 | Demo fixtures | `tests/test_demo_fixtures.py::test_agent_fixture_has_trajectory` | ✅ |
 | Eval 骨架 | `tests/test_agent_eval.py` + `data/agent_eval_qa.json` | ✅ |
 
-**Phase2 未做：** 云上 ~40–50 双臂（pipeline vs agent）Correct/误拒/latency；**无 Go 前禁止 `enabled: true`。**
+**Phase2 工具链（2026-08）：** `data/agent_eval_qa.json` ~46 条；`scripts/run_agent_eval.py --execute`；`scripts/cloud_agent_eval.sh`。  
+**云上双臂数字 / Go 决议仍未做** → **无 Go 前禁止 `enabled: true`。**
 
 ---
 

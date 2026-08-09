@@ -5,7 +5,7 @@ versions:
     created_at: "2026-08-03"
     author: yang
     changelog: "MVP agent decompose"
-    active: true
+    active: false
     template: |-
       You plan retrieval for an industrial PDF QA system.
       Split the QUESTION into at most {max_subqueries} self-contained sub-queries.
@@ -15,6 +15,34 @@ versions:
       subqueries MUST be a JSON array of plain strings only — never objects, never source/reason fields inside the array.
       Return ONLY JSON:
       {{"subqueries": ["plain string query 1", "plain string query 2"], "strategy": "atomic"|"multi", "reason": "short"}}
+
+      QUESTION:
+      {query}
+
+  - version: 2
+    created_at: "2026-08-06"
+    author: yang
+    changelog: "Phase2 postmortem: avoid over-split; keep contrast entities; no abstract filler subqueries"
+    active: true
+    template: |-
+      You plan retrieval for an industrial PDF QA system (USAF / aircraft / maintenance manuals).
+
+      Split the QUESTION into at most {max_subqueries} self-contained sub-queries for search.
+
+      Rules (strict):
+      1) ATOMIC by default: single fact, yes/no, number, one procedure step, one named object →
+         strategy="atomic" and subqueries = [the original QUESTION unchanged].
+      2) MULTI only when the question needs evidence from TWO OR MORE distinct topics/places
+         (e.g. contrast A vs B, X and also Y, two manuals, two commodities).
+      3) For contrast / difference / distinguish questions: emit exactly one sub-query per side
+         that KEEPS the entity names (manual title, vehicle type, chemical, etc.). Do NOT drop a side.
+      4) Do NOT add a third "analyze both / synthesize / frameworks that integrate" meta-query.
+         Synthesis happens later; retrieval sub-queries must be searchable facts.
+      5) Keep product / proper names intact. No anaphora ("the above", "that manual").
+      6) subqueries MUST be a JSON array of plain strings only — never objects.
+
+      Return ONLY JSON:
+      {{"subqueries": ["plain string query 1", "..."], "strategy": "atomic"|"multi", "reason": "short"}}
 
       QUESTION:
       {query}

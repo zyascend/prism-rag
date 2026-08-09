@@ -834,8 +834,9 @@ async def ask(request: AskRequest):
             )
             complete_fn = _make_complete_fn(gen)
 
-            def generate_fn(q, hits):
-                return gen.answer(q, hits, k_context=request.k)
+            def generate_fn(q, hits, k_context=None):
+                kk = int(k_context) if k_context is not None else int(request.k)
+                return gen.answer(q, hits, k_context=kk)
 
             pipeline_fallback = _pipeline_fallback_fn(
                 retriever,
@@ -1077,8 +1078,9 @@ async def ask_resume(request: AskResumeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"complete_fn unavailable: {e}")
 
-    def generate_fn(q, hits):
-        return gen.answer(q, hits, k_context=request.k)
+    def generate_fn(q, hits, k_context=None):
+        kk = int(k_context) if k_context is not None else int(request.k)
+        return gen.answer(q, hits, k_context=kk)
 
     # None → [] so graph falls back to interrupted subqueries (approve as-is)
     approved = list(request.subqueries) if request.subqueries is not None else []

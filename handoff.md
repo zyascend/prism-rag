@@ -89,17 +89,35 @@ HITL 默认关；需 `agent.hitl.review_subqueries: true` + checkpoint 后才走
 # 2026-08-03：57 passed
 ```
 
-### Phase2（未做 · 独立云跑 checklist）
+### Phase2 云上双臂 · 优化后再跑 **仍 NO_GO**（2026-08-06 · 定稿）
 
-- 扩 `data/agent_eval_qa.json` ~40–50（multi_hop / atomic / reject）
-- 双臂 pipeline vs agent（可选 grade off）；Correct / 误拒 / latency / avg searches
-- 产物 `runs/YYYYMMDD-agent-eval/` + README 决议
-- **仅 Go 后**另议是否启发式进 agent；**默认 enabled 仍建议 false**
+| 项 | 内容 |
+|----|------|
+| **定稿产物** | [`runs/20260806-agent-eval-opt/`](runs/20260806-agent-eval-opt/) |
+| 隔离修后 | [`runs/20260806-agent-eval-rerun/`](runs/20260806-agent-eval-rerun/) |
+| 串台污染 | [`runs/20260806-agent-eval/`](runs/20260806-agent-eval/)（勿引用主表） |
+| **云** | SeetaCloud 4090D · skip-index · colqwen2 · qwen2:7b · judge=llm · 46q |
+| **决议** | **NO_GO** · 保持 **`agent.enabled: false`** |
+
+| 版本 | agent Correct | multi_hop | 误拒 | atomic Δ |
+|------|-------------:|----------:|-----:|---------:|
+| 串台 | 0.217 | 0.056 | 33 | −0.39 |
+| 隔离 | 0.587 | 0.556 | 7 | −0.056 |
+| **汇合+dec v2** | **0.630** | **0.667** | **4** | **0** |
+| pipeline | **0.674** | **0.778** | 4 | — |
+
+门禁：atomic PASS · multi_hop FAIL（0.67&lt;0.78）· budget/degrade PASS。  
+延迟：agent ~6.4s vs pipeline ~3.2s。
+
+**结论：** 优化有效（+4pt Correct / multi_hop +11pt / 误拒打平），**仍不足以默认开 agent**。
+
+**工程：** 隔离 thread · diversify evidence · synthesis k · decompose v2 · 评测脚本。
 
 ### 下一步
 
-- 合 PR（默认 off）或继续 Phase2 云跑
-- 可选本机轻量真链路 ≤10q（local-demo + 已缓存模型）
+- 合 `feat/agent-phase2-eval`（默认 off · 含 NO_GO 文档）  
+- 可选：全局 rerank / 更大 LLM / 仅 Demo `mode=agent`  
+- **卡可关**
 
 ---
 
