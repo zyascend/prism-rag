@@ -26,9 +26,123 @@ __all__ = [
     "parse_json_object",
     "normalize_subquery_text",
     "normalize_subquery_list",
+    "diversify_evidence_for_synthesis",
+    "synthesis_k_context",
     "make_knowledge_search_tool",
     "make_agent_lc_tools",
 ]
+
+
+def _hit_score(h: dict) -> float:
+    """Prefer rerank_score, then score, for fill-up ranking."""
+    for key in ("rerank_score", "score", "rrf_score"):
+        v = h.get(key)
+        if v is None:
+            continue
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def synthesis_k_context(
+    n_subqueries: int,
+    *,
+    base_k: int = 5,
+    per_subquery: int = 2,
+    max_k: int = 12,
+) -> int:
+    """Target context size for multi-subquery synthesis.
+
+    Multi-hop must not collapse to first-subquery-only top-5 (Phase2 root cause).
+    """
+    n = max(1, int(n_subqueries or 1))
+    base = max(1, int(base_k or 5))
+    per = max(1, int(per_subquery or 2))
+    cap = max(base, int(max_k or 12))
+    return min(cap, max(base, per * n))
+
+
+def diversify_evidence_for_synthesis(
+    evidence: Sequence[Any],
+    *,
+    k: int = 5,
+) -> List[dict]:
+    """Select up to ``k`` hits for generation with per-subquery fairness.
+
+    Algorithm
+    ---------
+    1. Group by ``subquery_id`` (missing → single bucket ``-1``).
+    2. Round-robin one hit from each subquery (preserving within-bucket order).
+    3. Fill remaining slots by descending score across leftovers.
+    4. Deduplicate by ``chunk_id`` (fallback: id(text)).
+
+    This prevents ``Generator.answer``'s ``retrieved[:k_context]`` from seeing
+    only the first subquery's hits when multi-search appends evidence in order.
+    """
+    if not evidence or k <= 0:
+        return []
+
+    buckets: Dict[Any, List[dict]] = {}
+    order_keys: List[Any] = []
+    for raw in evidence:
+        h = dict(raw) if isinstance(raw, dict) else {"text": str(raw)}
+        sid = h.get("subquery_id")
+        if sid is None:
+            sid = -1
+        if sid not in buckets:
+            buckets[sid] = []
+            order_keys.append(sid)
+        buckets[sid].append(h)
+
+    # Round-robin
+    selected: List[dict] = []
+    seen: set = set()
+    indices = {sid: 0 for sid in order_keys}
+
+    def _key(h: dict) -> Any:
+        cid = h.get("chunk_id")
+        if cid is not None and cid != "":
+            return ("c", cid)
+        return ("t", (h.get("text") or "")[:120])
+
+    def _take(h: dict) -> bool:
+        key = _key(h)
+        if key in seen:
+            return False
+        seen.add(key)
+        selected.append(h)
+        return True
+
+    progressed = True
+    while len(selected) < k and progressed:
+        progressed = False
+        for sid in order_keys:
+            if len(selected) >= k:
+                break
+            i = indices[sid]
+            bucket = buckets[sid]
+            while i < len(bucket):
+                hit = bucket[i]
+                i += 1
+                indices[sid] = i
+                if _take(hit):
+                    progressed = True
+                    break
+
+    if len(selected) < k:
+        leftovers: List[dict] = []
+        for sid in order_keys:
+            i = indices[sid]
+            leftovers.extend(buckets[sid][i:])
+        leftovers.sort(key=_hit_score, reverse=True)
+        for hit in leftovers:
+            if len(selected) >= k:
+                break
+            _take(hit)
+
+    return selected
 
 
 def make_knowledge_search_tool(
@@ -469,7 +583,11 @@ class AgentToolBox:
             return original
 
     def synthesize_answer(self, query: str, evidence: list) -> dict:
-        """Generate final answer from evidence; empty evidence → unified abstain."""
+        """Generate final answer from evidence; empty evidence → unified abstain.
+
+        Multi-subquery evidence is **diversified** before generation so
+        ``Generator.answer``'s ``[:k_context]`` slice is not first-subquery-only.
+        """
         ev = list(evidence or [])
         if not ev:
             return {
@@ -478,9 +596,36 @@ class AgentToolBox:
                 "rejected": True,
             }
 
-        # Pass evidence as retrieved-style dicts for Generator.answer compatibility
-        hits: List[dict] = [dict(h) if isinstance(h, dict) else {"text": str(h)} for h in ev]
-        out = self.generate_fn(query, hits)
+        hits: List[dict] = [
+            dict(h) if isinstance(h, dict) else {"text": str(h)} for h in ev
+        ]
+        n_subs = len(
+            {
+                h.get("subquery_id")
+                for h in hits
+                if h.get("subquery_id") is not None
+            }
+        ) or 1
+        base_k = int(
+            self.cfg.get("synthesize_k_context")
+            or self.cfg.get("search_top_k")
+            or 5
+        )
+        per_sub = int(self.cfg.get("synthesize_per_subquery") or 2)
+        max_k = int(self.cfg.get("synthesize_max_k") or 12)
+        target_k = synthesis_k_context(
+            n_subs, base_k=base_k, per_subquery=per_sub, max_k=max_k
+        )
+        selected = diversify_evidence_for_synthesis(hits, k=target_k)
+        if not selected:
+            selected = hits[:target_k]
+
+        # Prefer generate_fn(..., k_context=) so curated list is not re-sliced short
+        try:
+            out = self.generate_fn(query, selected, k_context=len(selected))
+        except TypeError:
+            out = self.generate_fn(query, selected)
+
         if not isinstance(out, dict):
             return {
                 "answer": abstain_message(),
@@ -497,6 +642,9 @@ class AgentToolBox:
             "answer": answer,
             "citations": citations,
             "rejected": rejected,
+            "n_evidence_in": len(hits),
+            "n_evidence_used": len(selected),
+            "synthesize_k": target_k,
             **(
                 {"context": out["context"]}
                 if "context" in out

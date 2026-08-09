@@ -4,9 +4,15 @@ Callers inject search/complete/generate; ``agent.enabled`` stays false in yaml.
 Errors honor ``on_error``: degrade_pipeline | abstain | re-raise.
 
 P1c: ``stream_agent``, ``resume_agent``, HITL interrupt → status=interrupted.
+
+Isolation: each ``run_agent`` / ``stream_agent`` uses a **unique** ``thread_id``
+unless the caller passes ``trace_id`` (HITL resume must reuse the same id).
+Reusing a fixed id with MemorySaver merges reducer channels (evidence,
+trajectory) across questions — see Phase2 NO_GO ``evidence_n`` 20→611.
 """
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
@@ -16,7 +22,13 @@ __all__ = [
     "resume_agent",
     "stream_agent",
     "merge_agent_cfg",
+    "new_thread_id",
 ]
+
+
+def new_thread_id(prefix: str = "agent") -> str:
+    """Fresh thread id for one graph invocation (checkpoint isolation)."""
+    return f"{prefix}-{uuid.uuid4().hex}"
 
 
 @dataclass
@@ -196,13 +208,17 @@ def run_agent(
 
     When HITL interrupts, returns ``status="interrupted"`` with pending
     ``subqueries`` and ``thread_id`` (not an error).
+
+    Pass ``trace_id`` only when you need a stable id (HITL pause/resume).
+    Batch eval must **not** share one id across questions.
     """
     from src.agent.config import agent_config
     from src.agent.graph import build_agent_graph
     from src.agent.state import empty_agent_state
 
     c = merge_agent_cfg(agent_config(), cfg)
-    thread_id = trace_id or "local"
+    # Never default to a shared "local" id under MemorySaver — reducer state leaks.
+    thread_id = (str(trace_id).strip() if trace_id else "") or new_thread_id()
 
     try:
         graph = build_agent_graph(
@@ -215,7 +231,8 @@ def run_agent(
         init.setdefault("meta", {})
         if isinstance(init["meta"], dict):
             init["meta"] = dict(init["meta"])
-            init["meta"]["trace_id"] = trace_id
+            init["meta"]["trace_id"] = thread_id
+            init["meta"]["thread_id"] = thread_id
         out = graph.invoke(
             init,
             config={"configurable": {"thread_id": thread_id}},
@@ -302,7 +319,7 @@ def stream_agent(
     from src.agent.state import empty_agent_state
 
     c = merge_agent_cfg(agent_config(), cfg)
-    thread_id = trace_id or "local"
+    thread_id = (str(trace_id).strip() if trace_id else "") or new_thread_id("stream")
     modes = stream_mode if stream_mode is not None else ["updates", "values"]
 
     graph = build_agent_graph(
@@ -315,7 +332,8 @@ def stream_agent(
     init.setdefault("meta", {})
     if isinstance(init["meta"], dict):
         init["meta"] = dict(init["meta"])
-        init["meta"]["trace_id"] = trace_id
+        init["meta"]["trace_id"] = thread_id
+        init["meta"]["thread_id"] = thread_id
 
     yield from graph.stream(
         init,

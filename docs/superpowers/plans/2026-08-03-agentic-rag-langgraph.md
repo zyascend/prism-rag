@@ -1402,11 +1402,11 @@ git commit -m "docs: agent architecture notes and handoff for LangGraph MVP"
 
 > 有 GPU 时再做；遵守 AGENTS.md：先查缓存、HF 镜像、禁止无预算下载。
 
-- [ ] 扩 `data/agent_eval_qa.json` 至 ~40–50（multi_hop / atomic / reject）
-- [ ] `scripts/cloud_agent_eval.sh`：`enabled` 环境开 agent 配置覆盖 + skip-index
-- [ ] 双臂：pipeline vs agent（可选 grade off）
-- [ ] 指标：Correct、误拒、latency、avg searches、degrade 次数
-- [ ] 产物：`runs/YYYYMMDD-agent-eval/` + README 决议
+- [x] 扩 `data/agent_eval_qa.json` 至 ~46（multi_hop 18 / atomic 18 / reject 10）
+- [x] `scripts/cloud_agent_eval.sh`：skip-index 双臂 + 可选 grade_off
+- [x] 双臂实现：`run_agent_eval.py --execute` + `src/agent/eval.py` 汇总 / go_nogo_draft
+- [x] 指标：Correct、误拒、latency、avg searches、degrade 次数
+- [ ] **云跑**产物：`runs/YYYYMMDD-agent-eval/` + README 决议
 - [ ] **仅 Go 后** 另 PR 讨论是否启发式进 agent；**默认 enabled 仍建议 false**
 
 ---

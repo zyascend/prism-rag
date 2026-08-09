@@ -21,7 +21,6 @@ import logging
 import os
 import subprocess
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -227,23 +226,6 @@ def build_retriever_light(*, skip_visual: bool = False):
     )
 
 
-def _string_match_correct(answer: str, gold: Optional[str], expect_reject: bool) -> Optional[bool]:
-    """Placeholder Correct: reject phrase check or loose gold token overlap. Not Phase2 metric."""
-    from src.rejection import is_rejection
-
-    if expect_reject:
-        return bool(is_rejection(answer or ""))
-    if not gold:
-        return None
-    a = (answer or "").lower()
-    # take a few content words from gold
-    tokens = [t for t in gold.lower().replace(",", " ").split() if len(t) > 4][:8]
-    if not tokens:
-        return None
-    hits = sum(1 for t in tokens if t in a)
-    return hits >= max(1, len(tokens) // 3)
-
-
 def run_one_item(
     item: Dict[str, Any],
     *,
@@ -253,99 +235,18 @@ def run_one_item(
     use_visual: bool,
     use_rerank: bool,
 ) -> Dict[str, Any]:
-    from src.agent.eval import agent_answer_for_eval
-    from src.generation.self_rag import answer_for_eval
+    """Thin wrapper around shared dual-arm runner (heuristic judge for smoke)."""
+    from src.agent.eval import run_dual_arm_item
 
-    q = item.get("query") or item.get("question") or ""
-    gold = item.get("gold_answer")
-    expect_reject = bool(item.get("expect_reject"))
-    row: Dict[str, Any] = {
-        "id": item.get("id"),
-        "tag": item.get("tag"),
-        "query": q,
-        "expect_reject": expect_reject,
-    }
-
-    # pipeline arm
-    t0 = time.perf_counter()
-    try:
-        hits = retriever.search(q, k=k, use_visual=use_visual, use_rerank=use_rerank)
-        pipe = answer_for_eval(
-            q,
-            hits,
-            k_context=k,
-            generator=generator,
-            retriever=retriever,
-            use_rerank=use_rerank,
-            use_visual=use_visual,
-        )
-        row["pipeline"] = {
-            "answer": pipe.get("answer") or "",
-            "n_citations": len(pipe.get("citations") or []),
-            "latency_ms": int((time.perf_counter() - t0) * 1000),
-            "error": None,
-            "correct_placeholder": _string_match_correct(
-                pipe.get("answer") or "", gold, expect_reject
-            ),
-        }
-    except Exception as e:
-        logger.exception("pipeline failed id=%s", item.get("id"))
-        row["pipeline"] = {
-            "answer": "",
-            "n_citations": 0,
-            "latency_ms": int((time.perf_counter() - t0) * 1000),
-            "error": str(e)[:400],
-            "correct_placeholder": False,
-        }
-
-    # agent arm
-    t1 = time.perf_counter()
-    try:
-        ag = agent_answer_for_eval(
-            q,
-            retriever=retriever,
-            generator=generator,
-            k_context=k,
-            use_rerank=use_rerank,
-            use_visual=use_visual,
-            cfg={"return_trajectory": True},
-        )
-        agent_meta = ag.get("agent") or {}
-        row["agent"] = {
-            "answer": ag.get("answer") or "",
-            "n_citations": len(ag.get("citations") or []),
-            "latency_ms": int((time.perf_counter() - t1) * 1000),
-            "status": agent_meta.get("status"),
-            "subqueries": agent_meta.get("subqueries") or [],
-            "counts": agent_meta.get("counts") or {},
-            "trajectory_summary": [
-                {
-                    "step": t.get("step"),
-                    "node": t.get("node"),
-                    "tool": t.get("tool"),
-                }
-                for t in (agent_meta.get("trajectory") or [])[:12]
-                if isinstance(t, dict)
-            ],
-            "error": agent_meta.get("error"),
-            "correct_placeholder": _string_match_correct(
-                ag.get("answer") or "", gold, expect_reject
-            ),
-        }
-    except Exception as e:
-        logger.exception("agent failed id=%s", item.get("id"))
-        row["agent"] = {
-            "answer": "",
-            "n_citations": 0,
-            "latency_ms": int((time.perf_counter() - t1) * 1000),
-            "status": "error",
-            "subqueries": [],
-            "counts": {},
-            "trajectory_summary": [],
-            "error": str(e)[:400],
-            "correct_placeholder": False,
-        }
-    return row
+    return run_dual_arm_item(
+        item,
+        retriever=retriever,
+        generator=generator,
+        k=k,
+        use_visual=use_visual,
+        use_rerank=use_rerank,
+        judge="heuristic",
+    )
 
 
 def main(argv: Optional[List[str]] = None) -> int:

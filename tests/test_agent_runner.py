@@ -1,5 +1,11 @@
 # tests/test_agent_runner.py
-from src.agent.runner import run_agent, AgentResult, merge_agent_cfg
+from src.agent.checkpoint import reset_memory_saver
+from src.agent.runner import (
+    AgentResult,
+    merge_agent_cfg,
+    new_thread_id,
+    run_agent,
+)
 
 
 def _base_cfg(**overrides):
@@ -169,3 +175,124 @@ def test_answer_cache_key_includes_agent_salt(monkeypatch):
     assert k1 != k2
     assert "ag=off" in k1
     assert "ag=on" in k2
+
+
+def test_new_thread_id_unique():
+    ids = {new_thread_id() for _ in range(20)}
+    assert len(ids) == 20
+    assert all(i.startswith("agent-") for i in ids)
+
+
+def _mock_search(q, k=5):
+    # one hit per call — evidence_n should stay ~1 per isolated run
+    return [
+        {
+            "chunk_id": f"c-{q}",
+            "text": f"fact about {q}",
+            "score": 1.0,
+            "doc_id": "d1",
+        }
+    ]
+
+
+def _mock_complete(_p):
+    return '{"subqueries": ["atomic q"], "strategy": "atomic", "reason": "a"}'
+
+
+def _mock_generate(q, hits):
+    return {
+        "answer": f"ans:{q}",
+        "citations": [{"chunk_id": hits[0]["chunk_id"]}] if hits else [],
+        "rejected": False,
+    }
+
+
+def test_batch_isolation_no_evidence_leak_with_checkpoint():
+    """Regression: shared thread_id + MemorySaver merged evidence across questions.
+
+    Default run_agent must isolate each invoke so evidence_n / trajectory
+    do not grow across a dual-arm batch (Phase2 NO_GO root cause).
+    """
+    reset_memory_saver()
+    cfg = _base_cfg(
+        checkpoint={"enabled": True},  # the production default that leaked
+        grade={"enabled": False},
+        max_grade_cycles=0,
+    )
+
+    evidence_ns = []
+    thread_ids = []
+    for i in range(3):
+        res = run_agent(
+            f"query-{i}",
+            search_fn=_mock_search,
+            complete_fn=_mock_complete,
+            generate_fn=_mock_generate,
+            cfg=cfg,
+            # no trace_id — must auto-allocate unique thread ids
+        )
+        assert res.status in ("ok", "abstain")
+        evidence_ns.append(int(res.counts.get("evidence_n") or 0))
+        thread_ids.append(res.thread_id)
+        decomp = [t for t in res.trajectory if t.get("node") == "decompose"]
+        assert len(decomp) == 1, f"trajectory polluted: {res.trajectory}"
+
+    assert len(set(thread_ids)) == 3
+    # each run: one search → one hit (not 1,2,3… cumulative)
+    assert evidence_ns[0] == evidence_ns[1] == evidence_ns[2]
+    assert evidence_ns[0] >= 1
+    assert evidence_ns[0] <= 3  # budget headroom, never double-digit leak
+    reset_memory_saver()
+
+
+def test_shared_thread_id_still_leaks_evidence_documenting_pitfall():
+    """Same thread_id + checkpoint *does* accumulate reducers — do not use in batch."""
+    reset_memory_saver()
+    cfg = _base_cfg(checkpoint={"enabled": True}, grade={"enabled": False})
+    ns = []
+    for i in range(3):
+        res = run_agent(
+            f"shared-{i}",
+            search_fn=_mock_search,
+            complete_fn=_mock_complete,
+            generate_fn=_mock_generate,
+            cfg=cfg,
+            trace_id="fixed-batch-id",  # intentional anti-pattern
+        )
+        ns.append(int(res.counts.get("evidence_n") or 0))
+    # Document the bug class: evidence must strictly grow when id is reused.
+    assert ns[-1] > ns[0], f"expected leak under shared thread_id, got {ns}"
+    reset_memory_saver()
+
+
+def test_agent_answer_for_eval_batch_isolation():
+    """agent_answer_for_eval must not leak evidence across sequential calls."""
+    from src.agent.eval import agent_answer_for_eval
+
+    class Ret:
+        def search(self, query, k=5, **kwargs):
+            return _mock_search(query, k=k)
+
+    class Gen:
+        def complete(self, prompt: str) -> str:
+            return _mock_complete(prompt)
+
+        def answer(self, query, hits, k_context=5):
+            return _mock_generate(query, hits)
+
+    reset_memory_saver()
+    ret, gen = Ret(), Gen()
+    ns = []
+    for i in range(3):
+        out = agent_answer_for_eval(
+            f"eval-q-{i}",
+            retriever=ret,
+            generator=gen,
+            k_context=5,
+            cfg={"grade": {"enabled": False}, "max_grade_cycles": 0},
+        )
+        ns.append(int((out.get("agent") or {}).get("counts", {}).get("evidence_n") or 0))
+        traj = (out.get("agent") or {}).get("trajectory") or []
+        assert sum(1 for t in traj if t.get("node") == "decompose") == 1
+    assert ns[0] == ns[1] == ns[2]
+    reset_memory_saver()

@@ -1,9 +1,11 @@
 # tests/test_agent_tools.py
 from src.agent.tools import (
     AgentToolBox,
+    diversify_evidence_for_synthesis,
     normalize_subquery_list,
     normalize_subquery_text,
     parse_json_object,
+    synthesis_k_context,
 )
 
 
@@ -111,4 +113,80 @@ def test_synthesize_empty_evidence_rejects():
     out = box.synthesize_answer("q", evidence=[])
     assert out["rejected"] is True
     assert out["answer"]  # 拒答文案非空
+
+
+def test_synthesis_k_context_scales_with_subqueries():
+    assert synthesis_k_context(1, base_k=5, per_subquery=2, max_k=12) == 5
+    assert synthesis_k_context(2, base_k=5, per_subquery=2, max_k=12) == 5
+    assert synthesis_k_context(3, base_k=5, per_subquery=2, max_k=12) == 6
+    assert synthesis_k_context(3, base_k=5, per_subquery=3, max_k=12) == 9
+    assert synthesis_k_context(10, base_k=5, per_subquery=2, max_k=12) == 12
+
+
+def test_diversify_evidence_round_robin_not_first_subquery_only():
+    """Phase2 root cause: plain [:5] kept only subquery 0 hits."""
+    evidence = []
+    for sid in (0, 1, 2):
+        for i in range(5):
+            evidence.append(
+                {
+                    "chunk_id": f"s{sid}-{i}",
+                    "subquery_id": sid,
+                    "text": f"side{sid} hit{i}",
+                    "score": 1.0 - i * 0.01,
+                }
+            )
+    # Naive slice would be all subquery 0
+    naive = evidence[:5]
+    assert all(h["subquery_id"] == 0 for h in naive)
+
+    picked = diversify_evidence_for_synthesis(evidence, k=6)
+    assert len(picked) == 6
+    sids = {h["subquery_id"] for h in picked}
+    assert sids == {0, 1, 2}
+    # at least one hit per side in first 3 of round-robin
+    assert {h["subquery_id"] for h in picked[:3]} == {0, 1, 2}
+
+
+def test_synthesize_passes_diversified_hits_and_k_context():
+    evidence = []
+    for sid in (0, 1):
+        for i in range(5):
+            evidence.append(
+                {
+                    "chunk_id": f"s{sid}-{i}",
+                    "subquery_id": sid,
+                    "text": f"side{sid} content {i}",
+                    "score": 0.9 - i * 0.05,
+                    "doc_id": "d",
+                }
+            )
+    seen = {}
+
+    def generate_fn(q, hits, k_context=None):
+        seen["n"] = len(hits)
+        seen["k"] = k_context
+        seen["sids"] = {h.get("subquery_id") for h in hits}
+        return {
+            "answer": "both sides covered",
+            "citations": [{"chunk_id": h["chunk_id"]} for h in hits],
+            "rejected": False,
+        }
+
+    box = AgentToolBox(
+        search_fn=lambda q, k=5: [],
+        complete_fn=lambda p: "{}",
+        generate_fn=generate_fn,
+        cfg={
+            "synthesize_k_context": 5,
+            "synthesize_per_subquery": 2,
+            "synthesize_max_k": 12,
+        },
+    )
+    out = box.synthesize_answer("contrast A and B?", evidence=evidence)
+    assert out["rejected"] is False
+    assert seen["sids"] == {0, 1}
+    assert seen["n"] >= 4  # 2 sides × at least 2
+    assert seen["k"] == seen["n"]
+    assert out.get("n_evidence_used") == seen["n"]
 
