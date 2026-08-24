@@ -1,3 +1,15 @@
+## 0⁸. Agent 角色子图化（Phase 1 结构改造 · 行为零变化）
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `feat/agent-role-subgraphs`（Phase 2 supervisor 的结构地基） |
+| **代码** | 新增 `src/agent/nodes.py`（9 个角色 subgraph 工厂）；`src/agent/graph.py` 瘦身为纯路由编排 |
+| **验证** | `tests/test_agent_*.py + test_api + test_demo_fixtures` **69 passed**（与 Phase 0 基线一致） |
+| **关键坑** | 子图 schema **不能声明 reducer 通道（evidence/trajectory）为输入** —— 声明了子图 invoke 会把输入原值带回（echo），外层 operator.add 再合并 → evidence 0→2→4→8 翻倍 / trajectory 两整轮。修法：`_SharedInput` 只声明普通输入键（query/subqueries/budget/meta…），子图节点仍可**写** evidence/trajectory 作 delta |
+| **下一步** | Phase 2 supervisor：supervise 节点 + `validate_dispatch_plan`，插在 HITL 后、route 前；`agent.supervise.enabled` 默认关 |
+
+---
+
 ## 0⁷. Boot-A 重跑定稿 · Full_zerank2 = 0.5454（Visual 修序后）
 
 | 项 | 内容 |

@@ -1,19 +1,33 @@
 """Agent StateGraph — decompose → [HITL] → retrieve (seq or Send) → grade ⇄ refine → synthesize.
 
+Phase 1: 各角色节点抽为独立 subgraph（nodes.py 的 build_*_subgraph），
+外层 StateGraph 只保留路由 + Send fan-out。行为零变化（trajectory node 名、
+reducer 合并、meta 键、路由函数签名与 Phase 0 完全一致）。
+
 P1a: sequential multi-retrieve. P1b: optional Send map-reduce via use_send.
 P1c: MemorySaver checkpoint, stream, HITL interrupt after decompose.
 """
 from __future__ import annotations
 
 import re
-import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from langgraph.graph import END, StateGraph
-from langgraph.types import Send, interrupt
+from langgraph.types import Send
 
-from src.agent.state import AgentState, next_step, step_record
+from src.agent.nodes import (
+    build_decompose_subgraph,
+    build_finalize_subgraph,
+    build_grade_subgraph,
+    build_hitl_review_subgraph,
+    build_prepare_multi_subgraph,
+    build_refine_subgraph,
+    build_retrieve_multi_subgraph,
+    build_retrieve_one_subgraph,
+    build_synthesize_subgraph,
+)
+from src.agent.state import AgentState
 from src.agent.subgraphs import build_retrieval_subgraph, retrieval_worker_delta
 from src.agent.tools import AgentToolBox
 
@@ -135,63 +149,6 @@ def fan_out_searches(state: Dict[str, Any]) -> Union[List[Send], str]:
     return sends
 
 
-def _budget_copy(state: Dict[str, Any]) -> Dict[str, Any]:
-    b = state.get("budget") or {}
-    return {
-        "searches_left": int(b.get("searches_left") or 0),
-        "llm_calls_left": int(b.get("llm_calls_left") or 0),
-        "grade_cycles_left": int(b.get("grade_cycles_left") or 0),
-        "max_subqueries": int(b.get("max_subqueries") or 0),
-    }
-
-
-def _meta_copy(state: Dict[str, Any]) -> Dict[str, Any]:
-    return dict(state.get("meta") or {})
-
-
-def _dec_llm(budget: Dict[str, Any]) -> None:
-    budget["llm_calls_left"] = max(0, int(budget.get("llm_calls_left") or 0) - 1)
-
-
-def _grade_enabled(cfg: Dict[str, Any]) -> bool:
-    g = cfg.get("grade")
-    if isinstance(g, dict):
-        return bool(g.get("enabled", True))
-    return True
-
-
-def _select_multi_queries(state: Dict[str, Any]) -> tuple[List[str], bool]:
-    """Return (queries, clear_pending) for multi retrieve / fan-out."""
-    pending = list(state.get("pending_subqueries") or [])
-    all_subs = list(state.get("subqueries") or [])
-    if pending:
-        return pending, True
-    queries = all_subs if all_subs else [state.get("query") or ""]
-    return queries, False
-
-
-def _normalize_approved_subqueries(
-    approved: Any, fallback: List[str]
-) -> List[str]:
-    """Map interrupt resume value → clean subquery list (plain strings only)."""
-    from src.agent.tools import normalize_subquery_list, normalize_subquery_text
-
-    if isinstance(approved, list):
-        out = normalize_subquery_list(approved, max_n=max(1, len(approved)))
-        return out if out else list(fallback)
-    if isinstance(approved, dict):
-        raw = approved.get("subqueries")
-        if raw is None and any(k in approved for k in ("query", "subquery", "text", "q")):
-            one = normalize_subquery_text(approved)
-            return [one] if one else list(fallback)
-        out = normalize_subquery_list(raw if raw is not None else approved, max_n=16)
-        return out if out else list(fallback)
-    if isinstance(approved, str) and approved.strip():
-        one = normalize_subquery_text(approved)
-        return [one] if one else list(fallback)
-    return list(fallback)
-
-
 def build_agent_graph(
     *,
     search_fn: SearchFn,
@@ -206,6 +163,8 @@ def build_agent_graph(
 
     When ``checkpoint.enabled`` or HITL is on, compile with process-wide
     ``MemorySaver``. HITL inserts ``hitl_review`` after ``decompose``.
+
+    Phase 1: 角色节点全部委托 nodes.py 的独立 subgraph；本函数只做装配与路由。
     """
     cfg = dict(cfg or {})
     use_send = bool(cfg.get("use_send", False))
@@ -220,6 +179,19 @@ def build_agent_graph(
     max_per_sq = max(1, int(cfg.get("max_search_per_subquery") or 1))
     top_k = int(cfg.get("search_top_k") or 5)
 
+    # 角色子图（nodes.py）：各自编译，接收外层 state，返回 delta
+    decompose_sg = build_decompose_subgraph(box)
+    retrieve_one_sg = build_retrieve_one_subgraph(box)
+    retrieve_multi_sg = build_retrieve_multi_subgraph(box)
+    prepare_multi_sg = build_prepare_multi_subgraph(box)
+    grade_sg = build_grade_subgraph(box)
+    refine_sg = build_refine_subgraph(box)
+    synthesize_sg = build_synthesize_subgraph(box)
+    finalize_sg = build_finalize_subgraph(
+        use_send=use_send,
+        use_hitl=use_hitl,
+        use_checkpoint=use_checkpoint,
+    )
     retrieval_sg = build_retrieval_subgraph(
         box=box,
         top_k=top_k,
@@ -227,437 +199,36 @@ def build_agent_graph(
         node_name="retrieval_worker",
     )
 
-    def decompose_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        t0 = time.perf_counter()
-        query = state.get("query") or ""
-        budget = _budget_copy(state)
-        meta = _meta_copy(state)
-        step = next_step(state)
-        meta["step"] = step
-
-        result = box.decompose_query(query)
-        _dec_llm(budget)
-        meta["llm_calls"] = int(meta.get("llm_calls") or 0) + 1
-
-        latency = (time.perf_counter() - t0) * 1000
-        traj = [
-            step_record(
-                step=step,
-                node="decompose",
-                tool="decompose_query",
-                input_summary=query[:200],
-                output_summary=f"strategy={result.get('strategy')} n={len(result.get('subqueries') or [])}",
-                ok=True,
-                latency_ms=latency,
-                counts={"subqueries": len(result.get("subqueries") or [])},
-            )
-        ]
-        return {
-            "subqueries": list(result.get("subqueries") or [query]),
-            "strategy": str(result.get("strategy") or "atomic"),
-            "budget": budget,
-            "meta": meta,
-            "trajectory": traj,  # delta only
-            "pending_subqueries": [],
-        }
-
-    def hitl_review_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        """Pause for human review of subqueries; resume value replaces them."""
-        t0 = time.perf_counter()
-        meta = _meta_copy(state)
-        step = next_step(state)
-        meta["step"] = step
-        subs = list(state.get("subqueries") or [])
-        if not subs:
-            q = state.get("query") or ""
-            subs = [q] if q else []
-
-        # interrupt() returns the value passed via Command(resume=...)
-        approved = interrupt(
-            {
-                "subqueries": subs,
-                "strategy": state.get("strategy") or "atomic",
-                "query": state.get("query") or "",
-            }
-        )
-        new_subs = _normalize_approved_subqueries(approved, subs)
-        # If human collapses to a single query, keep multi only when >1
-        strategy = str(state.get("strategy") or "atomic")
-        if len(new_subs) > 1:
-            strategy = "multi"
-        elif len(new_subs) == 1 and strategy == "multi":
-            strategy = "atomic"
-
-        latency = (time.perf_counter() - t0) * 1000
-        traj = [
-            step_record(
-                step=step,
-                node="hitl_review",
-                tool=None,
-                input_summary=f"n_pending={len(subs)}",
-                output_summary=f"n_approved={len(new_subs)} strategy={strategy}",
-                ok=True,
-                latency_ms=latency,
-                counts={"subqueries": len(new_subs)},
-            )
-        ]
-        return {
-            "subqueries": new_subs,
-            "strategy": strategy,
-            "meta": meta,
-            "trajectory": traj,
-            "pending_subqueries": [],
-        }
-
-    def _retrieve(state: Dict[str, Any], *, use_pending: bool) -> Dict[str, Any]:
-        t0 = time.perf_counter()
-        budget = _budget_copy(state)
-        meta = _meta_copy(state)
-        step = next_step(state)
-        meta["step"] = step
-
-        pending = list(state.get("pending_subqueries") or [])
-        all_subs = list(state.get("subqueries") or [])
-        if use_pending and pending:
-            queries = pending
-            clear_pending = True
-        else:
-            queries = all_subs if all_subs else [state.get("query") or ""]
-            clear_pending = False
-
-        # Map subquery text → stable id (index in subqueries, or pending offset)
-        evidence_delta: List[dict] = []
-        n_searches = 0
-        for i, sq in enumerate(queries):
-            if not (sq or "").strip():
-                continue
-            # Prefer index into canonical subqueries list
-            if sq in all_subs:
-                sq_id = all_subs.index(sq)
-            else:
-                sq_id = i
-            for _ in range(max_per_sq):
-                if int(budget.get("searches_left") or 0) <= 0:
-                    break
-                out = box.knowledge_search(sq, subquery_id=sq_id, top_k=top_k)
-                hits = list(out.get("hits") or [])
-                evidence_delta.extend(hits)
-                budget["searches_left"] = max(
-                    0, int(budget.get("searches_left") or 0) - 1
-                )
-                n_searches += 1
-                meta["searches"] = int(meta.get("searches") or 0) + 1
-            if int(budget.get("searches_left") or 0) <= 0:
-                break
-
-        latency = (time.perf_counter() - t0) * 1000
-        node_name = "retrieve_multi" if use_pending or len(queries) > 1 else "retrieve_one"
-        # Caller names the node via wrapper; set via state flag
-        node_name = state.get("_retrieve_node") or node_name
-        traj = [
-            step_record(
-                step=step,
-                node=node_name,
-                tool="knowledge_search",
-                input_summary="; ".join(str(q)[:80] for q in queries)[:200],
-                output_summary=f"searches={n_searches} hits={len(evidence_delta)}",
-                ok=True,
-                latency_ms=latency,
-                counts={"searches": n_searches, "hits": len(evidence_delta)},
-            )
-        ]
-        update: Dict[str, Any] = {
-            "evidence": evidence_delta,  # delta only (operator.add)
-            "budget": budget,
-            "meta": meta,
-            "trajectory": traj,
-        }
-        if clear_pending:
-            update["pending_subqueries"] = []
-        return update
-
-    def retrieve_one_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        # Single subquery path — still honor budget
-        st = dict(state)
-        st["_retrieve_node"] = "retrieve_one"
-        subs = list(state.get("subqueries") or [])
-        if not subs:
-            subs = [state.get("query") or ""]
-        # Only first subquery for atomic path
-        st = {**st, "subqueries": subs[:1], "pending_subqueries": []}
-        return _retrieve(st, use_pending=False)
-
-    def retrieve_multi_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        st = dict(state)
-        st["_retrieve_node"] = "retrieve_multi"
-        # Prefer pending (post-refine); else all subqueries
-        return _retrieve(st, use_pending=True)
-
-    def prepare_multi_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        """Pre-allocate search budget, stage pending work list for Send fan-out."""
-        t0 = time.perf_counter()
-        budget = _budget_copy(state)
-        meta = _meta_copy(state)
-        step = next_step(state)
-        meta["step"] = step
-
-        raw_queries, _ = _select_multi_queries(state)
-        all_subs = list(state.get("subqueries") or [])
-        max_sq = int(budget.get("max_subqueries") or len(raw_queries) or 3)
-        remaining = int(budget.get("searches_left") or 0)
-
-        work: List[str] = []
-        allow_list: List[int] = []
-        n_allocated = 0
-        for i, sq in enumerate(raw_queries):
-            if not (sq or "").strip():
-                continue
-            if len(work) >= max_sq:
-                break
-            if remaining <= 0:
-                break
-            n_allow = min(max_per_sq, remaining)
-            if n_allow <= 0:
-                break
-            work.append(sq)
-            allow_list.append(n_allow)
-            remaining -= n_allow
-            n_allocated += n_allow
-
-        budget["searches_left"] = remaining
-        meta["searches"] = int(meta.get("searches") or 0) + n_allocated
-        meta["send_workers"] = len(work)
-        meta["fan_allowances"] = allow_list
-
-        latency = (time.perf_counter() - t0) * 1000
-        traj = [
-            step_record(
-                step=step,
-                node="prepare_multi",
-                tool=None,
-                input_summary=f"n_raw={len(raw_queries)} n_work={len(work)}",
-                output_summary=f"allocated={n_allocated} left={remaining}",
-                ok=True,
-                latency_ms=latency,
-                counts={
-                    "workers": len(work),
-                    "searches_allocated": n_allocated,
-                    "canonical_subs": len(all_subs),
-                },
-            )
-        ]
-        return {
-            "budget": budget,
-            "meta": meta,
-            "pending_subqueries": work,
-            "trajectory": traj,
-        }
-
-    def retrieval_worker_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        return retrieval_worker_delta(retrieval_sg, state)
-
-    def fan_in_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        """Clear staged work list after parallel merge."""
-        return {"pending_subqueries": []}
-
-    def grade_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        t0 = time.perf_counter()
-        budget = _budget_copy(state)
-        meta = _meta_copy(state)
-        step = next_step(state)
-        meta["step"] = step
-        query = state.get("query") or ""
-        evidence = list(state.get("evidence") or [])
-
-        if not _grade_enabled(cfg):
-            grade = {"sufficient": True, "missing": "", "score": 1.0, "skipped": True}
-            used_llm = False
-        else:
-            grade = box.grade_evidence(query, evidence)
-            _dec_llm(budget)
-            meta["llm_calls"] = int(meta.get("llm_calls") or 0) + 1
-            used_llm = True
-
-        latency = (time.perf_counter() - t0) * 1000
-        traj = [
-            step_record(
-                step=step,
-                node="grade",
-                tool="grade_evidence" if used_llm else None,
-                input_summary=f"n_evidence={len(evidence)}",
-                output_summary=(
-                    f"sufficient={grade.get('sufficient')} "
-                    f"score={grade.get('score')}"
-                ),
-                ok=True,
-                latency_ms=latency,
-                counts={"llm": int(used_llm)},
-            )
-        ]
-        return {
-            "grade": grade,
-            "budget": budget,
-            "meta": meta,
-            "trajectory": traj,
-        }
-
-    def refine_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        t0 = time.perf_counter()
-        budget = _budget_copy(state)
-        meta = _meta_copy(state)
-        step = next_step(state)
-        meta["step"] = step
-        query = state.get("query") or ""
-        grade = state.get("grade") or {}
-        missing = grade.get("missing") or ""
-        if isinstance(missing, list):
-            missing_s = "; ".join(str(m) for m in missing)
-        else:
-            missing_s = str(missing)
-
-        subs = list(state.get("subqueries") or [])
-        if not subs:
-            subs = [query]
-
-        # Consume one grade cycle when actually refining
-        budget["grade_cycles_left"] = max(
-            0, int(budget.get("grade_cycles_left") or 0) - 1
-        )
-
-        pending: List[str] = []
-        for sq in subs:
-            if int(budget.get("llm_calls_left") or 0) <= 0:
-                pending.append(sq)
-                continue
-            rewritten = box.refine_subquery(query, sq, missing_s)
-            _dec_llm(budget)
-            meta["llm_calls"] = int(meta.get("llm_calls") or 0) + 1
-            pending.append(rewritten or sq)
-
-        # Cap pending by remaining searches and max_subqueries
-        max_sq = int(budget.get("max_subqueries") or len(pending) or 3)
-        searches_left = int(budget.get("searches_left") or 0)
-        pending = pending[: max(0, min(max_sq, searches_left if searches_left > 0 else max_sq))]
-
-        latency = (time.perf_counter() - t0) * 1000
-        traj = [
-            step_record(
-                step=step,
-                node="refine",
-                tool="refine_subquery",
-                input_summary=f"missing={missing_s[:120]}",
-                output_summary=f"pending={pending!r}"[:200],
-                ok=True,
-                latency_ms=latency,
-                counts={"pending": len(pending)},
-            )
-        ]
-        return {
-            "pending_subqueries": pending,
-            "budget": budget,
-            "meta": meta,
-            "trajectory": traj,
-        }
-
-    def synthesize_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        t0 = time.perf_counter()
-        budget = _budget_copy(state)
-        meta = _meta_copy(state)
-        step = next_step(state)
-        meta["step"] = step
-        query = state.get("query") or ""
-        evidence = list(state.get("evidence") or [])
-
-        out = box.synthesize_answer(query, evidence)
-        # generate_fn is LLM-backed when evidence non-empty
-        if evidence:
-            _dec_llm(budget)
-            meta["llm_calls"] = int(meta.get("llm_calls") or 0) + 1
-
-        rejected = bool(out.get("rejected"))
-        status = "abstain" if rejected else "ok"
-        answer = out.get("answer") or ""
-        citations = list(out.get("citations") or [])
-
-        latency = (time.perf_counter() - t0) * 1000
-        traj = [
-            step_record(
-                step=step,
-                node="synthesize",
-                tool="synthesize_answer",
-                input_summary=f"n_evidence={len(evidence)}",
-                output_summary=f"status={status} answer_len={len(answer)}",
-                ok=True,
-                latency_ms=latency,
-                counts={"citations": len(citations)},
-            )
-        ]
-        update: Dict[str, Any] = {
-            "answer": answer,
-            "citations": citations,
-            "status": status,
-            "budget": budget,
-            "meta": meta,
-            "trajectory": traj,
-        }
-        if "context" in out:
-            # keep optional context in meta for runner
-            meta = dict(meta)
-            meta["context"] = out["context"]
-            update["meta"] = meta
-        return update
-
-    def finalize_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        meta = _meta_copy(state)
-        traj = list(state.get("trajectory") or [])
-        searches = int(meta.get("searches") or 0)
-        llm_calls = int(meta.get("llm_calls") or 0)
-        if not searches:
-            searches = sum(
-                int((t.get("counts") or {}).get("searches") or 0)
-                for t in traj
-                if t.get("tool") == "knowledge_search"
-            )
-        if not llm_calls:
-            llm_calls = sum(
-                1
-                for t in traj
-                if t.get("tool")
-                in ("decompose_query", "grade_evidence", "refine_subquery", "synthesize_answer")
-            )
-        meta["searches"] = searches
-        meta["llm_calls"] = llm_calls
-        meta["n_trajectory"] = len(traj)
-        meta["n_evidence"] = len(state.get("evidence") or [])
-        meta["finalized"] = True
-        meta["use_send"] = use_send
-        meta["hitl"] = use_hitl
-        meta["checkpoint"] = use_checkpoint
-        # no trajectory delta — avoid duplicate step records
-        return {"meta": meta}
+    def invoke_subgraph(sg: Any, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Invoke a compiled role subgraph with outer state, return only its delta."""
+        out = sg.invoke(state)
+        if not isinstance(out, dict):
+            return {}
+        return out
 
     builder = StateGraph(AgentState)
-    builder.add_node("decompose", decompose_node)
-    builder.add_node("retrieve_one", retrieve_one_node)
-    builder.add_node("grade", grade_node)
-    builder.add_node("refine", refine_node)
-    builder.add_node("synthesize", synthesize_node)
-    builder.add_node("finalize", finalize_node)
+    builder.add_node("decompose", lambda s: invoke_subgraph(decompose_sg, s))
+    builder.add_node("retrieve_one", lambda s: invoke_subgraph(retrieve_one_sg, s))
+    builder.add_node("grade", lambda s: invoke_subgraph(grade_sg, s))
+    builder.add_node("refine", lambda s: invoke_subgraph(refine_sg, s))
+    builder.add_node("synthesize", lambda s: invoke_subgraph(synthesize_sg, s))
+    builder.add_node("finalize", lambda s: invoke_subgraph(finalize_sg, s))
 
     if use_send:
-        builder.add_node("prepare_multi", prepare_multi_node)
-        builder.add_node("retrieval_worker", retrieval_worker_node)
+        builder.add_node("prepare_multi", lambda s: invoke_subgraph(prepare_multi_sg, s))
+        builder.add_node("retrieval_worker", _make_retrieval_worker_node(retrieval_sg))
         builder.add_node("fan_in", fan_in_node)
         multi_entry = "prepare_multi"
     else:
-        builder.add_node("retrieve_multi", retrieve_multi_node)
+        builder.add_node("retrieve_multi", lambda s: invoke_subgraph(retrieve_multi_sg, s))
         multi_entry = "retrieve_multi"
 
     builder.set_entry_point("decompose")
 
     # HITL: pause after decompose so human can edit subqueries before retrieve
     if use_hitl:
-        builder.add_node("hitl_review", hitl_review_node)
+        hitl_sg = build_hitl_review_subgraph(box)
+        builder.add_node("hitl_review", lambda s: invoke_subgraph(hitl_sg, s))
         builder.add_edge("decompose", "hitl_review")
         route_source = "hitl_review"
     else:
@@ -704,6 +275,20 @@ def build_agent_graph(
 
         return builder.compile(checkpointer=get_memory_saver())
     return builder.compile()
+
+
+def _make_retrieval_worker_node(retrieval_sg: Any) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
+    """Bind a compiled retrieval subgraph to a Send worker entry (deltas only)."""
+
+    def retrieval_worker_node(state: Dict[str, Any]) -> Dict[str, Any]:
+        return retrieval_worker_delta(retrieval_sg, state)
+
+    return retrieval_worker_node
+
+
+def fan_in_node(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Clear staged work list after parallel merge."""
+    return {"pending_subqueries": []}
 
 
 def export_graph_mermaid(
