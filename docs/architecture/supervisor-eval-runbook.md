@@ -74,22 +74,29 @@ PYTHONPATH=. python scripts/run_agent_eval.py \
 - **multi_hop 无增益或拖累 atomic** → supervisor 不值（一个 LLM 调用换不来派单精度），
   保留规则、删 supervise 节点。
 
-### 2026-08-24 实测结果（已完成）
+### 2026-08-24 实测结果（两轮已完成）
 
-| arm | Correct | atomic | multi_hop | reject | avg searches | lat |
-|-----|--------:|-------:|----------:|-------:|-------------:|----:|
-| pipeline | 0.674 | 0.500 | **0.778** | 0.800 | — | 3.1s |
-| agent off | 0.630 | 0.389 | 0.722 | 0.900 | 2.24 | 6.5s |
-| agent on | 0.630 | 0.389 | 0.722 | 0.900 | 2.24 | 7.8s |
+**第一轮（arms 架空）**：on 与 off 逐项相同（0.630/0.389/0.722），根因是评测单臂注入
+退化全臂 → 测不出 supervise。
 
-**判定：NO_GO（supervise 零增益 + 慢 1.3s）**。supervise 确实执行（35/46 派单、0 fallback），
-但评测是**单臂注入**（`retriever.search` 三路融合），`_search_arms` 无 `search_fns` 退化为
-全臂 → 选臂被架空；配额在每次全量三路检索下无效（off=on=2.24）。
+**第二轮（arms 透传修复后重跑）**：
 
-**决策（2026-08-24）**：supervise **保留但默认关**（已实现 + 测试全绿 + 零行为影响），
-待**多臂注入评测**（每臂独立 search_fn）再验证选臂价值。`agent.supervise.enabled` 维持 false。
+| arm | Correct | atomic | multi_hop | reject | 误拒 | avg searches | lat |
+|-----|--------:|-------:|----------:|-------:|-----:|-------------:|----:|
+| pipeline | 0.674 | 0.500 | **0.778** | 0.800 | 5 | — | 3.1s |
+| agent off | 0.630 | 0.389 | 0.722 | 0.900 | 4 | 2.24 | 6.5s |
+| agent on | **0.565** | 0.389 | **0.611** | 0.800 | **6** | 2.26 | 7.8s |
 
-附带：Phase1 evidence bug 修复真实增益 multi_hop 8/6 0.667 → 本次 off 0.722（+5.5pt）；
+**判定：NO_GO（选臂真实生效后全面变差）**。supervise 选臂导致 multi_hop 0.722→0.611
+（-11pt）、reject 0.9→0.8、误拒 4→6。3 条 multi_hop 回归（mh_001/009 被选臂后直接
+abstain）——只开单臂漏掉三路交叉 evidence。根因：**qwen2:7b 对「该用哪个臂」判断
+不可靠，选臂是负收益，不如规则全臂**。
+
+**决策（2026-08-24）**：supervise 不值得保留（选臂真实生效时有害，非评测架空）。
+维持规则派单 + `agent.supervise.enabled: false`。除非换更强模型或「先粗召回再选臂」
+的稳健设计再验证。
+
+附带：Phase1 evidence bug 修复真实增益 multi_hop 8/6 0.667 → off 0.722（+5.5pt）；
 agent 整体仍 < pipeline（0.630 vs 0.674）→ agent 保持默认关。
 
 ---
