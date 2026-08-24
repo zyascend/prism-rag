@@ -57,13 +57,21 @@ def agent_answer_for_eval(
     - Extra ``search_kwargs`` are forwarded to ``retriever.search`` (e.g. flags).
     """
 
-    def search_fn(q, k=None):
+    def search_fn(q, k=None, arms=None):
         kk = int(k) if k is not None else k_context
+        # supervise 派单的 arms → 只开对应检索臂；无 arms → 三路全开
+        use_b = use_d = use_v = True
+        if arms:
+            use_b = "bm25" in arms
+            use_d = "dense" in arms
+            use_v = "visual" in arms
         return retriever.search(
             q,
             k=kk,
             use_rerank=use_rerank,
-            use_visual=use_visual,
+            use_bm25=use_b,
+            use_dense=use_d,
+            use_visual=use_v,
             **search_kwargs,
         )
 

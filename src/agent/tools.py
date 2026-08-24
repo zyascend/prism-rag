@@ -461,10 +461,13 @@ class AgentToolBox:
         }
 
     def _search_arms(self, q: str, *, top_k: int, arms: Optional[List[str]]) -> List[dict]:
-        """按 arms 检索：多臂注入（search_fns）时逐臂调 + 合并。
+        """按 arms 检索，三种注入形态：
 
-        未注入 search_fns（仅 search_fn）时退化为 search_fn —— 单臂融合检索，
-        arms 只作语义提示（supervisor 派单在单臂注入下不改变检索行为）。
+        1. ``search_fns`` 多臂注入：逐臂调 + 合并（最细粒度）。
+        2. 仅 ``search_fn`` 且其接受 ``arms`` kwarg：把 arms 透传下去，
+           ``PrismRAGRetriever.search`` 按 use_bm25/use_dense/use_visual 开臂
+           —— 单臂注入下 supervise 选臂也能真实生效。
+        3. 仅 ``search_fn`` 且不接受 arms：退化为全臂（arms 只作语义提示）。
         """
         if arms and self.search_fns:
             hits_raw: List[dict] = []
@@ -477,6 +480,12 @@ class AgentToolBox:
                 except TypeError:
                     hits_raw.extend(fn(q) or [])
             return hits_raw
+        if arms:
+            # 单臂注入但 search_fn 接受 arms → 透传（开臂）
+            try:
+                return self.search_fn(q, k=top_k, arms=list(arms))
+            except TypeError:
+                pass  # 不接受 arms kwarg → 退化全臂
         try:
             return self.search_fn(q, k=top_k)
         except TypeError:

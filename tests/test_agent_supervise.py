@@ -215,3 +215,54 @@ def test_supervise_respects_arm_hints_prior():
     g.invoke(empty_agent_state("tbl?", cfg=_sub_cfg()))
     assert seen_prompts, "supervise 应被调用"
     assert '"tbl": "visual"' in seen_prompts[0] or "visual" in seen_prompts[0]
+
+
+def test_arms_passthrough_opens_only_selected_arms():
+    """arms 透传给 search_fn → retriever 只开被派的检索臂（根因修复验证）。
+
+    这是云上 NO_GO 根因的修复：单臂注入下 supervise 的 arms 必须真实影响
+    use_bm25/use_dense/use_visual，而不是被 _search_arms 架空成全臂。
+    """
+    from src.agent.tools import AgentToolBox
+
+    calls = []
+
+    class FakeRetriever:
+        def search(self, q, k=5, use_bm25=True, use_dense=True, use_visual=True, use_rerank=True, **kw):
+            calls.append(
+                {
+                    "q": q,
+                    "use_bm25": use_bm25,
+                    "use_dense": use_dense,
+                    "use_visual": use_visual,
+                }
+            )
+            return [{"chunk_id": "1", "text": q, "score": 1.0, "doc_id": "d"}]
+
+    r = FakeRetriever()
+
+    def search_fn(q, k=None, arms=None):
+        # 与 eval.py agent_answer_for_eval.search_fn 同款映射
+        kk = int(k) if k is not None else 5
+        use_b = use_d = use_v = True
+        if arms:
+            use_b = "bm25" in arms
+            use_d = "dense" in arms
+            use_v = "visual" in arms
+        return r.search(q, k=kk, use_bm25=use_b, use_dense=use_d, use_visual=use_v)
+
+    box = AgentToolBox(
+        search_fn=search_fn,
+        complete_fn=lambda p: "{}",
+        generate_fn=lambda q, h: {"answer": "", "citations": [], "rejected": True},
+        cfg={},
+    )
+    # supervise 派 visual 臂 → 只开 visual
+    box.knowledge_search("t", subquery_id=0, top_k=5, arms=["visual"])
+    assert calls[-1] == {"q": "t", "use_bm25": False, "use_dense": False, "use_visual": True}
+    # 派 bm25+dense → 关 visual
+    box.knowledge_search("t", subquery_id=0, top_k=5, arms=["bm25", "dense"])
+    assert calls[-1] == {"q": "t", "use_bm25": True, "use_dense": True, "use_visual": False}
+    # 无 arms → 三路全开
+    box.knowledge_search("t", subquery_id=0, top_k=5)
+    assert calls[-1] == {"q": "t", "use_bm25": True, "use_dense": True, "use_visual": True}
