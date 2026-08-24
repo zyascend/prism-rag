@@ -1,13 +1,14 @@
 # Ingestion — 文档索引与增量更新
 
 > 状态：与当前实现对齐（`src/ingestion/`、`src/store/`、`PrismRAGRetriever.delete_document`）  
-> 更新：2026-07-22  
+> 更新：2026-08-13  
 > 配套 Spec / 设计：  
 > - `docs/incremental-update-optimization-spec-2026-07-16.md`（增量删除/更新总 Spec）  
 > - `docs/incremental-update-delete-design-2026-07-09.md`（早期提案）  
 > - `docs/incremental-verification-runbook.md`（云上验收）  
 > - **解析 / 分块 / 表图入库细节**：[content-pipeline.md](./content-pipeline.md)  
-> 本文偏 **索引生命周期与三路一致**；内容怎么切、表图怎么进库见 content-pipeline。
+> 本文偏 **索引生命周期与三路一致**；内容怎么切、表图怎么进库见 content-pipeline。  
+> **增量更新时序：** §5.0 入口三岔路 → §5.2 页级 `page_hash` diff。
 
 ---
 
@@ -199,6 +200,46 @@ BM25Retriever
 
 ## 5. 主路径时序
 
+### 5.0 入口三岔路（先看这个，再进 5.1 / 5.2）
+
+增量更新 **不是**「再传一次 PDF 就自动 page diff」。`ingest()` 按两个哈希/主键分流：
+
+| 判定顺序 | 条件 | 走哪条 | status |
+|----------|------|--------|--------|
+| 1 | 整文件 `SHA256(bytes)` 已在 `documents.content_hash` | 不解析、不编码 | `noop_identical` |
+| 2 | 调用方传入的 `doc_id` 已在库，且文件 bytes **变了** | **页级增量** `_ingest_update` | `updated` |
+| 3 | 否则 | 全量写入 `_ingest_fresh` | `inserted` |
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Caller
+  participant I as PDFIngestor
+  participant PG as PgVectorStore
+
+  C->>I: ingest(pdf_path, doc_id?)
+  I->>I: content_hash = SHA256(整文件 bytes)
+  I->>PG: create_schema + get_doc_id_by_content_hash
+  alt 文件 bytes 未变
+    PG-->>I: 已有 doc_id
+    I-->>C: status=noop_identical
+  else bytes 变了
+    I->>I: doc_id = 传入值 或 新随机 id
+    I->>PG: document_exists(doc_id)
+    alt 同主键已存在
+      Note over I: 改版更新 · 见 5.2
+      I->>I: _ingest_update
+      I-->>C: status=updated
+    else 新文档
+      Note over I: 全页写入 · 见 5.1
+      I->>I: _ingest_fresh
+      I-->>C: status=inserted
+    end
+  end
+```
+
+**调用约定：** `POST /ingest` 每次新生成 `doc_id`，同文件再传只会 hit 第 1 步 no-op，**不会**走 page diff。改版必须脚本/`PDFIngestor.ingest(..., doc_id=旧id)`。
+
 ### 5.1 全新增（`_ingest_fresh`）
 
 ```mermaid
@@ -237,43 +278,74 @@ sequenceDiagram
 
 ### 5.2 页级增量更新（`_ingest_update`）
 
-**触发条件：** `document_exists(doc_id) == True`（同主键改版，不是「换文件新 uuid」）。
+**触发条件：** 整文件 hash 未命中（内容确实变了）**且** `document_exists(doc_id)`（同主键改版）。  
+对齐键是 **`page_number`**，比较的是 **`page_hash`**（优先页面渲染图 bytes，否则 markdown）。
+
+| 桶 | 判定 | 三路动作 |
+|----|------|----------|
+| unchanged | 同页号且 `page_hash` 相同 | **不动**（不重编 Col* / 不改 pg chunk / 不改 BM25） |
+| changed | 同页号但 hash 变了 | 旧 `page_id` 三路删 → **新** `page_id` 再走 `_ingest_pages` |
+| new | 新页号 | 只写入 |
+| deleted | 旧有新无 | 只删不建 |
 
 ```mermaid
-flowchart LR
-  subgraph Diff["按 page_number 对齐"]
-    U["unchanged<br/>hash 相同"]
-    Ch["changed<br/>同页号 hash 变"]
-    N["new<br/>新页号"]
-    D["deleted<br/>旧有新无"]
+sequenceDiagram
+  autonumber
+  participant C as Caller
+  participant I as PDFIngestor
+  participant P as Parser
+  participant PG as PgVectorStore
+  participant K as Chunker + Summarizer
+  participant B as BGE
+  participant V as ColQwen2
+  participant F as FaissColPaliStore
+  participant M as BM25
+
+  C->>I: ingest(pdf, doc_id=已有)
+  Note over I: 已过 5.0：content_hash 未命中
+  I->>P: parse → List[Page]
+  I->>I: 每页 page_hash = SHA256(图 tobytes)
+  I->>PG: get_pages_by_doc_id
+  PG-->>I: 旧 page_number → 旧 page_id
+  I->>PG: get_page_hashes_by_doc_id
+  PG-->>I: 旧 page_number → 旧 page_hash
+  I->>I: 按 page_number 分成四桶
+
+  opt 有 changed 或 deleted
+    I->>PG: get_chunk_ids_by_page_ids(旧 page_id)
+    PG-->>I: 待删 chunk_id
+    I->>PG: delete_chunks_by_page_ids
+    I->>F: delete_by_page_ids（写墓碑，检索跳过）
+    I->>M: remove_chunks
+    I->>F: maybe_compact（墓碑占比 ≥ 0.2 才物理重建）
   end
 
-  subgraph Del3["三路清旧 page_id"]
-    PG1["pg.delete_chunks_by_page_ids"]
-    F1["faiss.delete_by_page_ids"]
-    M1["bm25.remove_chunks"]
-    CP["faiss.maybe_compact"]
+  opt 有 changed 或 new
+    loop 仅这些页
+      I->>I: 新 page_id = random 31bit
+      I->>K: chunk_blocks 或 chunk_page
+      K->>K: 表 → 摘要；embed_text=摘要否则原文
+    end
+    I->>B: encode(embed_texts)
+    I->>PG: insert_chunks（新 page_id + 新 page_hash）
+    opt use_visual
+      I->>V: encode_pages(仅这些页的图)
+      I->>F: add_pages + save
+    end
+    I->>M: fit_incremental(仅新 chunk 原文)
   end
 
-  subgraph Re["仅 reencode"]
-    Enc["_ingest_pages<br/>changed + new"]
-  end
-
-  Ch --> Del3
-  D --> Del3
-  U -.->|跳过编码| Skip["省 Col* GPU"]
-  Ch --> Re
-  N --> Re
-  Del3 --> Re
-  Re --> Doc["pg.update_document<br/>新 content_hash"]
+  Note over I,F: unchanged 页：pg / FAISS / BM25 一行都不动
+  I->>PG: update_document(新 content_hash)
+  I-->>C: status=updated · unchanged/changed/new/deleted 计数
 ```
 
 **要点：**
 
-- unchanged：**三路都不动**（最大省 GPU 点）。  
-- changed：旧 `page_id` 三路删掉 → 新 `page_id` 重编码写入。  
-- deleted：只删不建。  
-- 日志：`unchanged / changed / new / deleted` 计数可观测。
+- 省 GPU 的点是 unchanged：**ColQwen2 根本不跑**。changed 会换新 `page_id`，Visual grounding 靠新 id，旧向量靠墓碑过滤。  
+- BM25 / Dense 吃的是 **新写入的那些 chunk**；未变页沿用旧倒排和旧向量。  
+- `PDFIngestor` **不** `invalidate_cache`。走 HTTP 时 `routes.py` 成功路径会 bump `index_version`；脚本直调 ingestor 需自己失效或重启。  
+- 无 2PC：先删旧再写新；中途崩溃以 pg 为真相源，启动后对账另两路。
 
 ### 5.3 删除文档（`delete_document`）
 

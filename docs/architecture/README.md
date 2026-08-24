@@ -3,6 +3,7 @@
 > 本目录记录 PrismRAG **按模块拆分**的架构设计，供开发与面试口述对齐代码。  
 > 仓库入口：[README.md](../../README.md) 的「模块架构文档」表。  
 > 全系统单页图：[prismrag-architecture.html](../prismrag-architecture.html)；早期总览：[industrial-pdf-rag-architecture.md](../industrial-pdf-rag-architecture.md)。  
+> 端到端闭环（入库 → 视觉显存 → 检索精排 → 评测回灌）：[end-to-end-pipeline.mmd](./end-to-end-pipeline.mmd)。  
 > 此处聚焦 **单模块边界、分层、数据流与排障入口**（当前实现快照，非长篇 Spec）。
 
 ---
@@ -39,7 +40,7 @@
 
 | 模块 | 文档 | 代码主路径 | 状态 |
 |------|------|------------|------|
-| Trace / 可观测请求链路 | [trace.md](./trace.md) | `src/observability/`、`src/api/routes.py` | ✅ 初版 |
+| Trace / 可观测请求链路 | [trace.md](./trace.md) | `src/observability/`、`src/api/routes.py` | ✅ 2026-08-15 按「位置→ID→记什么→怎么记」重排 |
 | Cache（L3/L4） | [cache.md](./cache.md) | `src/cache/`、`vidore_adapter`、`routes.py` | ✅ 初版 |
 | Ingestion / 索引与增量更新 | [ingestion.md](./ingestion.md) | `src/ingestion/`、`src/store/`、`vidore_adapter.delete_document` | ✅ 初版 |
 | Content Pipeline / 解析分块入库 | [content-pipeline.md](./content-pipeline.md) | `parser` · `text_chunker` · `table_summarizer` · `_ingest_pages` | ✅ 含 chunk 迭代历程 §15 |
