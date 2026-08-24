@@ -1,0 +1,3286 @@
+{
+  "version": 1,
+  "env": {
+    "created_at": "2026-08-24T12:22:33.029400+00:00",
+    "phase": "phase2_dual_arm",
+    "qa_file": "data/agent_eval_qa.json",
+    "n_items": 46,
+    "k": 5,
+    "judge": "llm",
+    "skip_index": true,
+    "skip_visual": false,
+    "no_rerank": false,
+    "grade_off": false,
+    "visual_model": "colqwen2",
+    "llm_model": "qwen2:7b",
+    "llm_base_url": "http://localhost:11434/v1",
+    "config_profile": "",
+    "use_visual": true,
+    "use_rerank": true,
+    "max_total_searches": 3.0,
+    "elapsed_s": 442.0,
+    "git_head": "unknown",
+    "git_branch": "unknown"
+  },
+  "summary": {
+    "n_items": 46,
+    "tag_counts": {
+      "atomic": 18,
+      "multi_hop": 18,
+      "reject": 10
+    },
+    "arms": {
+      "pipeline": {
+        "n": 46,
+        "errors": 0,
+        "error_rate": 0.0,
+        "correct_rate": 0.6739130434782609,
+        "reject_accuracy": 0.8,
+        "false_reject_count": 4,
+        "degrade_count": 0,
+        "latency_ms": {
+          "mean": 3093.021739130435,
+          "p50": 2813.0,
+          "p95": 6172.0
+        },
+        "by_tag": {
+          "atomic": {
+            "n": 18,
+            "correct_rate": 0.5,
+            "latency_ms_mean": 2543.5555555555557
+          },
+          "multi_hop": {
+            "n": 18,
+            "correct_rate": 0.7777777777777778,
+            "latency_ms_mean": 4524.777777777777
+          },
+          "reject": {
+            "n": 10,
+            "correct_rate": 0.8,
+            "latency_ms_mean": 1504.9
+          }
+        }
+      },
+      "agent": {
+        "n": 46,
+        "errors": 0,
+        "error_rate": 0.0,
+        "correct_rate": 0.6304347826086957,
+        "reject_accuracy": 0.9,
+        "false_reject_count": 4,
+        "degrade_count": 0,
+        "latency_ms": {
+          "mean": 6513.239130434783,
+          "p50": 5891.0,
+          "p95": 9405.0
+        },
+        "by_tag": {
+          "atomic": {
+            "n": 18,
+            "correct_rate": 0.3888888888888889,
+            "latency_ms_mean": 6106.555555555556
+          },
+          "multi_hop": {
+            "n": 18,
+            "correct_rate": 0.7222222222222222,
+            "latency_ms_mean": 7538.833333333333
+          },
+          "reject": {
+            "n": 10,
+            "correct_rate": 0.9,
+            "latency_ms_mean": 5399.2
+          }
+        },
+        "avg_searches": 2.239130434782609,
+        "avg_llm_calls": 3.5217391304347827,
+        "max_searches": 3.0
+      }
+    },
+    "delta": {
+      "correct_rate": -0.04347826086956519,
+      "reject_accuracy": 0.09999999999999998,
+      "false_reject_count": 0,
+      "latency_ms_mean": 3420.217391304348,
+      "by_tag": {
+        "atomic": {
+          "correct_rate": -0.1111111111111111
+        },
+        "multi_hop": {
+          "correct_rate": -0.05555555555555558
+        },
+        "reject": {
+          "correct_rate": 0.09999999999999998
+        }
+      }
+    },
+    "go_nogo": {
+      "verdict": "NO_GO_DRAFT",
+      "checks": [
+        {
+          "id": "atomic_not_hurt",
+          "ok": false,
+          "detail": "atomic Δ=-0.1111 (need ≥ -0.02)"
+        },
+        {
+          "id": "multi_hop_ge_pipeline",
+          "ok": false,
+          "detail": "multi_hop agent=0.7222 pipeline=0.7778"
+        },
+        {
+          "id": "searches_within_budget",
+          "ok": true,
+          "detail": "avg_searches=2.239 budget=3.0"
+        },
+        {
+          "id": "no_mass_degrade",
+          "ok": true,
+          "detail": "degrade=0/46 (0.0%)"
+        }
+      ],
+      "note": "Draft only — human must confirm before any default enabled change. Even GO_DRAFT keeps agent.enabled=false unless separate config PR."
+    }
+  },
+  "items": [
+    {
+      "id": "at_001",
+      "tag": "atomic",
+      "query": "List two acceptable conditions for the shield termination of a braid clamp.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_002",
+      "pipeline": {
+        "answer": "Two acceptable conditions for the shield termination of a braid clamp are:\n1. Shield strands not uniformly distributed around the braid clamp.\n2. Shield strands hold the braid clamp in tight contact with the cable outer jacket.",
+        "n_citations": 5,
+        "latency_ms": 3021,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by stating that shield strands should not be uniformly distributed, which is incorrect according to the conditions listed in the expected answer. Additionally, it fails to mention the condition regarding the braid being close to but not in contact with the outer shoulder flange and the assembly of the connector.",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "Two acceptable conditions for the shield termination of a braid clamp are:\n1. Shield strands not uniformly distributed around the braid clamp.\n2. Shield strands hold the braid clamp in tight contact with the cable outer jacket.",
+        "n_citations": 5,
+        "latency_ms": 9151,
+        "status": "ok",
+        "subqueries": [
+          "What are the two acceptable conditions for the shield termination of a braid clamp?",
+          "Provide details on the acceptable conditions for shielding termination in a braid clamp."
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 13
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by stating that shield strands should not be uniformly distributed, which is incorrect according to the conditions listed in the expected answer. Additionally, it fails to mention the condition regarding the braid/shield's relationship with the outer shoulder flange and the assembly of the connector.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_002",
+      "tag": "atomic",
+      "query": "Is non-wetting or de-wetting in the overlap area considered an acceptable condition?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_005",
+      "pipeline": {
+        "answer": "No, nonwetting or dewetting in the overlap area is a defect condition; the solder must be removed, and the joint reflowed.",
+        "n_citations": 5,
+        "latency_ms": 3056,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer states that nonwetting or dewetting in the overlap area is a defect condition, which aligns with the expected answer. Both answers agree on the unacceptable nature of this condition and suggest remedial action (removal and reflowing of solder). Although the phrasing differs slightly (\"defect conditions\" vs. \"falls under the defect conditions\"), these terms convey the same meaning in this context.",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "No, nonwetting or dewetting is considered a defect condition and requires rework.",
+        "n_citations": 5,
+        "latency_ms": 5891,
+        "status": "ok",
+        "subqueries": [
+          "Is non-wetting considered an acceptable condition?",
+          "Is de-wetting considered an acceptable condition?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 12
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer states that nonwetting or dewetting is considered a defect condition and requires rework, which aligns with the information provided in the expected answer. Both answers agree on the fact that non-wetting or de-wetting in the overlap area is not acceptable and needs to be corrected (rework).",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "at_003",
+      "tag": "atomic",
+      "query": "Required step for gaseous oxygen carts before beginning operations.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_007",
+      "pipeline": {
+        "answer": "Required step for gaseous oxygen carts before beginning operations is to statically ground the Gaseous Oxygen Servicing Cart to a common ground before connecting servicing hose.",
+        "n_citations": 5,
+        "latency_ms": 2663,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer misses out on key information from the expected answer. It only mentions static grounding, which is indeed important for safety reasons when working with gaseous oxygen carts. However, it does not include cleaning and maintaining the cart free of moisture, oil, grease, using approved anti-seize tape, or avoiding parking GOX carts in sodded areas.",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "Required step for gaseous oxygen carts before beginning operations is to statically ground the Gaseous Oxygen Servicing Cart to a common ground before connecting servicing hose.",
+        "n_citations": 5,
+        "latency_ms": 4388,
+        "status": "ok",
+        "subqueries": [
+          "Required step for gaseous oxygen carts before beginning operations."
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 1,
+          "llm_calls": 3,
+          "evidence_n": 5
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer misses key information from the expected answer. It only mentions static grounding, which is one of several required steps for gaseous oxygen carts before beginning operations. The expected answer includes cleaning and keeping the cart free of moisture, oil, and grease, using approved anti-seize tape, and not parking GOX carts in sodded areas.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_004",
+      "tag": "atomic",
+      "query": "How many internal fuel tanks are located in the center wing of the S-3 aircraft?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_010",
+      "pipeline": {
+        "answer": "The S-3 aircraft has four internal fuel tanks located in the center wing section.",
+        "n_citations": 5,
+        "latency_ms": 2610,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. It correctly identifies that there are four internal fuel tanks located in the center wing of the S-3 aircraft, which matches the information provided in the expected answer. The missing details about the gallons capacity and specific location within the wing section do not contradict or miss key information; they simply provide additional specifics that were not included in the generated response.",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The S-3 aircraft has four internal fuel tanks located in the center wing section.",
+        "n_citations": 5,
+        "latency_ms": 5617,
+        "status": "ok",
+        "subqueries": [
+          "What is the number of internal fuel tanks in the center wing of the S-3 aircraft?",
+          "Where can I find this information in the maintenance manual for the S-3 aircraft?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 13
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. It correctly identifies that there are four internal fuel tanks located in the center wing of the S-3 aircraft, which matches the information provided in the expected answer. The missing details about the gallons capacity and specific location within the wing section do not contradict or miss key information; they simply provide additional specifics that were not asked for in the question.",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "at_005",
+      "tag": "atomic",
+      "query": "Which military aircraft models necessitate specialized defueling procedures when using hydrant servicing equipment?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_011",
+      "pipeline": {
+        "answer": "The context mentions that the following military aircraft models necessitate specialized defueling procedures when using hydrant servicing equipment:\n\n- KC-10\n- KC/EC/RC-135\n\nThese are the specific aircraft types highlighted for requiring additional considerations during defueling operations with hydrant fueling systems.",
+        "n_citations": 5,
+        "latency_ms": 2874,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer misses key information from the expected answer. It only mentions two aircraft models (KC-10, KC/EC/RC-135) instead of specifying Type II and Type III hydrant systems as required in the expected answer. Additionally, it does not clarify that these are military aircraft models necessitating specialized defueling procedures when using hydrant servicing equipment.",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "C-130, KC-135, KC-46, and EC/RC-135 aircraft have been approved for wet wing defueling.",
+        "n_citations": 5,
+        "latency_ms": 5546,
+        "status": "ok",
+        "subqueries": [
+          "military aircraft that require special defueling methods for hydrant service",
+          "specialized defueling procedures in aviation context"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 13
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer mentions specific aircraft models (C-130, KC-135, KC-46, and EC/RC-135) that can undergo wet wing defueling. However, the expected answer focuses on Type II and Type III hydrant systems requiring specialized defueling procedures for certain military aircraft models. The generated answer does not address the specific hydrant systems mentioned in the question or confirm if these systems necessitate specialized procedures as stated in the expected answer.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_006",
+      "tag": "atomic",
+      "query": "What objects are prohibited inside Fuel Servicing Safety Zones?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_012",
+      "pipeline": {
+        "answer": "Clothing containing more than 65 percent of any combination or mixture of nylon, rayon, wool, or polyester is not to be worn as outer garments in the FSSZ when fuel servicing aircraft with low flashpoint fuels (flashpoint 100 degrees Fahrenheit (ºF) or below). Additionally, spark producing devices are not authorized in the Fuels Servicing Safety Zone (FSSZ).",
+        "n_citations": 5,
+        "latency_ms": 2813,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer misses key information from the expected answer and introduces new facts that were not present. It focuses on clothing materials and spark-producing devices instead of discussing prohibitions related to cargo containing explosives, oxygen, or flammable gases/liquids.",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "Clothing containing more than 65 percent of any combination or mixture of nylon, rayon, wool, or polyester should not be worn as outer garments in the FSSZ when fuel servicing aircraft with low flashpoint fuels (flashpoint 100 degrees Fahrenheit (ºF) or below). Additionally, active ignition sources are to be removed and kept out of the Fuel Servicing Safety Zone during fuel movement.",
+        "n_citations": 5,
+        "latency_ms": 4289,
+        "status": "ok",
+        "subqueries": [
+          "What objects are prohibited inside Fuel Servicing Safety Zones?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 1,
+          "llm_calls": 3,
+          "evidence_n": 6
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer focuses on clothing materials and active ignition sources, which were not mentioned in the expected answer. It misses the key information about cargo containing explosives, oxygen, or flammable gases/liquids that is present in the expected answer.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_007",
+      "tag": "atomic",
+      "query": "Does reflectorization enhance visibility for ground vehicles and trailers as per the USAF technical manual (TO_35-1-18)?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_014",
+      "pipeline": {
+        "answer": "Yes, according to the context provided, reflectorization enhances visibility for ground vehicles and trailers as it is specified that all reflectors must be in accordance with Ordnance drawing No. Additionally, silver reflectorized tape is used for highlighting certain vehicle equipment like fire trucks, fuel servicing trucks, A/S32A-2 water truck, 463L, and ground support equipment to indicate their length, width, and height.",
+        "n_citations": 5,
+        "latency_ms": 3066,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer affirms that reflectorization enhances visibility for ground vehicles and trailers, aligning with the expected answer. Although there are minor differences in details (e.g., mentioning specific types of reflectors by name), both answers confirm the enhancement of visibility through reflectorization as per TO 35-1-18.",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "Yes, according to the context provided in TO_35-1-18, reflectorization enhances visibility for ground vehicles and trailers by using black reflective strips that conform to specific standards. This is particularly important for safety reasons, as it allows for better visibility of vehicles and equipment during various conditions, including low light or nighttime scenarios.",
+        "n_citations": 5,
+        "latency_ms": 6070,
+        "status": "ok",
+        "subqueries": [
+          "Does reflectorization enhance visibility?",
+          "Is TO_35-1-18 a USAF technical manual regarding ground vehicle and trailer visibility enhancement?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 12
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer affirms the enhancement of visibility through reflectorization as stated in the expected answer. It acknowledges the use of black reflective strips that conform to specific standards (L-S-300C Type II, Class I, Reflectivity 2, Durability 1) and highlights their importance for safety during low light or nighttime conditions, which aligns with the information provided in the expected answer. The generated response does not contradict any details from the expected an",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "at_008",
+      "tag": "atomic",
+      "query": "What is the diameter and length of the wooden maul head, in inches?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_016",
+      "pipeline": {
+        "answer": "The diameter of the wooden maul head is about 8 inches, and its length is about 10 inches.",
+        "n_citations": 5,
+        "latency_ms": 2462,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides the same information as the expected answer but in a different order. It states the diameter first followed by the length, whereas the expected answer lists the length before the diameter. However, both convey the correct dimensions of the wooden maul head.",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The wooden maul has a cylindrical head which is about 8 inches in diameter and about 10 inches long.",
+        "n_citations": 5,
+        "latency_ms": 5231,
+        "status": "ok",
+        "subqueries": [
+          "What is the diameter of the wooden maul head?",
+          "What is the length of the wooden maul head?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 10
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides the same information as the expected answer but uses slightly different phrasing. It mentions that the maul head is cylindrical, which implies it has a diameter, and states its dimensions (diameter of 8 inches and length of 10 inches) in a clear manner. There are no contradictions or missing key facts.",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "at_009",
+      "tag": "atomic",
+      "query": "Which is the most common type of TC used in SATs, TUSs, and load TC monitoring according to the USAF technical manuals and orders?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_017",
+      "pipeline": {
+        "answer": "Type K base metal expendable with high temperature insulation, such as Silica or Nextel fiber.",
+        "n_citations": 5,
+        "latency_ms": 2855,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by specifying a different type of thermocouple (Type K instead of Type D) and mentioning materials for insulation which are not relevant to the question about the most common type used in specific applications.",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "Type K base metal expendable with high temperature insulation, such as Silica or Nextel fiber, is the most common type of TC used in SATs, TUSs, and load TC monitoring according to the USAF technical manuals and orders.",
+        "n_citations": 5,
+        "latency_ms": 6090,
+        "status": "ok",
+        "subqueries": [
+          "What are the most commonly used types of TC in SATs, TUSs, and load TC monitoring as per USAF technical manuals?",
+          "Identify the specific TC types mentioned for these applications in USAF orders."
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 12
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by specifying Type K thermocouples instead of Type D. Additionally, it mentions a specific type of insulation (Silica or Nextel fiber) which was not mentioned in the expected answer.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_010",
+      "tag": "atomic",
+      "query": "USAF Briner 2905 thickness ratio dry film to wet film.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_020",
+      "pipeline": {
+        "answer": "The context provided does not specify a direct \"thickness ratio\" between dry film and wet film for Briner 2905. However, it mentions that one coat with a dry film thickness of 2 mils is recommended when applying this coating. The wet film thickness can be thinned to facilitate spray painting if necessary, but the exact ratio is not provided in the context.",
+        "n_citations": 5,
+        "latency_ms": 1852,
+        "error": null,
+        "correct": false,
+        "is_rejected": true,
+        "false_reject": true,
+        "judge": "llm",
+        "judge_reasoning": "answerable question rejected",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "The context provides the information that for Briner 2905, a dry film thickness of 2 mils is recommended with a wet film thickness requiring 4.5 mils. Therefore, the thickness ratio of dry film to wet film for Briner 2905 is not directly provided but can be inferred as follows:\n\nTo find the ratio, we use the formula:\n\\[ \\text{Ratio} = \\frac{\\text{Dry Film Thickness}}{\\text{Wet Film Thickness}} \\]\n\nSubstituting the given values:\n\\[ \\text{Ratio} = \\frac{2\\, \\text{mils}}{4.5\\, \\text{mils}} \\approx 0.44 \\]\n\nThus, the thickness ratio of dry film to wet film for Briner 2905 is approximately 0.44:1.",
+        "n_citations": 5,
+        "latency_ms": 7553,
+        "status": "ok",
+        "subqueries": [
+          "What is the thickness ratio of dry film to wet film for USAF Briner 2905?",
+          "Find the specific maintenance manual that contains information on USAF Briner 2905."
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 12
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a detailed calculation based on the given information and arrives at an equivalent conclusion regarding the thickness ratio for Briner 2905, albeit with some minor differences in phrasing (e.g., \"requires\" vs. \"is recommended\"). However, since the question asks specifically about the thickness ratio dry film to wet film, and the generated answer calculates this ratio based on the provided data points, it can be considered semantically equivalent to what w",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "at_011",
+      "tag": "atomic",
+      "query": "Are Vapor Corrosion Inhibitors (VCIs) ineffective beyond 6 inches of material exposure according to USAF technical manuals and orders?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_028",
+      "pipeline": {
+        "answer": "The context does not provide information about the effectiveness range of Vapor Corrosion Inhibitors (VCIs) beyond a specific distance. Therefore, I don't know if VCIs are ineffective beyond 6 inches of material exposure based on USAF technical manuals and orders.",
+        "n_citations": 5,
+        "latency_ms": 1621,
+        "error": null,
+        "correct": false,
+        "is_rejected": true,
+        "false_reject": true,
+        "judge": "llm",
+        "judge_reasoning": "answerable question rejected",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "The context does not provide information about whether Vapor Corrosion Inhibitors (VCIs) are ineffective beyond a certain distance of material exposure. Therefore, I don't know if they are ineffective beyond 6 inches or any other specific distance.",
+        "n_citations": 5,
+        "latency_ms": 9128,
+        "status": "abstain",
+        "subqueries": [
+          "Does the USAF technical manual state that Vapor Corrosion Inhibitors are effective within 6 inches of material exposure?",
+          "Does the USAF order specify any limitations on the effectiveness of Vapor Corrosion Inhibitors beyond 6 inches of material exposure?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 11
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": true,
+        "false_reject": true,
+        "judge": "llm",
+        "judge_reasoning": "answerable question rejected",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_012",
+      "tag": "atomic",
+      "query": "How far away should the dry heat source be from the wire or wire group for the shrinking of polyethylene tubing?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_030",
+      "pipeline": {
+        "answer": "The heat source should be held four to five inches away from the wire when applying heat for the shrinking of polyethylene tubing.",
+        "n_citations": 5,
+        "latency_ms": 2952,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: Both answers convey the same information with slight variations in phrasing. The generated answer specifies \"the heat source\" instead of \"the dry heat source,\" but this is a minor difference and does not change the meaning or accuracy of the response. It also correctly identifies that the distance should be four to five inches away from the wire, which aligns with the expected answer's requirement for shrinking polyethylene tubing.",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The heat source should be held four to five inches away from the wire.",
+        "n_citations": 5,
+        "latency_ms": 9931,
+        "status": "ok",
+        "subqueries": [
+          "What is the recommended distance for a dry heat source to be placed from wires or wire groups when shrinking polyethylene tubing?",
+          "Find specific instructions on wire protection during polyethylene tubing shrinkage process."
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 14
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both convey that the distance between the heat source and the wire or wire group should be around 4 to 5 inches when shrinking polyethylene tubing. The minor difference in mentioning \"wire\" instead of \"wire or wire group\" does not affect the core information being communicated, which is the specific distance for proper application.",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "at_013",
+      "tag": "atomic",
+      "query": "State the maximum water pressure (PSI) allowed for manual rinsing in Clear Water Rinsing of Aircraft per the TO 1-1-691 Manual.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_031",
+      "pipeline": {
+        "answer": "The context states that for clear water rinsing, a minimum of eight gallons per minute (GPM) of water at a nozzle pressure of 25 PSI to 175 PSI maximum is required. Therefore, the maximum water pressure allowed for manual rinsing in Clear Water Rinsing of Aircraft per the TO 1-1-691 Manual is 175 PSI.",
+        "n_citations": 5,
+        "latency_ms": 3347,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer correctly identifies the maximum water pressure (175 PSI) allowed for manual rinsing in Clear Water Rinsing of Aircraft as specified in the TO 1-1-691 Manual. It also aligns with the expected answer by mentioning that this is the maximum pressure, which matches the provided information. The additional detail about the minimum water flow rate and nozzle pressure range does not contradict or miss key information from the expected answer; it merely provides more cont",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The maximum water pressure (PSI) allowed for manual rinsing in Clear Water Rinsing of Aircraft, as stated in the provided context, is less than 10 PSI.",
+        "n_citations": 5,
+        "latency_ms": 4845,
+        "status": "ok",
+        "subqueries": [
+          "What is the maximum water pressure (PSI) allowed for manual rinsing in Clear Water Rinsing of Aircraft according to TO 1-1-691 Manual?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 1,
+          "llm_calls": 3,
+          "evidence_n": 7
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by stating a much lower maximum water pressure (10 PSI) compared to the expected value of 175 PSI.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_014",
+      "tag": "atomic",
+      "query": "maximum allowed nozzle pressure type i hydrant system psi",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_032",
+      "pipeline": {
+        "answer": "The context does not provide information about the maximum allowed nozzle pressure for a Type I hydrant system.",
+        "n_citations": 5,
+        "latency_ms": 1293,
+        "error": null,
+        "correct": false,
+        "is_rejected": true,
+        "false_reject": true,
+        "judge": "llm",
+        "judge_reasoning": "answerable question rejected",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "The maximum allowed nozzle pressure for a Type I hydrant system is not specified in the provided context.",
+        "n_citations": 5,
+        "latency_ms": 6646,
+        "status": "ok",
+        "subqueries": [
+          "What is the maximum allowed nozzle pressure for a Type I hydrant system in PSI?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 5
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by stating that the maximum allowed nozzle pressure is not specified, while the expected answer provides a specific value of 55 PSI.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_015",
+      "tag": "atomic",
+      "query": "Determine the title of DAFMAN 91-223",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_036",
+      "pipeline": {
+        "answer": "The title of DAFMAN 91-223 is \"Water and Fuel Systems\".",
+        "n_citations": 5,
+        "latency_ms": 2289,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides the correct information that the title of DAFMAN 91-223 is \"Water and Fuel Systems\". There are no contradictions or missing key facts, despite minor phrasing differences.",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The title of DAFMAN 91-223 is \"Aviation Safety Investigations and Reports\".",
+        "n_citations": 5,
+        "latency_ms": 4344,
+        "status": "ok",
+        "subqueries": [
+          "title of DAFMAN 91-223"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 1,
+          "llm_calls": 3,
+          "evidence_n": 6
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by providing a different title for DAFMAN 91-223. The correct title, according to the expectation, should be \"Water and Fuel Systems\".",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_016",
+      "tag": "atomic",
+      "query": "minimum wing tip separation distance during rapid defueling with fire truck presence",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_037",
+      "pipeline": {
+        "answer": "The minimum wing tip separation distance during rapid defueling, when an aircraft rescue and firefighting vehicle is present, is 35 feet. This applies whenever a distance of less than 50 feet (wing tip to wing tip) is maintained between aircraft.",
+        "n_citations": 5,
+        "latency_ms": 2786,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides the same minimum wing tip separation distance as the expected answer (35 feet) and clarifies that it applies when maintaining a distance of less than 50 feet from another aircraft. It also includes the presence of an aircraft rescue and firefighting vehicle, which was not explicitly mentioned in the expected answer but is consistent with the context provided by the question. The generated answer does not contradict or miss any key information compared to ",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The minimum wing tip separation distance during rapid defueling, when a fire truck is present, is 50 feet. If space limitations require reducing this distance to less than 50 feet (between aircraft wing tips), an aircraft rescue and firefighting vehicle must be at the aircraft during rapid defueling operations.",
+        "n_citations": 5,
+        "latency_ms": 5550,
+        "status": "ok",
+        "subqueries": [
+          "What is the minimum wing tip separation distance during rapid defueling?",
+          "Does the presence of a fire truck affect this distance?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 14
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by stating a minimum separation distance of 50 feet instead of 35 feet. Additionally, it provides extra information about space limitations and the requirement for an aircraft rescue and firefighting vehicle that is not mentioned in the expected answer.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "at_017",
+      "tag": "atomic",
+      "query": "Provide Step A for using a torque wrench.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_041",
+      "pipeline": {
+        "answer": "Step A: Select proper size socket wrench (1) and attach to torque wrench square drive (2).",
+        "n_citations": 5,
+        "latency_ms": 2402,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both convey that the first step involves choosing the right-sized socket wrench and attaching it to the torque wrench's square drive, albeit with slightly different phrasing for \"attaching\" (using \"fitting\" in the expected answer).",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "Step A for using a torque wrench is: Select proper size socket wrench (1) and attach it to the torque wrench square drive (2).",
+        "n_citations": 5,
+        "latency_ms": 4469,
+        "status": "ok",
+        "subqueries": [
+          "Step A for using a torque wrench"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 1,
+          "llm_calls": 3,
+          "evidence_n": 6
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer closely mirrors the expected answer, with slight variations in phrasing (\"Step A involves\" vs. \"Step A for\") but conveys the same information accurately. Both answers describe selecting the proper size socket wrench and attaching it to the torque wrench square drive as part of Step A.",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "at_018",
+      "tag": "atomic",
+      "query": "What element makes up the highest composition range for the 8630 Nickel-Chromium-Molybdenum Alloy?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_042",
+      "pipeline": {
+        "answer": "The context does not provide information about an alloy named \"8630 Nickel-Chromium-Molybdenum Alloy.\" Therefore, I don't know which element makes up the highest composition range for this specific alloy.",
+        "n_citations": 5,
+        "latency_ms": 1822,
+        "error": null,
+        "correct": false,
+        "is_rejected": true,
+        "false_reject": true,
+        "judge": "llm",
+        "judge_reasoning": "answerable question rejected",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "The context does not provide information about the specific composition ranges of individual elements for the 8630 Nickel-Chromium-Molybdenum Alloy. Therefore, I don't know the answer to this question based on the provided context.",
+        "n_citations": 5,
+        "latency_ms": 5179,
+        "status": "abstain",
+        "subqueries": [
+          "What is the composition of 8630 Nickel-Chromium-Molybdenum Alloy?",
+          "Which element constitutes the maximum proportion in 8630 Nickel-Chromium-Molybdenum Alloy?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 14
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": true,
+        "false_reject": true,
+        "judge": "llm",
+        "judge_reasoning": "answerable question rejected",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_001",
+      "tag": "multi_hop",
+      "query": "What signal is used to indicate hot brakes, and what is the first step if one is detected during inspection?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_003",
+      "pipeline": {
+        "answer": "Signal: MAKES RAPID FANNING MOTION WITH ONE HAND IN FRONT OF FACE AND POINTS TO WHEEL WITH OTHER HAND.\n\nFirst step if one is detected: Check for hot brakes.",
+        "n_citations": 5,
+        "latency_ms": 3393,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides the correct signal used to indicate hot brakes, which matches the expected answer. However, it does not explicitly mention that this action should be performed as per procedure c, which was part of the expected answer. Additionally, the first step if hot brakes are detected is correctly identified in both answers as \"Check for hot brakes.\" Despite this minor discrepancy regarding the procedural reference, the core information matches, and there are no con",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The signal used to indicate hot brakes is making a rapid fanning motion with one hand in front of the face and pointing to the wheel with the other hand. If hot brakes are detected during inspection, the first step is to check for them.",
+        "n_citations": 5,
+        "latency_ms": 5047,
+        "status": "ok",
+        "subqueries": [
+          "What signal is used to indicate hot brakes?",
+          "What is the first step if one is detected during inspection?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 13
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both provide the same signal used to indicate hot brakes and the correct initial step if hot brakes are detected during inspection. There are minor phrasing differences but no missing facts or contradictions.",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_002",
+      "tag": "multi_hop",
+      "query": "Contrast the role of visual aids in the aircraft fuel servicing manual and the UID asset marking manual, focusing on how each type of aid supports procedural accuracy in high-risk operations.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_004",
+      "pipeline": {
+        "answer": "The aircraft fuel servicing manual utilizes visual aids such as illustrations, tables, and diagrams to supplement text material that guides personnel through procedures like refueling, defueling, and servicing aircraft with various fuels including JP-5, JP-8, Jet A, and Jet A-1. These aids are crucial for ensuring safety and efficiency in operations that involve potentially hazardous materials and equipment.\n\nIn contrast, the UID asset marking manual employs visual aids to instruct on the application of Air Force (AF) Item Unique Identification (IUID) program assets. This includes guidance on IUID characteristics, surface preparation, label application methods like Direct Part Marking (DPM), verification, validation, and inspection procedures. The visual aids here are essential for ensuring that assets are correctly marked with unique identifiers to facilitate tracking and management across the AF's inventory.\n\nBoth manuals recognize the importance of visual aids in supporting procedural accuracy; however, their focus differs significantly based on the nature of the tasks—safety-critical aircraft operations versus asset identification and management. The aids serve as critical tools for ensuring compliance with safety protocols and operational standards in each respective domain.",
+        "n_citations": 5,
+        "latency_ms": 4399,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer, providing a detailed comparison of how visual aids are utilized in aircraft fuel servicing manuals versus UID asset marking manuals. Both answers highlight the importance of visual aids for procedural accuracy and safety standards, though they differ in their specific applications and focus areas (fuel operations vs. asset identification). The generated answer also acknowledges minor phrasing differences while mai",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "In the aircraft fuel servicing manual, visual aids such as illustrations, tables, and diagrams play a crucial role in supplementing the text material to ensure safe and proper execution of procedures. These visual aids help personnel understand operational setups, equipment positioning, and safety zones clearly, thereby reducing risks associated with human error during high-risk operations like refueling or defueling aircraft.\n\nIn contrast, the UID asset marking manual utilizes magnifying loops and other optical magnification enhancement tools as a key form of visual aid for inspection activities. These aids are specifically mentioned to ensure that Direct Part Marking (DPM) is inspected accurately without any interference from debris, corrosion, cracks, tears, holes, or scratches on the marked area. This focus on detailed visual checks supports procedural accuracy in high-risk operations by confirming that UID labels meet quality standards and can be reliably read for tracking purposes.\n\nIn summary, while both manuals use visual aids to enhance understanding and ensure safety during high-risk tasks, the aircraft fuel servicing manual emphasizes general operational setups and equipment positioning through diagrams and illustrations. The UID asset marking manual focuses on detailed inspection techniques using magnifying tools to verify the quality of DPM markings, ensuring they are legible and correctly applied for tracking purposes.",
+        "n_citations": 6,
+        "latency_ms": 7980,
+        "status": "ok",
+        "subqueries": [
+          "What are the roles of visual aids in the aircraft fuel servicing manual?",
+          "How do visual aids support procedural accuracy in high-risk operations within the aircraft fuel servicing manual?",
+          "What are the roles of visual aids in the UID asset marking manual?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 15
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both answers discuss the role of visual aids in supporting procedural accuracy in high-risk operations within their respective manuals (aircraft fuel servicing manual and UID asset marking manual). They highlight specific tools and techniques used for each task, such as magnifying loops and optical aids, and explain how these support safety standards and quality control processes. The explanations cover key points",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_003",
+      "tag": "multi_hop",
+      "query": "Explain the engineering considerations for nozzle positioning during defueling operations based on equipment configuration and aircraft interface requirements.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_006",
+      "pipeline": {
+        "answer": "During defueling operations, several engineering considerations are crucial for proper nozzle positioning to ensure safety and efficiency:\n\n1. **Nozzle Engagement**: Make sure that the refueling nozzle is fully engaged by turning it clockwise until it resists turning. This ensures a secure connection between the fuel servicing equipment and the aircraft.\n\n2. **Locked Position**: Lock the nozzle in position by positioning the manual fuel shutoff lever in the full open position. This prevents accidental disconnection of the nozzle from the aircraft during refueling.\n\n3. **Nozzle Inspection**: Inspect the engagement of the nozzle by performing a counterclockwise tug on the nozzle handles to ensure it is securely attached and cannot be removed when the valve handle is in the open and locked position.\n\n4. **Correct Fuel Type Verification**: Ensure that the correct fuel type (JP-4, JP-5, or JP-8) is being supplied based on the aircraft's requirements. This prevents contamination of the fuel system and ensures compatibility with the aircraft’s specifications.\n\n5. **Nozzle to Aircraft Connection**: Connect the SPR nozzle to the aircraft before pressuring the hose. If equipped with a strainer coupling quick disconnect, test it for positive engagement prior to pressuring the hose to prevent leaks or disconnections during refueling operations.\n\n6. **Emergency Procedures**: Before starting any refueling operation, ensure that all personnel are aware of emergency procedures and protocols. This includes knowing how to respond in case of spills, fires, or equipment malfunctions.\n\n7. **Pre-Operation Inspection**: Conduct a thorough pre-operation inspection at the hot refueling site before the arrival of the receiver aircraft. This ensures that all equipment is functioning correctly and no safety issues are overlooked.\n\n8. **Safety Briefing**: Provide a safety briefing to personnel including emergency procedures, especially for the refueling supervisor (2A3X3) who will conduct this briefing prior to the arrival of the first aircraft.\n\n9. **Monitoring Equipment**: The fuels operator should maintain communication with the wet wing defueling supervisor through an intercom system during the entire operation. This ensures that any malfunctions are immediately identified and addressed, maintaining safety standards.\n\n10. **Positioning Ball Valve Strainers**: Inspect and clean ball valve strainers as required every time they are switched from refuel to defuel or defuel to refuel position. This prevents blockages and maintains the integrity of the fuel flow system.\n\nThese considerations are based on equipment configuration, aircraft interface requirements, and safety protocols designed to prevent accidents, ensure efficient operations, and protect personnel and aircraft during refueling and defueling processes.",
+        "n_citations": 5,
+        "latency_ms": 6172,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a detailed explanation of the engineering considerations for nozzle positioning during defueling operations, which aligns with the expected answer's focus on equipment configuration, aircraft interface requirements, safety protocols, and operational procedures. Although there are some differences in phrasing and minor details (such as mentioning \"SPR nozzle\" instead of referring to ball strainer valves specifically), the core information about nozzle enga",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "During defueling operations, several engineering considerations are crucial for ensuring safety, efficiency, and compatibility between the fuel servicing equipment and the aircraft:\n\n1. **Nozzle Positioning**: The nozzle must be correctly positioned to ensure that fuel is directed into the appropriate receptacle on the aircraft without causing damage or spillage. This involves aligning the nozzle with the aircraft's fuel tank inlet.\n\n2. **Flow Rate Control**: Equipment operators are instructed not to exceed a defueling rate of 300 GPM (gallons per minute) when using certain vehicles like R-11 fuel trucks. Exceeding this rate can lead to overfilling or bypassing the fuel system, which could result in safety hazards.\n\n3. **Vehicle and Equipment Configuration**: The configuration of the fuel servicing vehicle plays a significant role. For instance, with Condiesel (1981) R-9, Kovatch R-9, and Oshkosh R-11 vehicles, it's important to verify that the high-level shutoff system is operational during defueling.\n\n4. **Strainer Valve Inspection**: The ball strainer valve must be inspected and cleaned as required every time its position changes from refuel to defuel or vice versa. This is critical for preventing solid contaminants from entering either the aircraft fuel systems or the refueling vehicle components, which could lead to damage or operational failures.\n\n5. **Preventing Nozzle Removal**: Ensuring that the single point servicing nozzle cannot be removed from the aircraft when the valve handle is in the open and locked position helps prevent accidental disconnection during defueling operations.\n\n6. **Support for Nozzles and Hoses**: If 45-degree D-1 nozzles are used, they must be supported to avoid damage to the aircraft's fuel receptacles. This ensures that the equipment does not cause unintended wear or tear on the aircraft's structure.\n\n7. **Preparation of Vehicle Control Panel**: Before commencing defueling operations, the vehicle control panel should be prepared for this task. This includes ensuring all necessary systems are operational and ready for use.\n\n8. **Aircraft Engine Start Sequence**: The sequence of starting engines is important to ensure that fuel flow does not interfere with engine operation or cause imbalance in fuel distribution across multiple engines if present on the aircraft.\n\n9. **Secondary Visual Verification**: Secondary visual verification by a crew member, such as using 4FOX1 (or civilian equivalent), ensures that the ball valve strainer is correctly placed and conditionally suitable for the next operation, providing an additional layer of safety against contamination risks.\n\nThese considerations are part of comprehensive guidelines designed to minimize operational risks, protect aircraft integrity, and ensure efficient fuel management during defueling operations.",
+        "n_citations": 6,
+        "latency_ms": 9405,
+        "status": "ok",
+        "subqueries": [
+          "What are the engineering considerations for nozzle positioning during defueling operations?",
+          "How does equipment configuration influence nozzle positioning in defueling processes?",
+          "What role do aircraft interface requirements play in determining nozzle positioning during defueling?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 15
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer covers most aspects of the expected answer but omits some details. It does not explicitly mention TO 37A-1-101 or specify that nozzle strainers should be removed or reversed on all designated defuel units before each operation, as stated in the expected answer. However, these points are implied and can be considered minor phrasing differences rather than contradictions. The generated answer also includes additional details about flow rate control and vehicle confi",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_004",
+      "tag": "multi_hop",
+      "query": "Explain the key safety protocols for hot refueling Navy aircraft at Air Force bases as outlined in the technical manual.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_008",
+      "pipeline": {
+        "answer": "The key safety protocols for hot refueling Navy aircraft at Air Force bases, as outlined in the technical manual, include:\n\n1. **Approval of Equipment**: Only United States Air Force (USAF)-approved hot refueling equipment is to be used.\n\n2. **Avoid Hot Brake Condition**: Do not hot refuel aircraft with a hot brake condition.\n\n3. **Pre-flight Checks**: Prior to hot refueling, all external tanks, stores, and weapons must be safed. The Base Fire Chief determines the location for standby Aircraft Rescue and Firefighting (ARFF).\n\n4. **Pressure Limit**: The maximum refueling pressure is set at 55 pounds-force per square inch (PSI).\n\n5. **Verification of Previous Flight**: Verify with the aircrew that fuel has not been dumped on the previous flight. If fuel was jettisoned and the position of the dump valve is unknown, do not hot refuel.\n\n6. **Pre-checks for Aircraft**: Aircraft high level shutoff valves must be pre-checked at the beginning of the operation. If any pre-check fails, the aircraft can only be cold refueled.\n\n7. **Vent Checks**: During hot refueling, check that air is flowing from the aircraft fuel vent outlet(s) except for EF/F-18s where Navy external tank vents are on the bottoms of the tanks.\n\n8. **Navy Aircraft Landing in Wartime**: In wartime, US Navy aircraft may land at USAF bases to refuel before reaching their home base or carrier.\n\n9. **Hot Refueling Procedures**: The checklist provides procedures for hot refueling Navy aircraft, with specific instructions for aircraft like E/A-6, E-2, F-14, and S-3 that require shutting down one engine, while EF/F-18s can be hot refueled with both engines running.\n\n10. **Support Equipment**: Required support equipment includes stopping the aircraft at least 50 feet short of the hot refueling area, verifying safing of weapons and external tanks, ensuring the external fuel tank safety select is in LOCKED position, confirming the fuel dump valve is closed, signaling aircrew to taxi to the area, positioning the aircraft on the hot refueling pit.\n\n11. **Manual's Primary Importance**: The manual emphasizes safety and rescue equipment designed for specific tasks.\n\n12. **Precautions for NAOC Aircraft**: For E4-B National Airborne Operation Center (NAOC) aircraft, this chapter aims to eliminate omission of steps in the hot refueling process.\n\n13. **Qualified Personnel**: Qualified E4-B hot refueling specialists have a thorough understanding of precautions necessary for these tasks.\n\n14. **Waiver Authority**: Waivers for fueling service without deadman controls can be issued on a case-by-case basis by MAJCOM/DO/LG.\n\n15. **Aircraft Servicing Safety Precautions**: Electrical storms, vehicle discrepancies, handling of lighter/matches, bonding, clothing and distance criteria apply during hot refueling operations.",
+        "n_citations": 5,
+        "latency_ms": 6799,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a detailed explanation of key safety protocols for hot refueling Navy aircraft at Air Force bases, which is semantically equivalent to the expected answer. Both answers outline similar steps and considerations necessary for safe fueling procedures as per the technical manual TO 00-25-172CL-3. The generated answer includes some additional details specific to certain aircraft types (like E/A-6, E-2, F-14, S-3) and mentions qualified personnel and waiver aut",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The key safety protocols for hot refueling Navy aircraft at Air Force bases, as outlined in the technical manual, include:\n\n1. **Approval of Equipment**: Only United States Air Force (USAF)-approved hot refueling equipment is to be used.\n\n2. **Pre-flight Checks**: Before hot refueling, all external tanks, stores, and weapons must be safed. The aircraft high level shutoff valves must be pre-checked at the beginning of the operation; if any fail this check, the aircraft can only be cold refueled.\n\n3. **Avoiding Hot Brake Conditions**: Do not hot refuel aircraft with a hot brake condition.\n\n4. **Location for Standby ARFF**: The Base Fire Chief will determine where the standby Aircraft Rescue and Firefighting (ARFF) team should be positioned.\n\n5. **Maximum Refueling Pressure**: The maximum refueling pressure is set at 55 pounds-force per square inch (PSI).\n\n6. **Verification of Fuel Dump Valve**: Verify that fuel had not been dumped on the previous flight, and if it was, ensure the position of the dump valve is positively known to be closed before proceeding with hot refueling.\n\n7. **Insulating Matting**: The Ground Safety Officer will determine if insulating matting is required for safety purposes and approve or disapprove requisitions accordingly.\n\n8. **Safety Equipment Compliance**: This technical manual provides information on controlling and using insulating matting that meets Specification MIL-M-15562 and AFOSH 91-50, with certification requirements prescribed in paragraph 5.\n\n9. **Organizational Commander's Responsibility**: The appropriate organizational Commander is responsible for ensuring compliance with use restrictions and replacement requirements outlined in paragraphs 6, 7, and 8.\n\n10. **Preparation Before Taxiing**: Stop the aircraft at least 50 feet short of the hot refueling area, signal the aircrew to shut down the right engine, verify all weapons and external tanks are safed, confirm the fuel dump valve is closed, then taxi to the hot refueling area.\n\n11. **Positioning and Safety Measures**: Position the aircraft on the hot refueling pit, chock and ground it properly. Avoid working beneath the tail hook area when doing so.\n\n12. **Engine Bleed Air Check**: Verify that engine bleed air is not pressurizing the external tanks during the process.\n\nThese protocols are designed to ensure safety and prevent accidents during the hot refueling of Navy aircraft at Air Force bases, adhering to guidelines set by the Secretary of the Air Force and applicable military specifications.",
+        "n_citations": 5,
+        "latency_ms": 8781,
+        "status": "ok",
+        "subqueries": [
+          "What are the key safety protocols for hot refueling Navy aircraft?",
+          "Where are these protocols outlined in the technical manual?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 13
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer introduces new information not present in the expected answer, such as the approval of equipment being USAF-approved only, the mention of a Base Fire Chief determining the location for standby ARFF team, and the responsibility of the organizational Commander. It also omits some key points from the expected answer, like pre-refueling checks involving attempting to remove the nozzle with the flow handle open, wearing skin/eye protection during refueling, and specifi",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_005",
+      "tag": "multi_hop",
+      "query": "How do standardized maintenance protocols in Air Force technical manuals balance regulatory compliance with site-specific operational needs across different systems?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_015",
+      "pipeline": {
+        "answer": "Standardized maintenance protocols in Air Force technical manuals balance regulatory compliance with site-specific operational needs by prioritizing the weapon system specific manuals over general guidelines. In the event of a conflict between chapter-specific regulations and more general directives, such as those found in NFPA standards or AFOTEC recommendations, the precedence goes to the weapon system specific manuals. This ensures that while overarching safety and operational guidelines are followed (as mandated by regulatory bodies like NFPA), the unique requirements and conditions of each aircraft or system are also addressed and prioritized. The Air Force's internal OT&E process validates compliance with these standards, allowing for adjustments based on real-world operational data and feedback from independent testing centers like AFOTEC. This approach ensures that safety protocols are robust enough to meet regulatory benchmarks while being adaptable to the specific needs of each aircraft or system within the Air Force fleet.",
+        "n_citations": 5,
+        "latency_ms": 4447,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a detailed explanation on how standardized maintenance protocols balance regulatory compliance with site-specific operational needs, aligning closely with the expected answer. It mentions specific manuals (TO 35E1-2-13-1 and TO 25-25-245), emphasizes the importance of personal protective equipment, and discusses the prioritization of weapon system-specific manuals over general guidelines in case of conflicts. The generated answer also highlights the role ",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "Standardized maintenance protocols in Air Force technical manuals balance regulatory compliance with site-specific operational needs by integrating general guidelines and specific system requirements. These manuals:\n\n1. **Provide a Common Framework**: They establish a uniform approach to maintenance, ensuring that personnel follow consistent procedures for corrosion prevention, repair, and inspection across various C-E-M equipment systems.\n\n2. **Reference Specific Manuals**: By linking to Technical Orders (TOs) like TO 1-1-8, TO 1-1-689-series, TO 1-1-691, and system-specific maintenance manuals, the guidelines adapt to the unique characteristics of different equipment types, allowing for tailored maintenance practices.\n\n3. **Incorporate Military Specifications**: Using primary specification numbers without revision letters ensures that materials used meet current standards implied by these specifications, facilitating compliance with regulatory requirements while allowing updates through revisions rather than manual updates in the main manual.\n\n4. **Guide Quality Assurance and Documentation**: Through TCTO (Technical Change) implementation processes, manuals ensure that critical data elements are transferred to Maintenance Information Systems for tracking and management of tasks, which helps maintain operational readiness by managing timelines and compliance periods effectively.\n\n5. **Address Environmental and Safety Standards**: By including sections on environmental regulations like NESHAPs and ESD safety practices, the manuals guide personnel in handling equipment safely while complying with environmental standards and protecting personnel from hazards.\n\n6. **Enable Remote Operations Guidance**: For systems requiring maintenance away from permanent workstations, guidelines are provided for using portable ESD workstations or wrist straps to ensure proper grounding and minimize risks associated with static electricity discharge.\n\n7. **Facilitate Material Substitution**: By allowing the use of materials conforming to current revisions without specifying every update in the manual, these protocols enable flexibility while maintaining quality standards.\n\nIn essence, Air Force technical manuals serve as a bridge between broad regulatory compliance and the specific operational realities faced by maintenance personnel across diverse systems, ensuring that standardized practices are both effective and adaptable.",
+        "n_citations": 6,
+        "latency_ms": 9668,
+        "status": "ok",
+        "subqueries": [
+          "What are the key standardized maintenance protocols mentioned in Air Force technical manuals?",
+          "How does regulatory compliance influence these maintenance protocols?",
+          "In what ways do site-specific operational needs affect the application of these maintenance protocols across different systems?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 19
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a detailed explanation of how standardized maintenance protocols in Air Force technical manuals balance regulatory compliance with site-specific operational needs. It covers the integration of general guidelines, specific system requirements, reference to Technical Orders (TOs), incorporation of military specifications, guidance on quality assurance and documentation, addressing environmental and safety standards, facilitating remote operations, and enabl",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_006",
+      "tag": "multi_hop",
+      "query": "State the purpose of a TC device and how it is constructed as per the USAF technical manuals and orders.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_018",
+      "pipeline": {
+        "answer": "The purpose of a Technical Order (TO) device, as described in the context, is to provide operation and service instructions for standard Air Force torque devices used to obtain predetermined torque values on low, medium, and high pressure hoses, tubing, nuts, bolts, and related fasteners. The term \"devices\" encompasses various tools such as handles, wrenches, screwdrivers, etc., which are designed to ensure precise torque application during maintenance tasks.\n\nThe construction or specific details of how these devices are built are not detailed in the provided context; however, they are expected to be engineered for durability and accuracy in torque measurement and application. The focus is on their operational instructions and compliance with safety standards as outlined by the Air Force Technical Order (TO) system.",
+        "n_citations": 5,
+        "latency_ms": 3590,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by discussing a Technical Order device instead of focusing on thermocouples (TC devices). It also provides information about torque devices and their operational instructions, which is not aligned with the question's focus on TC devices' purpose and construction as per USAF technical manuals and orders.",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "A thermocouple (TC) device, according to the provided context, is used for accurately measuring temperatures. It consists of a wire with two dissimilar metal leads that are converted into temperature readings using a field test instrument or other TC monitoring unit. The construction can be achieved through welding or twisting the TC wire elements together. Welded TCs are prone to problems and should be used when available, whereas twisted TCs do not form as reliable a junction as welded ones and their reliability decreases with repeated use.\n\nFor re-use limits of Base Metal Non-Expendable TCs, they are nickel-based devices that can be utilized in various applications such as SATs (System Accuracy Tests), TUSs (Temperature Uniformity Studies), and load TC monitoring. The color coding for Type K TCs conforms to ANSI MC 96 wire color coding standards.\n\nField test instruments are used in conjunction with TCs to measure temperatures inside an oven chamber, aiding in the monitoring of load TCs, performing SATs, and TUSs. These instruments should have a minimum of one input channel and calibration accuracy of ±1°F or better for SATs and TUSs, respectively.\n\nThe manual also provides guidance on vehicle fleet maintenance, including corrosion control, storage, shipment, warranties, depot overhaul, repair procedures, and applies to all Active Duty, Air Force Reserve (AFRS), and Ai National Guard (ANG) vehicle management units. It specifies procedures, materials, and guidance for Vehicle Fleet Managers (VFM), Vehicle Management Superintendents (VMS), supervisors, and technicians related to the maintenance and upkeep of their respective fleets.\n\nThe purpose of this technical order is to provide operation and service instructions for standard Air Force torque devices used in obtaining predetermined torque values on various components such as low, medium, and high pressure hoses, tubing, nuts, bolts, and related fasteners.",
+        "n_citations": 5,
+        "latency_ms": 8731,
+        "status": "ok",
+        "subqueries": [
+          "What is the purpose of a TC device according to USAF technical manuals?",
+          "How is a TC device constructed as per USAF orders?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 12
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer misses key information from the expected answer. It does not mention that thermocouples measure temperature based on thermoelectric principles or provide details about the initial calibration process for TCs. Additionally, it incorrectly states that field test instruments should have a minimum of one input channel and calibration accuracy of ±1°F or better for SATs and TUSs when the expected answer did not specify these requirements. The generated answer also incl",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_007",
+      "tag": "multi_hop",
+      "query": "Discuss the safety considerations when using Type I heavy-duty solvent-based cleaners during maintenance as per the USAF technical manuals.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_021",
+      "pipeline": {
+        "answer": "When using Type I heavy-duty solvent-based cleaners for aircraft maintenance according to USAF technical manuals, several key safety considerations must be observed:\n\n1. **Ventilation**: Solvent cleaners contain volatile organic compounds (VOCs) that can create hazardous conditions if not properly ventilated. Therefore, it is essential to ensure adequate ventilation in the area where cleaning takes place.\n\n2. **Personal Protective Equipment (PPE)**: Personnel should wear type II goggles for eye protection, protective wet weather clothing to shield against spills and splashes, solvent-resistant gloves to prevent skin contact with harmful substances, boots that are resistant to solvents, and head covering to protect hair from exposure.\n\n3. **Respiratory Protection**: When working in enclosed areas where solvents may accumulate or be present due to evaporation, a respirator fitted with organic vapor cartridges should be used to filter out harmful vapors.\n\n4. **Fire Safety**: Suitable fire extinguishing equipment must be available near the solvent cleaning area since solvents are flammable and can pose a fire risk if not managed properly.\n\n5. **Handling of Solvents**: The application of solvents should be done using approved methods such as pads, cloths, or brushes to avoid direct contact with skin and eyes. It is crucial to follow specific procedures for applying these solvents correctly.\n\n6. **Prevention of Trapped Solvent**: Ensuring that no solvent is trapped inside equipment during cleaning is vital to prevent potential damage from solvent corrosion or entrapment.\n\n7. **Residual Cleaning**: After using solvents, the area must be recleaned with appropriate methods to remove any residue left by the solvents, as they can leave behind corrosive or harmful substances that need to be thoroughly removed.\n\n8. **Safety Equipment Approval**: When applying cleaners, approved explosion-proof lights and other equipment should be used to minimize fire risks associated with solvent vapors.\n\n9. **Authorization of Cleaners**: The use of unauthorized cleaning compounds or the improper mixing of authorized compounds can result in damage to coatings or initiation of corrosion. Therefore, it is crucial to adhere strictly to the guidelines provided for each cleaner's correct usage and compatibility.\n\n10. **Environmental Considerations**: Since Type I solvents contain potentially corrosive terpenes that could be harmful if not completely removed from equipment interiors, their use may need to be restricted on certain components or equipment.\n\nThese safety considerations are part of a broader set of guidelines designed to ensure personal safety, protect Air Force property, and manage environmental impacts associated with solvent-based cleaning operations.",
+        "n_citations": 5,
+        "latency_ms": 6587,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer covers most of the key points from the expected answer but omits some details. It includes ventilation, PPE, respiratory protection, fire safety, handling of solvents, prevention of trapped solvent, residual cleaning, authorization of cleaners, and environmental considerations. However, it misses specific USAF directives (AFI 23-101, AFMAN 23-122, AFH 23-123) for grounding requirements, the emphasis on using approved equipment, and the detailed procedures for drai",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "When using Type I heavy-duty solvent-based cleaners for maintenance according to USAF technical manuals, several key safety considerations must be observed:\n\n1. **Ventilation**: Use solvents only in well-ventilated areas to prevent inhalation of harmful vapors and ensure proper dispersion of fumes.\n\n2. **Personal Protective Equipment (PPE)**: Wear chemical-resistant rubber gloves and chemical or splash-proof goggles when handling these cleaners to protect hands and eyes from exposure.\n\n3. **Avoid Mixing**: Do not mix cleaning compounds with solvents like MIL-PRE-32295, as this can create a fire hazard and disposal issues, and may damage non-metallic materials.\n\n4. **Fire Hazards**: Ensure that suitable fire extinguishing equipment is available in the solvent cleaning area to manage potential risks associated with flammable solvents.\n\n5. **Concentration Control**: Do not apply cleaners at higher concentrations than recommended; exceeding these can lead to adverse effects on surfaces and components.\n\n6. **Prevent Drying**: Avoid allowing cleaning solutions to dry on aircraft surfaces as this can cause streaking and damage finishes and components.\n\n7. **Displacement of Water**: After cleaning, displace any entrapped water or cleaning materials that could cause corrosion and failure in lubricated parts if left undisturbed.\n\n8. **Preservative Application**: Apply preservatives/corrosion preventive compounds (CPC's) to cleaned components according to guidelines to protect surfaces from corrosion.\n\n9. **Avoid Certain Surfaces**: Do not apply certain cleaners like MIL-PRF-87937 Type IV, MIL-PRF-85570 Type II, A-A-59921 (formerly MILL-C43616), or MIL-PRF-85704 Type I to electrical wiring or plastic aircraft canopies as they may cause damage.\n\n10. **Follow Specific Guidelines**: Consult local safety offices and Bioenvironmental Engineers for specific personal protective equipment requirements tailored to the maintenance task at hand.\n\nThese considerations are part of a broader set of guidelines designed to ensure safe operations, protect personnel health, safeguard property, and prevent environmental hazards during maintenance procedures involving heavy-duty solvent-based cleaners.",
+        "n_citations": 5,
+        "latency_ms": 9066,
+        "status": "ok",
+        "subqueries": [
+          "Safety precautions for using Type I heavy-duty solvent-based cleaners in aircraft maintenance according to USAF technical manuals.",
+          "Hazards and risks associated with solvent-based cleaning agents mentioned in USAF maintenance guidelines."
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 13
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer covers most of the key points mentioned in the expected answer but misses some details. It includes considerations about ventilation, personal protective equipment (PPE), avoiding mixing solvents, fire hazards, concentration control, preventing drying, displacement of water, applying preservatives, and avoiding certain surfaces. However, it does not explicitly mention grounding requirements, specific USAF directives for disposing of containers, proper drainage pro",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_008",
+      "tag": "multi_hop",
+      "query": "What is the difference between the packaging of garments, shoe covers, and wiping cloths as per the USAF technical manuals and orders?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_023",
+      "pipeline": {
+        "answer": "Garments are packaged individually except for shoe covers which may be packaged in pairs. Wiping cloths are packaged in multiples of 10 per package.",
+        "n_citations": 5,
+        "latency_ms": 2601,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer, although it omits the details about the minimum thickness of polyethylene bags for garments and the specific packaging requirements for shoe covers. However, these differences are minor phrasings that do not contradict or miss key information from the expected answer.",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The packaging procedures for garments, shoe covers, and wiping cloths differ in terms of individual versus paired packaging:\n\n1. **Garments**: Each garment is packaged individually except for shoe covers which may be packaged in pairs.\n2. **Shoe Covers**: Shoe covers can be packaged in pairs.\n3. **Wiping Cloths**: Wiping cloths are packaged in multiples of 10 per package.\n\nThese distinctions ensure proper handling and traceability according to the USAF technical manuals and orders.",
+        "n_citations": 6,
+        "latency_ms": 6911,
+        "status": "ok",
+        "subqueries": [
+          "What are the packaging guidelines for garments in USAF technical manuals?",
+          "What are the packaging specifics for shoe covers according to USAF orders?",
+          "How does the packaging of wiping cloths differ from garments and shoe covers as per USAF instructions?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 19
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both provide the differences in packaging for garments, shoe covers, and wiping cloths as per the USAF guidelines. The details about hermetically sealed bags for garments, individual versus paired packaging for shoe covers, and packaging wiping cloths in multiples of 10 are accurately conveyed despite minor phrasing differences.",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_009",
+      "tag": "multi_hop",
+      "query": "Explain the markings and safety for the tires of the United States Air Force aircraft.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_024",
+      "pipeline": {
+        "answer": "The United States Air Force has specific guidelines for marking and maintaining tires on their aircraft to ensure safety during servicing and operation. Here are some key points:\n\n1. **Tire Inflation Danger Areas**: Before servicing tires, a visual inspection is conducted to remove any debris from the tire bead area. This prevents potential catastrophic failure due to deteriorated condition or over-pressurization.\n\n2. **Personal Static Discharge Marking**: A marking for static discharge prevention might be required during tire servicing procedures.\n\n3. **Tire Pressure and Tow Speed Markings**: These are cautionary markings that indicate the appropriate tire pressure and tow speed limits, which must be followed to prevent damage or failure of the tires.\n\n4. **CAUTION/AARNING MARKINGS**:\n   - **Pintle Hook Caution Marking**: This marking alerts personnel about potential hazards associated with the pintle hook.\n   - **Spring Loaded Warning Marking**: A warning marking is used for spring-loaded components that could cause injury if not handled properly.\n   - **Aircraft Tow Bar Caution Marking**: A caution marking related to aircraft tow bar operations, indicating safety measures and procedures.\n\n5. **Service Tire Pressure**: Tires are serviced to 40% of their land base operating pressure before installation on the aircraft.\n\n6. **Installation and Servicing Procedures**: Wheel and tire assemblies must be installed according to specific instructions in TO 4T-1-3/NAVAIR 04-10-506 guidelines, which include visual inspections for damage or wear that could affect safety.\n\n7. **Painting and Markings Guidelines**: Aircraft authorized for certain markings are specified by the United States Air Force in Europe (USAFE). These aircraft may have American flag and \"UNITED STATES OF AMERICA\" markings painted on both sides of the fuselage, above the cabin windows. The \"AIR FORCE\" marking is removed from these aircraft.\n\n8. **Storage Aircraft Tire Inspection**: Specific guidelines are provided for inspecting storage tires to ensure they meet safety standards before use. This includes checking for contamination, cracks or cuts in the sidewall area, bulges, tread wear and cuts, rubber separation, bulges in the tread area, bead area conditions, and whether the tire can hold pressure.\n\nThese guidelines aim to maintain high levels of safety during aircraft maintenance and operation by ensuring that tires are properly marked, inspected, and serviced according to established procedures.",
+        "n_citations": 5,
+        "latency_ms": 5987,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer covers most aspects of the expected answer, including tire maintenance guidelines, inspections, pressure checks, and specific markings for safety. It mentions valve stem caps, inspections for damage or wear, tire pressure requirements, and service procedures. Although it does not explicitly mention nitrogen-filled tires, tire inflation dangers, or detailed inspection criteria as in the expected answer, these are minor differences that do not contradict the core in",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The United States Air Force (USAF) has specific guidelines for aircraft tire servicing, which include:\n\n1. **General Guidance**: All aircraft installed tire inflation operations must comply with specific operating instructions and safety precautions prescribed for the aircraft being serviced and inflating tools and servicing units used.\n\n2. **Personal Protective Equipment**: Tire servicers are required to wear impact-resistant safety goggles or glasses with sideshields to protect against potential flying debris during tire inflation.\n\n3. **Pre-Inflation Inspection**: Before tire inflation, a visual inspection of the tire bead area is necessary to remove any debris. This ensures that no foreign objects could cause damage or failure during inflation.\n\n4. **Tire Failure Prevention**: Tires on storage aircraft may fail due to deteriorated condition or over-pressurization. It's crucial to use required personal protective equipment and avoid the tire inflation danger area during servicing.\n\n5. **Tire Inflation Danger Areas**: Servicers must be aware of these areas where flying debris could occur, as shown in Figure 7-6.\n\n6. **Servicing Process**:\n   - Inflate tires to 40 percent of land base operating pressure.\n   - Install the wheel and tire assembly according to specific instructions.\n   - Service the wheel and tire on the aircraft following further guidelines provided.\n\n7. **Tire Inspection Standards**: Table 7-2 outlines inspection criteria for various aspects of the tire, including contamination, sidewall damage (cracks or cuts), bulges in the tread area, wear limits, cuts in the tread area, tread chevron cutting, separation of tread rubber, bulges in the tread area, bead area conditions, and issues with the tire bead unseating from the wheel.\n\n8. **Acceptable Conditions**: Tire inspections must meet certain standards; for example, no visible contamination is allowed on the tire surface, and there should be no bulges or exposed layers of cord in the sidewall area. If any condition exceeds these limits, the tire assembly needs to be replaced.\n\nThese guidelines ensure safety during aircraft maintenance operations and help prevent potential hazards associated with tire servicing.",
+        "n_citations": 5,
+        "latency_ms": 8628,
+        "status": "ok",
+        "subqueries": [
+          "What are the markings on tires used in US Air Force aircraft?",
+          "What are the safety guidelines for tire usage in US Air Force aircraft?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 14
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a summary of key points related to tire maintenance for USAF aircraft, which aligns with the expected answer's main themes. However, there are some discrepancies:",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_010",
+      "tag": "multi_hop",
+      "query": "Enumerate the three types of instrumentation that allow for an extended TUS interval, and analyze the maximum allowable working pressure (PSIA) for 1 1/2-inch pipe at Schedule 80 and 160. ",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_026",
+      "pipeline": {
+        "answer": "The three types of instrumentation that allow for an extended TUS (Temperature Uniformity Survey) interval are Type B, Type C, and Type A.\n\nFor a 1 1/2-inch pipe at Schedule 80:\n- The maximum allowable working pressure (PSIA) is 3,604 PSI.\n\nFor the same size pipe but at Schedule 160:\n- The maximum allowable working pressure (PSIA) is not directly provided in the context. However, based on the trend shown for other schedules and sizes, it can be inferred that Schedule 160 would have a higher strength due to its designation as \"extra-strong\" or equivalent to standard schedule 80. Typically, Schedule 160 pipes are designed to handle higher pressures than Schedule 80. Without specific data points in the context for Schedule 160 at this size, an exact value cannot be provided, but it would likely exceed the pressure rating of a Schedule 80 pipe.\n\nThe maximum allowable working pressure values given in the context are based on service temperature and material grade (e.g., stainless steel, aluminum alloy, red brass, and copper). The values listed under each type of pipe provide the PSIA for various nominal sizes at different schedules.",
+        "n_citations": 5,
+        "latency_ms": 4814,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING:",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "The three types of instrumentation that allow for an extended TUS interval are Type B, Type C, and Type D.\n\nFor a 1 1/2-inch pipe at Schedule 80:\n- The maximum allowable working pressure (PSIA) is 4,980 PSI.\n\nFor a 1 1/2-inch pipe at Schedule 160:\n- The maximum allowable working pressure (PSIA) is not directly provided in the table but can be inferred to be higher than that of Schedule 80 due to its thicker wall. Typically, Schedule 160 pipes are designed for higher pressures and temperatures compared to Schedule 80. Without a specific value from the table, we cannot provide an exact figure, but it would likely exceed 4,980 PSI based on standard industry practices.",
+        "n_citations": 6,
+        "latency_ms": 7540,
+        "status": "abstain",
+        "subqueries": [
+          "List the three types of instrumentation that extend TUS interval.",
+          "What is the maximum allowable working pressure (PSIA) for a 1 1/2-inch pipe at Schedule 80?",
+          "What is the maximum allowable working pressure (PSIA) for a 1 1/2-inch pipe at Schedule 160?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 23
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": true,
+        "false_reject": true,
+        "judge": "llm",
+        "judge_reasoning": "answerable question rejected",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_011",
+      "tag": "multi_hop",
+      "query": "What are the specific PPE requirements for liquid oxygen and nitrogen servicing?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_027",
+      "pipeline": {
+        "answer": "The specific Personal Protective Equipment (PPE) requirements for liquid oxygen and nitrogen servicing include:\n\n1. **Personal Eye and Face Protection Devices Requirements**\n2. **Face Shield** (NSN 4240-00-542-2048)\n3. **Gloves**: Leather, welder's gauntlet cuff (A-A-50022B) or leather gloves with wool inserts (NSN 8415-00-268-7871 and NSN 8415-00-682-6673)\n4. **Apron** (NSN 8415-00-082-6108)\n5. **Trousers**: Long, leather or cotton (NSN 8415-00-082-6108)\n6. **Shirt**: Cotton long sleeve\n7. **Jacket or Coveralls**: Cotton (NSN 8405-00-037-9274)\n8. **Shoes**: With rubber soles and heels, fitting closely around the top\n\nThese items are necessary to protect personnel from potential hazards associated with liquid oxygen and nitrogen servicing.",
+        "n_citations": 5,
+        "latency_ms": 4633,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a detailed list of PPE requirements for liquid oxygen and nitrogen servicing, which is semantically equivalent to the expected answer. Both answers discuss specific protective equipment needed for each substance. However, since the expected answer states that there are no specific PPE requirements for liquid nitrogen servicing, while the generated answer lists several items required for both substances, a minor discrepancy exists in specificity regarding ",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "For both liquid oxygen and nitrogen servicing, personnel shall wear Personal Protective Equipment (PPE) required for either gaseous or liquid oxygen servicing. For liquid nitrogen servicing specifically, it is mentioned that eye protection such as safety goggles, safety glasses with side shields, or face shields should be worn by personnel performing oxygen servicing at the aircraft connection point. The completeness of protective equipment depends largely on the type of service fluid and operation involved.",
+        "n_citations": 5,
+        "latency_ms": 5281,
+        "status": "ok",
+        "subqueries": [
+          "specific personal protective equipment requirements for liquid oxygen servicing",
+          "specific personal protective equipment requirements for liquid nitrogen servicing"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 11
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer contradicts the expected answer by not distinguishing between liquid oxygen and nitrogen requirements as clearly stated in the expectation. It also adds information about eye protection for liquid nitrogen servicing which was not mentioned in the expected answer, thus missing key details while including extraneous information.",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_012",
+      "tag": "multi_hop",
+      "query": "Explain the sequence of actions required to execute an emergency shutdown during aircraft fuel servicing",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_029",
+      "pipeline": {
+        "answer": "To execute an emergency shutdown during aircraft fuel servicing, follow these steps:\n\n1. **Stop fuel flow**.\n2. **Notify aircraft servicing supervisor**, **operations expediter**, and **Fuels Service Center (FSC)** if possible.\n3. **Release the deadman switch** and activate the **emergency shutdown switch** on the hand-held remote, R-18 pumping unit, or R-20 servicing platform.\n\nThese actions are designed to quickly halt fuel operations in case of an emergency, ensuring safety for personnel and preventing potential hazards.",
+        "n_citations": 5,
+        "latency_ms": 3033,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer misses several critical steps from the expected answer. It does not mention pushing the engine auxiliary throttle control all the way in, turning off the emergency switch, closing specific valves (hose reel shut off valve and main tank emergency shut off valve), or evacuating the area according to instructions. Additionally, it incorrectly refers to \"Fuels Control Center\" instead of \"Fuels Service Center\".",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "The sequence of actions required to execute an emergency shutdown during aircraft fuel servicing varies slightly depending on the specific context provided in the different scenarios. However, there are common elements across these procedures:\n\n1. **Notify Appropriate Personnel**: Immediately inform the aircraft servicing supervisor, operations expediter, and Fuels Control Center (FCC) or Fuels Service Center (FSC), if possible.\n\n2. **Stop Fuel Flow**: This involves halting the supply of fuel to prevent further leakage or spillage.\n\n3. **Disconnect Refueling Hose**: The aircraft servicing crew should disconnect the refueling hose from both the aircraft and the refueling vehicle, ensuring that there is no residual fuel left in the hose.\n\n4. **Release Deadman Switch**: For specific units like the R-18 Pumping Unit or R-20 Servicing Platform, release the deadman switch and activate the emergency shutdown switch on the hand-held remote control.\n\n5. **Evacuate Area (if instructed)**: If instructed by the fuel servicing supervisor or fire department personnel, evacuate the area to ensure safety.\n\nIn one scenario, there's an additional step mentioned for handling fuel spills other than normal aircraft venting; do not evacuate the fuel servicing vehicle until it is declared safe by fire department personnel. This highlights a specific protocol that might apply in exceptional circumstances of spillage management.",
+        "n_citations": 5,
+        "latency_ms": 7921,
+        "status": "ok",
+        "subqueries": [
+          "What are the steps involved in executing an emergency shutdown during aircraft fuel servicing?",
+          "Identify the safety protocols that need to be followed during an emergency shutdown for aircraft fuel servicing.",
+          "List the equipment and tools necessary for performing an emergency shutdown procedure in aircraft fuel servicing."
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 15
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a sequence of actions for executing an emergency shutdown during aircraft fuel servicing, which aligns with the expected answer's key points. However, it introduces slight variations and additional context that were not present in the expected answer (e.g., mentioning different scenarios and specific units like R-18 Pumping Unit or R-20 Servicing Platform). The core steps are correctly identified, but minor differences in structure and detail lead to a nu",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_013",
+      "tag": "multi_hop",
+      "query": "What operational frameworks ensure the Aircraft Fire Training Facility maintains alignment with both national fire protection standards and Air Force-specific safety requirements?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_033",
+      "pipeline": {
+        "answer": "The operational frameworks that ensure the Aircraft Fire Training Facility maintains alignment with both national fire protection standards and Air Force-specific safety requirements include:\n\n1. **Generic Site Adaptable Design**: This design principle allows for flexibility in adapting to various operational needs while ensuring it meets basic safety standards.\n\n2. **Lined Burn Area**: The presence of a 100-foot lined burn area provides a controlled environment for training, which is essential for simulating multi-aircraft type fires under safe conditions.\n\n3. **Conservation Pond and Water Recycling System**: These features are designed to conserve water resources during training exercises, ensuring that the facility operates efficiently while adhering to environmental standards.\n\n4. **Pneumatic Emergency Shutdown System**: This system ensures immediate safety measures can be taken in case of an emergency, aligning with safety protocols required by both national fire protection standards and Air Force guidelines.\n\n5. **Ignition System and Liquid Propane Fuel System**: These systems provide the necessary resources for conducting live-fire training scenarios while adhering to operational requirements that ensure controlled and safe use of fuel.\n\n6. **Quality Training Standards**: The design aims to maintain firefighting proficiency among personnel, which is crucial for meeting both national standards and Air Force-specific safety requirements.\n\n7. **Controlled Fire Simulation**: Through various switches and valves on the control stand, trainees can manage fire scenarios during training exercises, ensuring that they are prepared according to operational guidelines.\n\nThese frameworks collectively ensure that the Aircraft Fire Training Facility operates within the parameters set by national fire protection standards and Air Force-specific safety requirements, providing a comprehensive and safe training environment.",
+        "n_citations": 5,
+        "latency_ms": 4995,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a detailed explanation of the operational frameworks that ensure alignment with national fire protection standards and Air Force-specific safety requirements. It includes specific systems and features like lined burn area, conservation pond, water recycling system, pneumatic emergency shutdown system, ignition system, liquid propane fuel system, quality training standards, and controlled fire simulation. The expected answer also mentions adherence to Air ",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The operational frameworks that ensure the Aircraft Fire Training Facility maintains alignment with both national fire protection standards and Air Force-specific safety requirements are:\n\n1. **TO 35E1-2-13-1**: This technical order provides guidelines for conducting semi-annual system safety inspections, operational checks, and documentation.\n\n2. **National Fire Protection Association Standard 410**: This standard outlines the requirements for aircraft maintenance operations, including fire protection systems and personnel training.\n\nThese frameworks are in accordance with local policies and procedures and are essential for ensuring compliance with national standards while also meeting Air Force-specific safety guidelines.",
+        "n_citations": 6,
+        "latency_ms": 6315,
+        "status": "ok",
+        "subqueries": [
+          "operational frameworks for aircraft fire training facilities",
+          "national fire protection standards",
+          "Air Force-specific safety requirements"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 16
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer correctly identifies TO 35E1-2-13-1 as a key operational framework, mentions conducting semi-annual system safety inspections and operational checks, and references the National Fire Protection Association Standard 410. It also acknowledges alignment with national standards and Air Force-specific safety requirements, which matches the expected answer's content. The generated answer does not contradict or miss any critical information from the expected answer.",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_014",
+      "tag": "multi_hop",
+      "query": "List all safety precautions mentioned in the document that address the risks of fuel flammability and toxicity during aircraft refueling operations.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_035",
+      "pipeline": {
+        "answer": "The safety precautions mentioned in the document that address the risks of fuel flammability and toxicity during aircraft refueling operations include:\n\n1. **General Safety Precautions**: These cover electrical storms, equipment discrepancies, spark-producing items, grounding/bonding, clothing, distance criteria, etc.\n\n2. **Clothing Restrictions**: Clothing containing more than 65 percent of any combination or mixture of nylon, rayon, wool, or polyester is not to be worn as outer garments when fuel servicing aircraft with low flashpoint fuels (flashpoint 100 degrees Fahrenheit (ºF) or below).\n\n3. **Fire Protection Equipment Requirements**: These are placed according to TO 00-25-172.\n\n4. **Handling of Lighters/Matches**: Caution is advised regarding the handling of lighters and matches near fuel sources.\n\n5. **Bonding**: Proper grounding/bonding procedures must be followed to prevent electrical shocks or burns during high-frequency (HF) transmissions.\n\n6. **Distance Criteria**: Refueling should not be done within 300 feet of ground radar equipment, and refueling is not to be done within 50 feet of other aircraft with engine(s) operating.\n\n7. **Avoiding Skin Contact**: Personnel are advised not to touch the skin of the aircraft or other metal objects, nor any portion of the servicing vehicle.\n\n8. **Hearing Protection**: Wearing hearing protection when an aircraft engine is operating is recommended.\n\n9. **Specific Fuel Handling Precautions**: The document mentions that fuels contain toxic substances such as benzene, toluene, and xylene, which can cause health issues if exposed to high levels or through dermal exposure.\n\n10. **Handling of Hazardous Waste**: Vigilance is required by all personnel to ensure hazardous materials/waste are handled in accordance with the SDS (Safety Data Sheet) and local/federal guidance to prevent environmental contamination.\n\nThese precautions collectively aim to minimize risks associated with fuel flammability and toxicity during aircraft refueling operations.",
+        "n_citations": 5,
+        "latency_ms": 5218,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a list of safety precautions that are semantically equivalent to the expected answer. Both answers include key points such as grounding/bonding, fire-fighting equipment availability, clothing restrictions, handling lighters/matches, distance criteria for refueling, avoiding skin contact, hearing protection, and specific fuel handling precautions related to toxicity. The generated answer might have slightly different phrasing or organization but still cove",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The safety precautions mentioned in the document to address the risks of fuel flammability and toxicity during aircraft refueling operations include:\n\n1. **Maintaining high standards of cleanliness** in the hazardous environment of aircraft ground servicing.\n2. **Keeping aircraft parking areas, servicing aprons, fuel servicing vehicles/equipment, and Support Equipment (SE) compartments and surfaces free of debris and accumulation of oil, hydraulic fluids, grease, or fuel** to prevent ignition sources and contamination risks.\n3. **Ensuring personnel are not subjected to increased risk from catching servicing fluids**, which could lead to exposure hazards.\n4. **Controlling spills immediately** according to local directives once the aircraft and surrounding area are made safe.\n5. **Keeping fuels in controlled areas**, avoiding spillage, and maintaining a distance between ignition sources and designated fuel servicing areas.\n6. **Wearing hearing protection when the aircraft engine is operating** to mitigate noise-induced hearing loss risks.\n7. **Using personal protective clothing and equipment**, as specified by safety data sheets (SDS) for each solvent, chemical, or product used during refueling operations.\n8. **Being aware of potential unintentional ignition from high-powered ground-based systems** when in close proximity to fuel servicing areas.\n9. **Classifying aircraft fuels as either combustible or flammable liquids**, recognizing that AVGAS and JP-4 have a large percentage of low flash point hydrocarbons, which can create a readily ignitable vapor-air concentration at ambient temperatures.\n\nThese precautions are designed to minimize risks associated with the potential fire or explosion hazards from fuel vapors, flammability limits, toxicity, and exposure to solvents and chemicals during aircraft refueling operations.",
+        "n_citations": 5,
+        "latency_ms": 8703,
+        "status": "ok",
+        "subqueries": [
+          "safety precautions for fuel handling in aircraft maintenance manuals",
+          "risks of fuel flammability addressed in USAF guidelines"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 11
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a comprehensive list of safety precautions that aligns well with the expected answer. Both answers mention avoiding hot brakes, grounding equipment, using fire-fighting equipment, ensuring ventilation, wearing protective gear, keeping away from ignition sources, and controlling spills. However, there are minor differences in phrasing and specific details (e.g., mentioning hearing protection for aircraft engine noise). The generated answer does not contrad",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_015",
+      "tag": "multi_hop",
+      "query": "What causes the formation of galvanic corrosion at joints or dissimilar metal assemblies, and how can filiform corrosion be prevented in aircraft structures?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_044",
+      "pipeline": {
+        "answer": "Galvanic corrosion occurs when two or more dissimilar metals are in electrical contact within an electrolyte. This process is facilitated by the difference in their electrochemical potentials, leading to the corrosion of one metal (the anode) at the expense of another (the cathode). The buildup of corrosion is typically observed at the joint between the metals.\n\nFiliform corrosion can be prevented through several measures:\n1. Storing equipment in an environment with a relative humidity below 70%.\n2. Using coating systems that have a low rate of diffusion for oxygen and water vapors.\n3. Maintaining coatings in good condition to protect against moisture ingress.\n4. Washing equipment to remove acidic contaminants from the surface, such as those created by pollutants in the air.\n\nThese actions help create an environment less conducive to corrosion and ensure that protective layers are intact, reducing the risk of filiform corrosion on aircraft structures.",
+        "n_citations": 5,
+        "latency_ms": 3926,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both provide explanations for galvanic corrosion and methods to prevent filiform corrosion in aircraft structures. Although there are minor differences in phrasing, such as mentioning \"storing equipment\" instead of \"ensuring proper adhesion and integrity of organic coatings,\" these do not significantly alter the meaning or key information provided.",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "Galvanic corrosion forms when two dissimilar metals are in contact with each other and an electrolyte is present. This process leads to a buildup of corrosion at the joint between the metals due to differences in their electrochemical potentials.\n\nFiliform corrosion, which is a type of oxygen concentration cell corrosion that occurs on metal surfaces with organic coating systems, can be prevented by:\n1. Storing equipment in an environment with a relative humidity below 70%.\n2. Using coating systems that have a low rate of diffusion for oxygen and water vapors.\n3. Maintaining coatings in good condition.\n4. Washing equipment to remove acidic contaminants from the surface (such as those created by air pollutants).\n\nThese measures help prevent filiform corrosion, which is more likely to occur in humid environments on steel, aluminum, magnesium, and zinc surfaces.",
+        "n_citations": 5,
+        "latency_ms": 6801,
+        "status": "ok",
+        "subqueries": [
+          "What causes galvanic corrosion at joints or dissimilar metal assemblies?",
+          "How can filiform corrosion be prevented in aircraft structures?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 16
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer correctly identifies that galvanic corrosion forms due to electrical contact between dissimilar metals with different electrochemical potentials. It also mentions the role of an electrolyte in this process. However, it does not explicitly state that the less corrosion-resistant metal becomes the anode and corrodes faster while the more corrosion-resistant metal acts as the cathode. The explanation for filiform corrosion prevention is accurate but could be more det",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_016",
+      "tag": "multi_hop",
+      "query": "How do technical manuals balance procedural consistency with operational flexibility across different military domains while maintaining compliance with standardized protocols?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_047",
+      "pipeline": {
+        "answer": "Technical manuals balance procedural consistency with operational flexibility by providing mandatory procedures that are considered safe for the tasks they were designed to accomplish. They ensure safety and rescue equipment is used correctly, facilitating easy access to information through an \"information oriented\", digital format optimized for computer presentation. The IETM (Interactive Electronic Technical Manual) supports interactive guidance, navigational directions, and supplemental information, enhancing user access. Compliance terminology defines terms like 'standardized procedures' that may not damage equipment under certain conditions, allowing for flexibility while maintaining safety standards. Applicable technical data includes various manuals, instructions, drawings, and dispositions that guide specific tasks, with deviations managed according to owning agency guidelines. This approach ensures consistency across different military domains (USAF, AF Reserve, ANG) while accommodating operational specifics through detailed procedures tailored to aircraft or engine models when necessary.",
+        "n_citations": 5,
+        "latency_ms": 3483,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both answers discuss how technical manuals balance procedural consistency and operational flexibility across different military domains while maintaining compliance with standardized protocols. They both mention modular content organization, adaptability for specific domain requirements, use of warnings and icons for safety, and the importance of following consistent procedures while accommodating operational cont",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "Technical manuals balance procedural consistency with operational flexibility by providing a structured set of guidelines that are mandatory for safety and performance. They ensure that all activities involved in corrosion prevention and control, maintenance, and equipment handling adhere to specific standards outlined in military specifications, standards, and manuals. This includes detailed procedures for inspection, maintenance, and storage of various components and systems.\n\nThe manuals are designed with primary importance placed on ensuring the safety and functionality of equipment as initially intended by their design. They offer a framework that is applicable across different commands, operating agencies, and forces within the United States Air Force (USAF), including the AF Reserve and ANG, thereby maintaining consistency in operational procedures.\n\nHowever, they also acknowledge the need for flexibility to accommodate specific conditions or requirements of individual units or missions. For instance, deviations are not permitted for safety-critical equipment outlined in manuals but allow for more nuanced adjustments where necessary without compromising overall standards.\n\nMoreover, the manuals include provisions for documentation and verification processes that ensure compliance with technical orders (TOs) and manuals, facilitating a systematic approach to maintaining and updating equipment records and procedures. This allows for adaptability while ensuring that all changes are properly reviewed and approved according to established protocols.\n\nIn summary, technical manuals achieve this balance by providing comprehensive guidelines that are both consistent across military domains and flexible enough to accommodate operational needs through structured documentation, verification processes, and specific provisions for exceptions or deviations when necessary.",
+        "n_citations": 6,
+        "latency_ms": 7707,
+        "status": "ok",
+        "subqueries": [
+          "What are the key elements of procedural consistency in technical manuals for military aircraft maintenance?",
+          "How do technical manuals ensure operational flexibility across various military domains?",
+          "What standardized protocols must technical manuals comply with to balance consistency and flexibility?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 15
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both answers discuss how technical manuals balance procedural consistency with operational flexibility across different military domains while maintaining compliance with standardized protocols. They both mention modular content organization, tailored procedures for specific domains, safety guidelines, and documentation processes. However, there are minor differences in phrasing and emphasis that do not alter the ",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "mh_017",
+      "tag": "multi_hop",
+      "query": "Distinguish between the vehicle marking standards for the USAF's ambulances and recruiting vehicles.",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_049",
+      "pipeline": {
+        "answer": "The vehicle marking standards for the USAF's ambulances and recruiting vehicles differ significantly:\n\n**Ambulances:**\n- Ambulances are marked with a premasked reflectorized decal featuring a 3-inch Omaha orange cross on a 2-inch square white field, placed I inch above the left and right corners of the windshield.\n- A similar cross is applied to the center of the rear door panel directly below an 8-inch square white field bearing a 6-inch orange stripe. The legend \"AMBULANCE\" in 3-inch black reflective letters is applied immediately below this cross.\n- On each side window, a premasked reflectorized decal with a 6-inch Omaha orange cross is placed, and the word \"AMBULANCE\" in 3-inch black reflective letters is centered below it.\n\n**Recruiting Vehicles:**\n- The identification markings for AF vehicles assigned to recruiting service are determined by instructions issued by the Commander of the USAF Recruiting Service. These instructions cannot be specified directly from the context but imply that they will follow specific guidelines or directives provided by the Commander.\n- Emblems that cannot be placed due to varying body styles may be applied as directed, indicating a more flexible approach compared to the standardized cross markings on ambulances.\n\nIn summary, ambulances are marked with distinctive orange crosses for visibility and identification purposes, while recruiting vehicles follow specific guidelines issued by the USAF Recruiting Service Commander, which might include emblems or logos that could vary based on body style and other factors.",
+        "n_citations": 5,
+        "latency_ms": 5002,
+        "error": null,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer provides a detailed comparison between the vehicle marking standards for ambulances and recruiting vehicles within the USAF. It correctly identifies that ambulance markings include specific cross designs, placement, and text, while mentioning that recruiting vehicles follow guidelines issued by the Commander of the USAF Recruiting Service without specifying exact details. Although there is some minor discrepancy in the description (such as the size of the orange s",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The context provided does not specifically distinguish between the vehicle marking standards for USAF ambulances and recruiting vehicles. However, based on the information given:\n\nFor ambulances:\n- Ambulances are marked with a premasked reflectorized decal featuring a 3-inch Omaha orange cross on a 2-inch square white field applied I inch above the left and right corners of the windshield.\n- A similar cross is placed on the center of the rear door panel directly below a 6-inch orange stripe, accompanied by the legend \"AMBULANCE\" in 3-inch black reflective letters. If space is insufficient, two smaller crosses can be used instead with the same lettering centered between them.\n- An additional 6-inch Omaha orange cross is applied to each side of the rear window.\n\nFor recruiting vehicles (not explicitly mentioned but implied by context):\nThe context does not provide specific details for recruiting vehicle markings. Typically, such vehicles might have different requirements based on their purpose and visibility needs in public areas. However, without explicit information from the provided context, we cannot detail the exact standards for recruiting vehicles. The general guidelines suggest that they would likely adhere to broader USAF vehicle marking policies but could potentially include additional or modified elements specific to their role.\n\nTo summarize:\n- Ambulances are marked with a distinctive orange cross emblem and clear instructions on placement.\n- Recruiting vehicles' markings are not detailed in the context, suggesting they might follow similar guidelines but with adaptations suitable for public visibility and promotional purposes.",
+        "n_citations": 5,
+        "latency_ms": 5870,
+        "status": "abstain",
+        "subqueries": [
+          "What are the vehicle marking standards for USAF ambulances?",
+          "What are the vehicle marking standards for USAF recruiting vehicles?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 11
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": true,
+        "false_reject": true,
+        "judge": "llm",
+        "judge_reasoning": "answerable question rejected",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "mh_018",
+      "tag": "multi_hop",
+      "query": "What are the potential consequences of failing to follow emergency shutdown protocols for hydrant servicing vehicles in hazardous situations?",
+      "expect_reject": false,
+      "source_e2e_id": "e2e_050",
+      "pipeline": {
+        "answer": "Failure to comply with emergency shutdown protocols for hydrant servicing vehicles could result in injury to, or death of, personnel or long term health hazards.",
+        "n_citations": 5,
+        "latency_ms": 2367,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer misses out on key information from the expected answer. It does not mention damage to or destruction of equipment and loss of mission effectiveness, which are crucial parts of the expected response. Additionally, it omits the detail about potential safety risks during hazardous situations.",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "Failure to comply with emergency shutdown protocols could result in injury to, or death of, personnel or long term health hazards. Additionally, it may lead to damage to, or destruction of, equipment and loss of mission effectiveness.",
+        "n_citations": 5,
+        "latency_ms": 5344,
+        "status": "ok",
+        "subqueries": [
+          "What are the potential consequences of not following emergency shutdown procedures for hydrant service vehicles?",
+          "What happens if emergency shutdown protocols are ignored during hazardous situations involving hydrant servicing equipment?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 2,
+          "llm_calls": 3,
+          "evidence_n": 10
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "REASONING: The generated answer is semantically equivalent to the expected answer. Both convey that failure to follow emergency shutdown protocols can result in injury or death of personnel, long-term health hazards, damage or destruction of equipment, and loss of mission effectiveness. The order of information and specific details are slightly rearranged but do not contradict each other or miss any key points mentioned in the expected answer.",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_001",
+      "tag": "reject",
+      "query": "What is the meaning of life according to philosophy?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_001",
+      "pipeline": {
+        "answer": "The meaning of life according to philosophy varies across different schools of thought and individual perspectives. Philosophers have proposed various interpretations over time:\n\n1. **Existentialism** emphasizes personal freedom, choice, and responsibility in creating one's own meaning in life.\n2. **Nihilism** argues that life is inherently meaningless since there are no inherent values or purposes beyond what humans impose on their experiences.\n3. **Platonism** suggests that the true reality exists beyond our physical world and that our purpose lies in understanding this higher realm of forms.\n4. **Utilitarianism**, a form of consequentialist ethics, posits that the meaning of life is to maximize happiness or utility for the greatest number of beings.\n5. **Hedonism** focuses on maximizing pleasure as the primary goal of human existence.\n\nEach philosophical perspective offers a unique insight into what might constitute the purpose or significance of life.",
+        "n_citations": 5,
+        "latency_ms": 2084,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "expected reject, got answer",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "The context provided discusses corrosion theory and chemical definitions, but it does not address the meaning of life according to philosophy. Therefore, I do not know the answer to that question based on the given information.",
+        "n_citations": 5,
+        "latency_ms": 6952,
+        "status": "abstain",
+        "subqueries": [
+          "What is the meaning of life in philosophy?",
+          "Can you provide examples of philosophical theories about the meaning of life?"
+        ],
+        "counts": {
+          "subqueries": 2,
+          "searches": 3,
+          "llm_calls": 6,
+          "evidence_n": 10
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_002",
+      "tag": "reject",
+      "query": "Who won the 2022 FIFA World Cup?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_002",
+      "pipeline": {
+        "answer": "The context provided does not contain information about who won the 2022 FIFA World Cup.",
+        "n_citations": 5,
+        "latency_ms": 1128,
+        "error": null,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The context provided does not contain information about who won the 2022 FIFA World Cup.",
+        "n_citations": 5,
+        "latency_ms": 5442,
+        "status": "abstain",
+        "subqueries": [
+          "Who won the 2022 FIFA World Cup?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 5
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_003",
+      "tag": "reject",
+      "query": "How do I install Python on Windows?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_003",
+      "pipeline": {
+        "answer": "The provided context does not contain information on how to install Python on Windows. The context is about choosing and using pullers and clamps, as well as procedures for covering canopies and windows with specific materials and tapes. It does not provide instructions on software installation or programming tasks.",
+        "n_citations": 5,
+        "latency_ms": 1483,
+        "error": null,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The provided context does not contain information on how to install Python on Windows. The context is about installation procedures for a Touch Strip Ground Cord and other technical data related to aircraft maintenance, which are unrelated to installing software like Python.",
+        "n_citations": 6,
+        "latency_ms": 4753,
+        "status": "abstain",
+        "subqueries": [
+          "What are the steps to install Python on Windows?",
+          "Do I need administrator privileges to install Python on Windows?",
+          "Which version of Python should I install for Windows?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 19
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_004",
+      "tag": "reject",
+      "query": "What is the capital of France?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_004",
+      "pipeline": {
+        "answer": "The context does not provide information about the capital of France. Therefore, I don't know the answer.",
+        "n_citations": 5,
+        "latency_ms": 1380,
+        "error": null,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "The context does not provide information about the capital of France.",
+        "n_citations": 5,
+        "latency_ms": 5088,
+        "status": "abstain",
+        "subqueries": [
+          "What is the capital of France?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 7
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_005",
+      "tag": "reject",
+      "query": "Can you write a poem about conveyor belts?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_005",
+      "pipeline": {
+        "answer": "Certainly! Here's a poem inspired by the context provided:\n\n**Conveyor Belts in Harmony**\n\nIn the heart of industry, where machines hum,\nLie conveyor belts, in steady rhythm, they drum.\nRiding correctly with each turn and glide,\nThey carry loads, day and night side by side.\n\nRollers spinning freely, without a bind,\nA symphony of motion, their dance refined.\nBelt splices in good condition, tight as can be,\nTension adjusted to specifications, no need for fear or misery.\n\nThrough the factory floor, they move with grace,\nGuiding products smoothly from one place to another's embrace.\nNo leaks, no binding, a seamless flow,\nEfficiency at its peak, day after day, it grows.\n\nIn harmony with machinery and men,\nThey are the backbone of production scenes.\nA testament to engineering's art,\nConveyor belts, in service, they impart.",
+        "n_citations": 5,
+        "latency_ms": 2478,
+        "error": null,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "expected reject, got answer",
+        "correct_placeholder": false
+      },
+      "agent": {
+        "answer": "Certainly! Here's a poem inspired by the theme of conveyor belts:\n\n---\n\nIn the heart of industry, where machines hum,\nLies the magic of movement, in endless loops and rum.\nConveyor belts whisper tales of goods in transit,\nCarrying dreams from one place to another, with precision.\n\nThey are the silent workers, day and night,\nGuiding packages on their journey through light.\nFrom factory floors to shipping docks they glide,\nEfficiently moving products far and wide.\n\nWith grooves that hold secrets of the unseen,\nAnd tension just right for a smooth scene,\nThese belts dance under the watchful eye,\nOf engineers who ensure they never sigh.\n\nThey connect worlds, bridge distances vast,\nInvisible links in commerce's vast past.\nFrom raw materials to final product form,\nTheir journey is seamless, from dawn till dusk's storm.\n\nSo here’s to the conveyor belt, humble yet grand,\nA symbol of progress, where dreams are planned.\nThrough it flows the pulse of industry's heart,\nA testament to human innovation and art.",
+        "n_citations": 6,
+        "latency_ms": 6291,
+        "status": "ok",
+        "subqueries": [
+          "What are the key functions of conveyor belts in industrial settings?",
+          "How do conveyor belts contribute to efficiency in manufacturing processes?",
+          "What are some common materials used in making conveyor belts?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 19
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": false,
+        "is_rejected": false,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "expected reject, got answer",
+        "correct_placeholder": false
+      }
+    },
+    {
+      "id": "rj_006",
+      "tag": "reject",
+      "query": "What is the stock price of Siemens today?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_006",
+      "pipeline": {
+        "answer": "I don't know. The provided context does not contain information about the stock price of Siemens or any other company.",
+        "n_citations": 5,
+        "latency_ms": 1339,
+        "error": null,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "I don't know. The provided context does not contain information about the stock price of Siemens or any other company.",
+        "n_citations": 5,
+        "latency_ms": 5164,
+        "status": "abstain",
+        "subqueries": [
+          "What is the stock price of Siemens today?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 5
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_007",
+      "tag": "reject",
+      "query": "How to cook pasta?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_007",
+      "pipeline": {
+        "answer": "The provided context does not contain information on how to cook pasta. The context is about instructions for heat treatment processes and choosing and using various tools, but it does not provide a recipe or method for cooking pasta.",
+        "n_citations": 5,
+        "latency_ms": 1594,
+        "error": null,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "I don't know how to cook pasta based on the provided context. The context is about soldering procedures and does not provide information on cooking pasta.",
+        "n_citations": 6,
+        "latency_ms": 4898,
+        "status": "abstain",
+        "subqueries": [
+          "What are the basic steps to cook pasta?",
+          "What ingredients are needed to cook pasta?",
+          "What is the ideal cooking time for different types of pasta?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 17
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_008",
+      "tag": "reject",
+      "query": "Who is the current president of the United States?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_008",
+      "pipeline": {
+        "answer": "I don't know.",
+        "n_citations": 5,
+        "latency_ms": 1027,
+        "error": null,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "I do not know who the current president of the United States is because the provided context does not contain this information.",
+        "n_citations": 5,
+        "latency_ms": 5320,
+        "status": "abstain",
+        "subqueries": [
+          "current president of the united states"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 5
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_009",
+      "tag": "reject",
+      "query": "What are the health benefits of coffee?",
+      "expect_reject": true,
+      "source_e2e_id": "rej_009",
+      "pipeline": {
+        "answer": "The context provided does not contain information about the health benefits of coffee.",
+        "n_citations": 5,
+        "latency_ms": 1357,
+        "error": null,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "I don't know. The provided context does not contain information about the health benefits of coffee.",
+        "n_citations": 5,
+        "latency_ms": 5678,
+        "status": "abstain",
+        "subqueries": [
+          "What are the health benefits associated with consuming coffee?"
+        ],
+        "counts": {
+          "subqueries": 1,
+          "searches": 2,
+          "llm_calls": 5,
+          "evidence_n": 5
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_one",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "refine",
+            "tool": "refine_subquery"
+          },
+          {
+            "step": 5,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 6,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 7,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    },
+    {
+      "id": "rj_010",
+      "tag": "reject",
+      "query": "Explain quantum computing in simple terms.",
+      "expect_reject": true,
+      "source_e2e_id": "rej_010",
+      "pipeline": {
+        "answer": "I don't know.",
+        "n_citations": 5,
+        "latency_ms": 1179,
+        "error": null,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      },
+      "agent": {
+        "answer": "I don't know. The provided context discusses topics related to particle size, counting methods, and vacuum systems, but it does not provide information about quantum computing.",
+        "n_citations": 6,
+        "latency_ms": 4406,
+        "status": "abstain",
+        "subqueries": [
+          "What is quantum computing?",
+          "How does quantum computing differ from classical computing?",
+          "What are the basic principles of quantum computing?"
+        ],
+        "counts": {
+          "subqueries": 3,
+          "searches": 3,
+          "llm_calls": 3,
+          "evidence_n": 17
+        },
+        "trajectory_summary": [
+          {
+            "step": 1,
+            "node": "decompose",
+            "tool": "decompose_query"
+          },
+          {
+            "step": 2,
+            "node": "retrieve_multi",
+            "tool": "knowledge_search"
+          },
+          {
+            "step": 3,
+            "node": "grade",
+            "tool": "grade_evidence"
+          },
+          {
+            "step": 4,
+            "node": "synthesize",
+            "tool": "synthesize_answer"
+          }
+        ],
+        "error": null,
+        "degraded": false,
+        "correct": true,
+        "is_rejected": true,
+        "false_reject": false,
+        "judge": "llm",
+        "judge_reasoning": "reject phrase match",
+        "correct_placeholder": true
+      }
+    }
+  ]
+}

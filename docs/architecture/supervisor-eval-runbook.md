@@ -74,6 +74,24 @@ PYTHONPATH=. python scripts/run_agent_eval.py \
 - **multi_hop 无增益或拖累 atomic** → supervisor 不值（一个 LLM 调用换不来派单精度），
   保留规则、删 supervise 节点。
 
+### 2026-08-24 实测结果（已完成）
+
+| arm | Correct | atomic | multi_hop | reject | avg searches | lat |
+|-----|--------:|-------:|----------:|-------:|-------------:|----:|
+| pipeline | 0.674 | 0.500 | **0.778** | 0.800 | — | 3.1s |
+| agent off | 0.630 | 0.389 | 0.722 | 0.900 | 2.24 | 6.5s |
+| agent on | 0.630 | 0.389 | 0.722 | 0.900 | 2.24 | 7.8s |
+
+**判定：NO_GO（supervise 零增益 + 慢 1.3s）**。supervise 确实执行（35/46 派单、0 fallback），
+但评测是**单臂注入**（`retriever.search` 三路融合），`_search_arms` 无 `search_fns` 退化为
+全臂 → 选臂被架空；配额在每次全量三路检索下无效（off=on=2.24）。
+
+**决策（2026-08-24）**：supervise **保留但默认关**（已实现 + 测试全绿 + 零行为影响），
+待**多臂注入评测**（每臂独立 search_fn）再验证选臂价值。`agent.supervise.enabled` 维持 false。
+
+附带：Phase1 evidence bug 修复真实增益 multi_hop 8/6 0.667 → 本次 off 0.722（+5.5pt）；
+agent 整体仍 < pipeline（0.630 vs 0.674）→ agent 保持默认关。
+
 ---
 
 ## 5. 产物归档

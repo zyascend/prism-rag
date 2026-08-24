@@ -1,16 +1,21 @@
-## 0⁹. Supervisor 派单（Phase 2 · 默认关 · 未上云验证）
+## 0⁹. Supervisor 派单（Phase 2 · 云上双臂 NO_GO · 默认关）
 
 | 项 | 内容 |
 |----|------|
-| **分支** | `feat/agent-supervisor` |
+| **分支** | `feat/agent-supervisor`（PR #45） |
 | **代码** | supervise 子图（`nodes.py`）+ `supervise_dispatch`/`validate_dispatch_plan`（`tools.py`）+ `route_after_supervise`（`graph.py`）+ `AgentToolBox.search_fns` 多臂注入 + `prepare_multi` 读 plan 配额 |
-| **配置** | `agent.supervise.enabled: false`（默认关，零行为变化）；`supervise.prompt_id: agent_supervise` |
-| **验证** | `75 passed`（69 基线 + 6 supervise 新单测：合法 plan 派单 / 坏 JSON fallback / 配额截断 / 默认关零变化 / arm_hint 先验 / route） |
-| **关键修复** | ① `AgentState` 加 `active_arms`（Send worker 传臂）；② 子图 schema 声明 `plan` 为输入（否则 prepare_multi 读不到）；③ `_SharedInput` 不声明 reducer 输入，`invoke_subgraph` 只剥 `evidence` 回显（grade/synthesize 只读 evidence 声明为输入会 echo） |
-| **顺带修 bug** | **Phase 1 遗留：grade/synthesize 子图拿不到 evidence → 永远 abstain**（69 测试因只断言 answer 非空而漏掉）。`invoke_subgraph` 剥 evidence 回显后修复；顺带修掉共享 thread_id 下 evidence 泄漏（NO_GO 根因），trajectory 仍累积（checkpoint 固有） |
-| **门禁（未跑）** | 云上双臂：atomic Δ 不拖累 / **multi_hop ≥ 0.778**（上次 agent 0.667 FAIL）/ budget 不超 / 延迟 ≤ ~7s。过才谈 Go |
-| **云上方案** | [`docs/architecture/supervisor-eval-runbook.md`](docs/architecture/supervisor-eval-runbook.md) · **off/on 双 arm 都跑**（各 46q）。off 不能用 8/6 数据（本次修了 Phase 1 evidence bug，归因不干净） |
-| **下一步** | 云上 off + on 双臂（`--supervise-on` 已加进 `run_agent_eval.py`）→ 过门禁才默认开；不过保留规则删节点 |
+| **配置** | `agent.supervise.enabled: false`（默认关，零行为变化） |
+| **验证** | 本地 `75 passed`（69 + 6 supervise 单测） |
+| **云上双臂** | [`runs/20260824-agent-eval-off/`](runs/20260824-agent-eval-off/) + [`runs/20260824-agent-eval-supervise/`](runs/20260824-agent-eval-supervise/) · SeetaCloud 4090D · 46q · 8/24 |
+| **主表** | off: 0.630 / on: **0.630** · atomic 0.389=0.389 · multi_hop 0.722=0.722 · avg searches 2.24=2.24 · lat 6.5s→7.8s |
+| **门禁判定** | multi_hop ≥ 0.778 **FAIL**（0.722，supervise 零增益）；atomic 不拖累 PASS；budget PASS；延迟 +1.3s |
+| **根因** | supervise **确实执行**（35/46 派单、0 fallback），但评测是**单臂注入**（retriever.search 三路融合）→ `_search_arms` 无 search_fns 退化为全臂，**选臂被架空**；配额在每次全量三路检索下无效（off=on=2.24） |
+| **附带** | Phase1 evidence bug 修复真实增益：multi_hop 8/6 0.667 → 本次 off **0.722**（+5.5pt）；但 agent 仍 < pipeline（0.630 vs 0.674）、atomic 弱（0.389）→ agent 整体仍 NO_GO |
+| **决策** | **supervise 不值得保留**（单臂评测无增益 + 更慢）。保留规则派单、删 supervise 节点；除非未来建**多臂注入评测**再验证。`agent.supervise.enabled` 维持 false |
+
+---
+
+## 0⁸. Agent 角色子图化（Phase 1 结构改造 · 行为零变化）
 
 ---
 
