@@ -9,7 +9,8 @@
 | **关键修复** | ① `AgentState` 加 `active_arms`（Send worker 传臂）；② 子图 schema 声明 `plan` 为输入（否则 prepare_multi 读不到）；③ `_SharedInput` 不声明 reducer 输入，`invoke_subgraph` 只剥 `evidence` 回显（grade/synthesize 只读 evidence 声明为输入会 echo） |
 | **顺带修 bug** | **Phase 1 遗留：grade/synthesize 子图拿不到 evidence → 永远 abstain**（69 测试因只断言 answer 非空而漏掉）。`invoke_subgraph` 剥 evidence 回显后修复；顺带修掉共享 thread_id 下 evidence 泄漏（NO_GO 根因），trajectory 仍累积（checkpoint 固有） |
 | **门禁（未跑）** | 云上双臂：atomic Δ 不拖累 / **multi_hop ≥ 0.778**（上次 agent 0.667 FAIL）/ budget 不超 / 延迟 ≤ ~7s。过才谈 Go |
-| **下一步** | 云上 46q 双臂（supervise on vs off）→ 过门禁才默认开；不过保留规则删节点 |
+| **云上方案** | [`docs/architecture/supervisor-eval-runbook.md`](docs/architecture/supervisor-eval-runbook.md) · **off/on 双 arm 都跑**（各 46q）。off 不能用 8/6 数据（本次修了 Phase 1 evidence bug，归因不干净） |
+| **下一步** | 云上 off + on 双臂（`--supervise-on` 已加进 `run_agent_eval.py`）→ 过门禁才默认开；不过保留规则删节点 |
 
 ---
 

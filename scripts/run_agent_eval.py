@@ -360,6 +360,8 @@ def execute_dual_arm(args: argparse.Namespace) -> int:
     if args.grade_off:
         agent_cfg["grade"] = {"enabled": False}
         agent_cfg["max_grade_cycles"] = 0
+    if args.supervise_on:
+        agent_cfg["supervise"] = {"enabled": True}
 
     # agent budget snapshot for go draft
     base_agent = agent_config()
@@ -599,6 +601,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--grade-off",
         action="store_true",
         help="disable agent grade/refine cycle (isolation arm; separate out-dir)",
+    )
+    parser.add_argument(
+        "--supervise-on",
+        action="store_true",
+        help="enable agent supervisor dispatch (Phase2 arm; separate out-dir)",
     )
     parser.add_argument(
         "--agent-only",
