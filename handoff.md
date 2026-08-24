@@ -1,3 +1,18 @@
+## 0⁹. Supervisor 派单（Phase 2 · 默认关 · 未上云验证）
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `feat/agent-supervisor` |
+| **代码** | supervise 子图（`nodes.py`）+ `supervise_dispatch`/`validate_dispatch_plan`（`tools.py`）+ `route_after_supervise`（`graph.py`）+ `AgentToolBox.search_fns` 多臂注入 + `prepare_multi` 读 plan 配额 |
+| **配置** | `agent.supervise.enabled: false`（默认关，零行为变化）；`supervise.prompt_id: agent_supervise` |
+| **验证** | `75 passed`（69 基线 + 6 supervise 新单测：合法 plan 派单 / 坏 JSON fallback / 配额截断 / 默认关零变化 / arm_hint 先验 / route） |
+| **关键修复** | ① `AgentState` 加 `active_arms`（Send worker 传臂）；② 子图 schema 声明 `plan` 为输入（否则 prepare_multi 读不到）；③ `_SharedInput` 不声明 reducer 输入，`invoke_subgraph` 只剥 `evidence` 回显（grade/synthesize 只读 evidence 声明为输入会 echo） |
+| **顺带修 bug** | **Phase 1 遗留：grade/synthesize 子图拿不到 evidence → 永远 abstain**（69 测试因只断言 answer 非空而漏掉）。`invoke_subgraph` 剥 evidence 回显后修复；顺带修掉共享 thread_id 下 evidence 泄漏（NO_GO 根因），trajectory 仍累积（checkpoint 固有） |
+| **门禁（未跑）** | 云上双臂：atomic Δ 不拖累 / **multi_hop ≥ 0.778**（上次 agent 0.667 FAIL）/ budget 不超 / 延迟 ≤ ~7s。过才谈 Go |
+| **下一步** | 云上 46q 双臂（supervise on vs off）→ 过门禁才默认开；不过保留规则删节点 |
+
+---
+
 ## 0⁸. Agent 角色子图化（Phase 1 结构改造 · 行为零变化）
 
 | 项 | 内容 |

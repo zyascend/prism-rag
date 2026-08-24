@@ -48,9 +48,12 @@ class AgentState(TypedDict, total=False):
     grade: Dict[str, Any]
     pending_subqueries: List[str]  # refine 后待检索
     meta: Dict[str, Any]
+    plan: Dict[str, Any]  # supervise 派单计划（DispatchPlan + fallback 标记）
     # Send 扇出时单路可带
     active_subquery: str
     active_subquery_id: int
+    active_search_allowance: int
+    active_arms: List[str]  # supervisor 派单：本 worker 只检这些臂（空 = 全臂）
 
 
 def empty_agent_state(query: str, *, cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

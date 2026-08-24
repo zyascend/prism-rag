@@ -245,11 +245,18 @@ def test_batch_isolation_no_evidence_leak_with_checkpoint():
     reset_memory_saver()
 
 
-def test_shared_thread_id_still_leaks_evidence_documenting_pitfall():
-    """Same thread_id + checkpoint *does* accumulate reducers — do not use in batch."""
+def test_shared_thread_id_still_leaks_trajectory_documenting_pitfall():
+    """Same thread_id + checkpoint still accumulates trajectory — do not reuse in batch.
+
+    Phase 2 (supervise branch): invoke_subgraph now strips the evidence echo, so
+    evidence_n no longer grows (was the NO_GO root cause). Trajectory accumulation
+    remains a LangGraph checkpoint behavior — the reason run_agent allocates a
+    unique thread_id per request.
+    """
     reset_memory_saver()
     cfg = _base_cfg(checkpoint={"enabled": True}, grade={"enabled": False})
     ns = []
+    traj_lens = []
     for i in range(3):
         res = run_agent(
             f"shared-{i}",
@@ -260,8 +267,11 @@ def test_shared_thread_id_still_leaks_evidence_documenting_pitfall():
             trace_id="fixed-batch-id",  # intentional anti-pattern
         )
         ns.append(int(res.counts.get("evidence_n") or 0))
-    # Document the bug class: evidence must strictly grow when id is reused.
-    assert ns[-1] > ns[0], f"expected leak under shared thread_id, got {ns}"
+        traj_lens.append(len(res.trajectory))
+    # evidence 泄漏已修复（invoke_subgraph 剥回显）——不再增长
+    assert ns[0] == ns[1] == ns[2], f"evidence should not leak under shared thread_id, got {ns}"
+    # trajectory 仍在累积（checkpoint reducer 叠加）——这才是必须唯一 thread_id 的原因
+    assert traj_lens[-1] > traj_lens[0], f"expected trajectory accumulation, got {traj_lens}"
     reset_memory_saver()
 
 

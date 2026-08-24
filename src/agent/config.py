@@ -17,6 +17,7 @@ def agent_config(get_cfg: Optional[Callable] = None) -> Dict[str, Any]:
     react = raw.get("react_demo") if isinstance(raw.get("react_demo"), dict) else {}
     decompose = raw.get("decompose") if isinstance(raw.get("decompose"), dict) else {}
     synthesize = raw.get("synthesize") if isinstance(raw.get("synthesize"), dict) else {}
+    supervise = raw.get("supervise") if isinstance(raw.get("supervise"), dict) else {}
     return {
         "enabled": bool(raw.get("enabled", False)),
         "max_subqueries": int(raw.get("max_subqueries", 3)),
@@ -33,6 +34,11 @@ def agent_config(get_cfg: Optional[Callable] = None) -> Dict[str, Any]:
         "react_demo": {"enabled": bool(react.get("enabled", False))},
         "decompose": {"prompt_id": str(decompose.get("prompt_id") or "agent_decompose")},
         "synthesize": {"prompt_id": str(synthesize.get("prompt_id") or "agent_synthesize")},
+        "supervise": {
+            "enabled": bool(supervise.get("enabled", False)),
+            "prompt_id": str(supervise.get("prompt_id") or "agent_supervise"),
+            "max_assignments": int(supervise.get("max_assignments", 3)),
+        },
     }
 
 
@@ -49,4 +55,5 @@ def agent_cache_salt(get_cfg: Optional[Callable] = None) -> str:
         f"|mgc={c['max_grade_cycles']}"
         f"|gr={int(c['grade']['enabled'])}"
         f"|hitl={int(c['hitl']['review_subqueries'])}"
+        f"|sv={int(c['supervise']['enabled'])}"
     )

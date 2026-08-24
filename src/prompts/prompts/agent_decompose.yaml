@@ -42,7 +42,14 @@ versions:
       6) subqueries MUST be a JSON array of plain strings only — never objects.
 
       Return ONLY JSON:
-      {{"subqueries": ["plain string query 1", "..."], "strategy": "atomic"|"multi", "reason": "short"}}
+      {{"subqueries": ["plain string query 1", "..."], "strategy": "atomic"|"multi", "reason": "short", "arm_hints": {{"<subquery>": "visual"|"bm25"|"dense"|"mixed"}}}}
+
+      arm_hints is optional: per sub-query, hint which retrieval arm is most likely to find it.
+      - "visual" if the answer likely lives in a table / chart / figure / page layout
+      - "bm25" for exact product / part / manual / command names
+      - "dense" for semantic / conceptual / comparative meaning
+      - "mixed" when both exact and semantic matter (default)
+      Only include sub-queries you actually emitted.
 
       QUESTION:
       {query}

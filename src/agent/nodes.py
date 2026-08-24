@@ -33,6 +33,7 @@ __all__ = [
     "PrepareMultiChannel",
     "GradeChannel",
     "RefineChannel",
+    "SuperviseChannel",
     "SynthesizeChannel",
     "FinalizeChannel",
     "build_decompose_subgraph",
@@ -42,6 +43,7 @@ __all__ = [
     "build_prepare_multi_subgraph",
     "build_grade_subgraph",
     "build_refine_subgraph",
+    "build_supervise_subgraph",
     "build_synthesize_subgraph",
     "build_finalize_subgraph",
 ]
@@ -64,6 +66,7 @@ class _SharedInput(TypedDict, total=False):
     pending_subqueries: List[str]
     budget: Dict[str, Any]
     meta: Dict[str, Any]
+    plan: Dict[str, Any]  # supervise 派单计划（supervise/prepare_multi/retrieve_multi 读取）
 
 
 class DecomposeChannel(_SharedInput, TypedDict, total=False):
@@ -106,6 +109,7 @@ class PrepareMultiChannel(_SharedInput, TypedDict, total=False):
 
 
 class GradeChannel(_SharedInput, TypedDict, total=False):
+    evidence: List[Dict[str, Any]]  # 只读输入（不写回）
     grade: Dict[str, Any]
     budget: Dict[str, Any]
     meta: Dict[str, Any]
@@ -119,7 +123,16 @@ class RefineChannel(_SharedInput, TypedDict, total=False):
     trajectory: List[Dict[str, Any]]
 
 
+class SuperviseChannel(_SharedInput, TypedDict, total=False):
+    plan: Dict[str, Any]
+    strategy: str
+    budget: Dict[str, Any]
+    meta: Dict[str, Any]
+    trajectory: List[Dict[str, Any]]
+
+
 class SynthesizeChannel(_SharedInput, TypedDict, total=False):
+    evidence: List[Dict[str, Any]]  # 只读输入（不写回）
     answer: str
     citations: List[Dict[str, Any]]
     status: str
@@ -168,6 +181,10 @@ def build_decompose_subgraph(box: AgentToolBox, *, node_name: str = "decompose")
         result = box.decompose_query(query)
         dec_llm(budget)
         meta["llm_calls"] = int(meta.get("llm_calls") or 0) + 1
+        # arm_hints 存 meta（supervisor 派单强先验）
+        arm_hints = result.get("arm_hints") or {}
+        if isinstance(arm_hints, dict) and arm_hints:
+            meta["arm_hints"] = arm_hints
 
         latency = (time.perf_counter() - t0) * 1000
         traj = [
@@ -363,6 +380,13 @@ def build_retrieve_multi_subgraph(
 
         evidence_delta: List[dict] = []
         n_searches = 0
+        # supervisor 派单：按 subquery 匹配 arms（顺序 multi 路径也吃 plan）
+        plan = state.get("plan") or {}
+        plan_arms = {}
+        if isinstance(plan, dict) and not plan.get("fallback"):
+            for a in plan.get("assignments") or []:
+                if isinstance(a, dict) and a.get("subquery"):
+                    plan_arms[str(a["subquery"])] = list(a.get("arms") or [])
         for i, sq in enumerate(queries):
             if not (sq or "").strip():
                 continue
@@ -370,10 +394,11 @@ def build_retrieve_multi_subgraph(
                 sq_id = all_subs.index(sq)
             else:
                 sq_id = i
+            arms = plan_arms.get(sq) or None
             for _ in range(int(box.cfg.get("max_search_per_subquery") or 1)):
                 if int(budget.get("searches_left") or 0) <= 0:
                     break
-                out = box.knowledge_search(sq, subquery_id=sq_id, top_k=int(box.cfg.get("search_top_k") or 5))
+                out = box.knowledge_search(sq, subquery_id=sq_id, top_k=int(box.cfg.get("search_top_k") or 5), arms=arms)
                 hits = list(out.get("hits") or [])
                 evidence_delta.extend(hits)
                 budget["searches_left"] = max(0, int(budget.get("searches_left") or 0) - 1)
@@ -433,8 +458,16 @@ def build_prepare_multi_subgraph(
         remaining = int(budget.get("searches_left") or 0)
         max_per_sq = max(1, int(box.cfg.get("max_search_per_subquery") or 1))
 
+        # supervisor 派单（plan 有效时接管配额与臂；否则全臂均分）
+        plan = state.get("plan") or {}
+        plan_assign = {}
+        if isinstance(plan, dict) and not plan.get("fallback"):
+            for a in plan.get("assignments") or []:
+                if isinstance(a, dict) and a.get("subquery"):
+                    plan_assign[str(a["subquery"])] = a
+
         work: List[str] = []
-        allow_list: List[int] = []
+        allow_list: List[dict] = []
         n_allocated = 0
         for i, sq in enumerate(raw_queries):
             if not (sq or "").strip():
@@ -443,11 +476,17 @@ def build_prepare_multi_subgraph(
                 break
             if remaining <= 0:
                 break
-            n_allow = min(max_per_sq, remaining)
+            pa = plan_assign.get(sq)
+            if pa is not None:
+                n_allow = max(1, min(int(pa.get("searches") or 1), remaining))
+                arms = list(pa.get("arms") or [])
+            else:
+                n_allow = min(max_per_sq, remaining)
+                arms = []
             if n_allow <= 0:
                 break
             work.append(sq)
-            allow_list.append(n_allow)
+            allow_list.append({"searches": n_allow, "arms": arms})
             remaining -= n_allow
             n_allocated += n_allow
 
@@ -603,6 +642,79 @@ def build_refine_subgraph(box: AgentToolBox, *, node_name: str = "refine") -> An
     g.add_node("refine", refine)
     g.set_entry_point("refine")
     g.add_edge("refine", END)
+    return g.compile()
+
+
+def build_supervise_subgraph(box: AgentToolBox, *, node_name: str = "supervise") -> Any:
+    """Supervisor 子图：LLM 一次调用产 DispatchPlan（派单决策）。
+
+    决策内容 = 每个子问 → arms（检索臂子集）+ searches（配额上限）。
+    纯 planner，不调用任何工具。失败/预算不足 → fallback 规则计划（全臂均分），
+    行为退化为「supervisor 关闭时」——绝不比不开更差。
+    """
+
+    def supervise(state: Dict[str, Any]) -> Dict[str, Any]:
+        t0 = time.perf_counter()
+        budget = budget_copy(state)
+        meta = meta_copy(state)
+        step = next_step(state)
+        meta["step"] = step
+        query = state.get("query") or ""
+        subs = list(state.get("subqueries") or [])
+        if not subs:
+            subs = [query]
+        strategy = str(state.get("strategy") or "atomic")
+        arm_hints = meta.get("arm_hints") or {}
+        if not isinstance(arm_hints, dict):
+            arm_hints = {}
+
+        plan = box.supervise_dispatch(
+            query,
+            subs,
+            strategy,
+            budget=budget,
+            arm_hints=arm_hints,
+        )
+        # supervise 的 LLM 调用计入全局账本（与 grade/refine 同纪律）
+        if not plan.get("fallback") and int(budget.get("llm_calls_left") or 0) > 0:
+            dec_llm(budget)
+            meta["llm_calls"] = int(meta.get("llm_calls") or 0) + 1
+        # 没有有效派单 → 不覆盖 strategy（走规则）
+        if plan.get("fallback"):
+            plan["mode"] = plan.get("mode") or strategy
+
+        latency = (time.perf_counter() - t0) * 1000
+        n_assign = len(plan.get("assignments") or [])
+        traj = [
+            step_record(
+                step=step,
+                node=node_name,
+                tool="supervise_dispatch" if not plan.get("fallback") else None,
+                input_summary=f"n_subqueries={len(subs)} strategy={strategy}",
+                output_summary=(
+                    f"plan_fallback={int(bool(plan.get('fallback')))} "
+                    f"assignments={n_assign} mode={plan.get('mode')}"
+                ),
+                ok=True,
+                latency_ms=latency,
+                counts={
+                    "subqueries": len(subs),
+                    "assignments": n_assign,
+                    "fallback": int(bool(plan.get("fallback"))),
+                },
+            )
+        ]
+        return {
+            "plan": plan,
+            "budget": budget,
+            "meta": meta,
+            "trajectory": traj,
+        }
+
+    g = StateGraph(SuperviseChannel)
+    g.add_node("supervise", supervise)
+    g.set_entry_point("supervise")
+    g.add_edge("supervise", END)
     return g.compile()
 
 
