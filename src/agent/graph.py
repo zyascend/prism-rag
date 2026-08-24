@@ -25,6 +25,7 @@ from src.agent.nodes import (
     build_refine_subgraph,
     build_retrieve_multi_subgraph,
     build_retrieve_one_subgraph,
+    build_supervise_subgraph,
     build_synthesize_subgraph,
 )
 from src.agent.state import AgentState
@@ -39,6 +40,7 @@ __all__ = [
     "build_agent_graph",
     "route_after_decompose",
     "route_after_grade",
+    "route_after_supervise",
     "fan_out_searches",
     "export_graph_mermaid",
     "sanitize_langgraph_mermaid",
@@ -115,6 +117,22 @@ def route_after_grade(state: Dict[str, Any]) -> str:
     return "synthesize"
 
 
+def route_after_supervise(state: Dict[str, Any]) -> str:
+    """Supervisor 派单后路由：plan 有效且 mode=atomic → retrieve_one；否则 multi。
+
+    fallback plan（无有效派单）保持 decompose 的 strategy —— 走规则对应分支。
+    """
+    plan = state.get("plan") or {}
+    mode = ""
+    if isinstance(plan, dict):
+        mode = str(plan.get("mode") or "").strip().lower()
+        if not mode or plan.get("fallback"):
+            mode = str(state.get("strategy") or "atomic").strip().lower()
+    if mode == "atomic":
+        return "retrieve_one"
+    return "retrieve_multi"
+
+
 def fan_out_searches(state: Dict[str, Any]) -> Union[List[Send], str]:
     """Map pending (or empty) work list to Send workers; empty → grade."""
     pending = list(state.get("pending_subqueries") or [])
@@ -122,7 +140,7 @@ def fan_out_searches(state: Dict[str, Any]) -> Union[List[Send], str]:
     if not pending:
         return "grade"
     meta = state.get("meta") or {}
-    # list[int] parallel to pending, staged by prepare_multi (meta is a real channel)
+    # list[dict] parallel to pending, staged by prepare_multi (supervisor arms + quota)
     allow_list = list(meta.get("fan_allowances") or [])
     sends: List[Send] = []
     for i, sq in enumerate(pending):
@@ -132,12 +150,19 @@ def fan_out_searches(state: Dict[str, Any]) -> Union[List[Send], str]:
             sq_id = all_subs.index(sq)
         else:
             sq_id = i
-        n_allow = int(allow_list[i]) if i < len(allow_list) else 1
+        allow = allow_list[i] if i < len(allow_list) else {}
+        if isinstance(allow, dict):
+            n_allow = max(0, int(allow.get("searches") or 0))
+            arms = list(allow.get("arms") or [])
+        else:  # 兼容旧 int 形态
+            n_allow = max(0, int(allow or 1))
+            arms = []
         payload = {
             **dict(state),
             "active_subquery": sq,
             "active_subquery_id": sq_id,
-            "active_search_allowance": max(0, n_allow),
+            "active_search_allowance": n_allow,
+            "active_arms": arms,
             # Critical: worker deltas only — avoid reducer double-count of parent lists
             "evidence": [],
             "trajectory": [],
@@ -155,6 +180,7 @@ def build_agent_graph(
     complete_fn: CompleteFn,
     generate_fn: GenerateFn,
     cfg: Optional[Dict[str, Any]] = None,
+    search_fns: Optional[Dict[str, SearchFn]] = None,
 ) -> Any:
     """Compile agent graph with injected toolbox deps.
 
@@ -170,11 +196,18 @@ def build_agent_graph(
     use_send = bool(cfg.get("use_send", False))
     use_hitl = hitl_enabled(cfg)
     use_checkpoint = checkpoint_enabled(cfg)
+    # supervise 开关：cfg 里可传 supervise.enabled 或平铺 supervise_enabled（对齐 agent_config）
+    sup = cfg.get("supervise")
+    if isinstance(sup, dict):
+        use_supervise = bool(sup.get("enabled", False))
+    else:
+        use_supervise = bool(cfg.get("supervise_enabled", False))
     box = AgentToolBox(
         search_fn=search_fn,
         complete_fn=complete_fn,
         generate_fn=generate_fn,
         cfg=cfg,
+        search_fns=search_fns or {},
     )
     max_per_sq = max(1, int(cfg.get("max_search_per_subquery") or 1))
     top_k = int(cfg.get("search_top_k") or 5)
@@ -200,11 +233,27 @@ def build_agent_graph(
     )
 
     def invoke_subgraph(sg: Any, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Invoke a compiled role subgraph with outer state, return only its delta."""
+        """Invoke a compiled role subgraph with outer state, return only its delta.
+
+        只对 ``evidence`` 剥回显：grade/synthesize 子图 schema 声明 evidence 为
+        只读输入，LangGraph 会把它回显到子图输出（子图不写 evidence，输出 = 输入
+        echo）。外层 reducer 若把 echo 当 delta 再合并 → 证据双计。这里剥掉输入
+        部分。``trajectory`` 不做切片——各子图的 trajectory 是纯输出 delta，
+        切片会误截（prepare_multi 的 1 条 delta 被外层已有长度截空）。
+        """
         out = sg.invoke(state)
         if not isinstance(out, dict):
             return {}
-        return out
+        delta = {}
+        for k, v in out.items():
+            if k == "evidence" and k in state and isinstance(state.get(k), list):
+                cur = state[k]
+                # 子图输出 evidence = 输入 echo + 节点 delta；echo 部分剥掉
+                new = v if not isinstance(v, list) else v[len(cur):]
+                delta[k] = new
+            else:
+                delta[k] = v
+        return delta
 
     builder = StateGraph(AgentState)
     builder.add_node("decompose", lambda s: invoke_subgraph(decompose_sg, s))
@@ -234,12 +283,31 @@ def build_agent_graph(
     else:
         route_source = "decompose"
 
+    # Supervisor（Phase 2）：multi 路径先派单再检索；默认关 → 图拓扑与 Phase 1 完全一致
+    if use_supervise:
+        supervise_sg = build_supervise_subgraph(box)
+        builder.add_node("supervise", lambda s: invoke_subgraph(supervise_sg, s))
+        builder.add_edge("supervise", multi_entry)
+        # 条件边：supervise 之后按 plan.mode 路由；fallback（无有效 plan）→ 规则路由
+        builder.add_conditional_edges(
+            "supervise",
+            route_after_supervise,
+            {
+                "retrieve_one": "retrieve_one",
+                "retrieve_multi": multi_entry,
+            },
+        )
+        multi_source = "supervise"
+    else:
+        multi_source = "decompose"  # 保持 Phase 1 路由
+
     builder.add_conditional_edges(
         route_source,
         route_after_decompose,
         {
             "retrieve_one": "retrieve_one",
-            "retrieve_multi": multi_entry,
+            # supervise 关 → 直连 multi 入口；开 → 先进 supervise 派单
+            "retrieve_multi": multi_source if use_supervise else multi_entry,
         },
     )
     builder.add_edge("retrieve_one", "grade")

@@ -363,8 +363,16 @@ class AgentToolBox:
         generate_fn: GenerateFn,
         cfg: Optional[Dict[str, Any]] = None,
         prompt_get_active: Optional[PromptGetActive] = None,
+        search_fns: Optional[Dict[str, SearchFn]] = None,
     ) -> None:
+        """Narrow agent tools.
+
+        ``search_fn`` — 兼容单检索注入（Phase 1 前形态，arms 全开时用）。
+        ``search_fns`` — 多臂注入（supervisor 派单用）：{"bm25": fn, "dense": fn,
+        "visual": fn}，``knowledge_search(arms=[...])`` 按臂只调对应 fn，结果合并。
+        """
         self.search_fn = search_fn
+        self.search_fns = search_fns or {}
         self.complete_fn = complete_fn
         self.generate_fn = generate_fn
         self.cfg: Dict[str, Any] = dict(cfg or {})
@@ -434,24 +442,70 @@ class AgentToolBox:
         elif strategy != "multi":
             strategy = "atomic"
 
+        # 可选 arm_hints（supervisor 派单强先验）：{subquery: visual|bm25|dense|mixed}
+        arm_hints: Dict[str, str] = {}
+        raw_hints = data.get("arm_hints")
+        if isinstance(raw_hints, dict):
+            for k, v in raw_hints.items():
+                sq = normalize_subquery_text(k)
+                s = str(v or "").strip().lower()
+                if sq and s in ("visual", "bm25", "dense", "mixed"):
+                    arm_hints[sq] = s
+
         return {
             "subqueries": subs,
             "strategy": strategy,
             "reason": str(data.get("reason") or "")[:300],
+            "arm_hints": arm_hints,
             "fallback": False,
         }
 
+    def _search_arms(self, q: str, *, top_k: int, arms: Optional[List[str]]) -> List[dict]:
+        """按 arms 检索，三种注入形态：
+
+        1. ``search_fns`` 多臂注入：逐臂调 + 合并（最细粒度）。
+        2. 仅 ``search_fn`` 且其接受 ``arms`` kwarg：把 arms 透传下去，
+           ``PrismRAGRetriever.search`` 按 use_bm25/use_dense/use_visual 开臂
+           —— 单臂注入下 supervise 选臂也能真实生效。
+        3. 仅 ``search_fn`` 且不接受 arms：退化为全臂（arms 只作语义提示）。
+        """
+        if arms and self.search_fns:
+            hits_raw: List[dict] = []
+            for arm in arms:
+                fn = self.search_fns.get(arm)
+                if fn is None:
+                    continue
+                try:
+                    hits_raw.extend(fn(q, k=top_k) or [])
+                except TypeError:
+                    hits_raw.extend(fn(q) or [])
+            return hits_raw
+        if arms:
+            # 单臂注入但 search_fn 接受 arms → 透传（开臂）
+            try:
+                return self.search_fn(q, k=top_k, arms=list(arms))
+            except TypeError:
+                pass  # 不接受 arms kwarg → 退化全臂
+        try:
+            return self.search_fn(q, k=top_k)
+        except TypeError:
+            return self.search_fn(q)
+
     def knowledge_search(
-        self, query: str, *, subquery_id: int, top_k: int = 5
+        self,
+        query: str,
+        *,
+        subquery_id: int,
+        top_k: int = 5,
+        arms: Optional[List[str]] = None,
     ) -> dict:
-        """Retrieve hits and tag each with subquery_id + rank."""
+        """Retrieve hits and tag each with subquery_id + rank.
+
+        ``arms`` 非空时只调指定检索臂（supervisor 派单）；否则走默认全臂 search_fn。
+        """
         # Defense in depth: strip dict-shaped leftovers from bad decompose output
         q = normalize_subquery_text(query) or str(query or "").strip()
-        try:
-            hits_raw = self.search_fn(q, k=top_k)
-        except TypeError:
-            # Some injectors use search_fn(query) only
-            hits_raw = self.search_fn(q)
+        hits_raw = self._search_arms(q, top_k=top_k, arms=arms)
         hits: List[dict] = []
         for i, h in enumerate(hits_raw or []):
             if not isinstance(h, dict):
@@ -459,8 +513,127 @@ class AgentToolBox:
             item = dict(h)
             item["subquery_id"] = subquery_id
             item["rank"] = i + 1
+            if arms:
+                item["arms"] = list(arms)
             hits.append(item)
-        return {"hits": hits, "query": q, "subquery_id": subquery_id}
+        return {"hits": hits, "query": q, "subquery_id": subquery_id, "arms": arms}
+
+    _ARMS = ("bm25", "dense", "visual")
+
+    def _normalize_arms(self, arms: Any) -> List[str]:
+        """Coerce arms to a validated subset of {bm25, dense, visual}; empty → all."""
+        if not isinstance(arms, (list, tuple, set)):
+            return list(self._ARMS)
+        out: List[str] = []
+        for a in arms:
+            s = str(a).strip().lower()
+            if s in self._ARMS and s not in out:
+                out.append(s)
+        return out if out else list(self._ARMS)
+
+    def validate_dispatch_plan(self, data: Dict[str, Any], *, max_assignments: int) -> Dict[str, Any]:
+        """Validate supervisor DispatchPlan JSON → normalized plan; any failure → fallback.
+
+        Fallback plan = 规则行为（mode 用 decompose 的 strategy，assignments 空 → 调用方全臂均分配额）。
+        """
+        fallback = {"mode": "", "assignments": [], "fallback": True, "reason": ""}
+
+        mode = str(data.get("mode") or "").strip().lower()
+        if mode not in ("atomic", "multi"):
+            mode = ""
+        assignments_raw = data.get("assignments")
+        if not isinstance(assignments_raw, list) or not assignments_raw:
+            return {
+                **fallback,
+                "mode": mode,
+                "reason": str(data.get("reason") or "")[:300],
+            }
+
+        assignments: List[dict] = []
+        for a in assignments_raw[:max_assignments]:
+            if not isinstance(a, dict):
+                continue
+            sq = normalize_subquery_text(a.get("subquery"))
+            if not sq:
+                continue
+            arms = self._normalize_arms(a.get("arms"))
+            try:
+                n_searches = int(a.get("searches") or 1)
+            except (TypeError, ValueError):
+                n_searches = 1
+            n_searches = max(1, min(n_searches, 3))
+            assignments.append(
+                {
+                    "subquery": sq,
+                    "arms": arms,
+                    "searches": n_searches,
+                }
+            )
+        if not assignments:
+            return {**fallback, "mode": mode, "reason": str(data.get("reason") or "")[:300]}
+
+        return {
+            "mode": mode,
+            "assignments": assignments,
+            "fallback": False,
+            "reason": str(data.get("reason") or "")[:300],
+        }
+
+    def supervise_dispatch(
+        self,
+        query: str,
+        subqueries: List[str],
+        strategy: str,
+        *,
+        budget: Dict[str, Any],
+        arm_hints: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        """Supervisor: LLM 一次调用产 DispatchPlan；失败 → fallback 规则计划。
+
+        fallback 计划 = 保持 decompose 的 strategy，assignments 为空（调用方全臂均分）。
+        ``arm_hints``（decompose 产出）作为派单强先验拼进 prompt，但不强制（LLM 可覆盖）。
+        """
+        max_assignments = max(1, int(self.cfg.get("supervise_max_assignments") or 3))
+        prompt_id = "agent_supervise"
+        sup = self.cfg.get("supervise")
+        if isinstance(sup, dict) and sup.get("prompt_id"):
+            prompt_id = str(sup["prompt_id"])
+        fallback = {
+            "mode": strategy,
+            "assignments": [],
+            "fallback": True,
+            "reason": "",
+        }
+
+        if int(budget.get("llm_calls_left") or 0) <= 0:
+            # 预算不足 → 不调 LLM，走规则派单
+            return fallback
+
+        try:
+            pv = self._get_active(prompt_id)
+            hints_json = (
+                json.dumps(dict(arm_hints or {}), ensure_ascii=False)
+                if isinstance(arm_hints, dict) and arm_hints
+                else "{}"
+            )
+            prompt = pv.render(
+                "template",
+                query=query,
+                subqueries=json.dumps(subqueries, ensure_ascii=False),
+                max_assignments=max_assignments,
+                max_total_searches=int(self.cfg.get("max_total_searches") or 3),
+                arm_hints=hints_json,
+            )
+            raw = self.complete_fn(prompt)
+            data = parse_json_object(raw)
+        except Exception as e:
+            logger.warning("supervise_dispatch failed (%s); fallback to rules", e)
+            return fallback
+
+        plan = self.validate_dispatch_plan(data, max_assignments=max_assignments)
+        if plan.get("fallback"):
+            plan["mode"] = plan["mode"] or strategy
+        return plan
 
     def grade_evidence(self, query: str, evidence: list) -> dict:
         """LLM JSON grade: sufficient / missing / score.

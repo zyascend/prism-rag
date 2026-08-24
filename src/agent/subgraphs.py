@@ -61,10 +61,13 @@ def build_retrieval_subgraph(
 
         evidence_delta: List[dict] = []
         n_searches = 0
+        arms = state.get("active_arms") or None
         for _ in range(n_allow):
             if not sq:
                 break
-            out = box.knowledge_search(sq, subquery_id=sq_id, top_k=top_k)
+            out = box.knowledge_search(
+                sq, subquery_id=sq_id, top_k=top_k, arms=arms
+            )
             hits = list(out.get("hits") or [])
             evidence_delta.extend(hits)
             n_searches += 1

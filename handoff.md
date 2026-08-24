@@ -1,3 +1,25 @@
+## 0⁹. Supervisor 派单（Phase 2 · 云上双臂 NO_GO · 默认关）
+
+| 项 | 内容 |
+|----|------|
+| **分支** | `feat/agent-supervisor`（PR #45） |
+| **代码** | supervise 子图 + `supervise_dispatch`/`validate_dispatch_plan` + `route_after_supervise` + `AgentToolBox.search_fns`/arms 透传 + `prepare_multi` 读 plan |
+| **配置** | `agent.supervise.enabled: false`（默认关，零行为变化） |
+| **验证** | 本地 `76 passed`（69 + 7 supervise 单测） |
+| **云上双臂** | [`runs/20260824-agent-eval-off/`](runs/20260824-agent-eval-off/) + [`runs/20260824-agent-eval-supervise/`](runs/20260824-agent-eval-supervise/) · SeetaCloud 4090D · 46q · 8/24 |
+| **主表** | off: Correct 0.630 / multi_hop 0.722 / reject 0.9 · on（arms 生效）: **0.565 / 0.611 / 0.8** · 误拒 4→6 · lat 6.5s→7.8s |
+| **门禁判定** | multi_hop ≥ 0.778 **FAIL**（0.611）；选臂真实生效后**全面变差**（-6.5pt Correct） |
+| **两轮验证** | 第一轮 arms 被架空（单臂注入退化全臂）→ off=on；第二轮 arms 透传修复 → supervise 选臂真实生效，**3 条 multi_hop 回归**（mh_001/009 被选臂后 abstain） |
+| **根因** | **qwen2:7b 对「该用哪个检索臂」判断不可靠**——选臂是负收益，只开单臂漏掉三路交叉 evidence → 误拒↑ |
+| **附带** | Phase1 evidence bug 修复真实增益：multi_hop 8/6 0.667 → off 0.722（+5.5pt）；agent 仍 < pipeline（0.630 vs 0.674）→ agent 保持默认关 |
+| **决策** | **supervise 不值得保留**（选臂真实生效时有害，非评测架空）。维持规则派单 + `agent.supervise.enabled: false`。除非换更强模型或「先粗召回再选臂」稳健设计再验证 |
+
+---
+
+## 0⁸. Agent 角色子图化（Phase 1 结构改造 · 行为零变化）
+
+---
+
 ## 0⁸. Agent 角色子图化（Phase 1 结构改造 · 行为零变化）
 
 | 项 | 内容 |
